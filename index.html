@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Geoportal Philippines Map Composer</title>
+
+    <!-- Inter Font from Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- OpenLayers CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@v8.0.0/ol.css" />
+    
+    <!-- Font Awesome 6.4.0 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    
+    <!-- External CSS -->
+    <link rel="stylesheet" href="style.css">
+    
+    <!-- Shpjs for Shapefile parsing -->
+    <script src="https://unpkg.com/shpjs@latest/dist/shp.js"></script>
+    
+    <!-- OpenLayers Library -->
+    <script src="https://cdn.jsdelivr.net/npm/ol@v8.0.0/dist/ol.js"></script>
+</head>
+<body>
+    <!-- TOP NAVIGATION -->
+    <nav class="navbar">
+        <div class="navbar-left">
+            <a href="#" class="app-brand">
+                <div class="app-logo">
+                    <img src="https://geoportal.gov.ph/viewer/assets/img/gplogo.png" alt="Geoportal Logo">
+                </div>
+                <div class="app-title">Geoportal Philippines Map Composer</div>
+            </a>
+        </div>
+
+        <div class="nav-controls">
+            <div class="basemap-selector">
+                <label><i class="fas fa-map"></i> Basemap:</label>
+                <select id="basemapSelect" onchange="changeBasemap(this.value)">
+                    <option value="namria">NAMRIA</option>
+                    <option value="osm">OpenStreetMap</option>
+                    <option value="google">Google</option>
+                    <option value="bing">Bing</option>
+                    <option value="stamen-terrain">Terrain</option>
+                    <option value="esri-satellite">Satellite</option>
+                </select>
+            </div>
+            <button class="btn btn-share" onclick="openModal('shareModal')"><i class="fas fa-share-alt"></i> Share</button>
+            <button class="btn btn-export" onclick="openModal('exportModal')"><i class="fas fa-download"></i> Export</button>
+        </div>
+    </nav>
+
+    <!-- MAIN CONTAINER -->
+    <div class="app-container">
+        <!-- LEFT SIDEBAR -->
+        <aside class="sidebar-left">
+            <div class="sidebar-header">
+                <div class="sidebar-title"><i class="fas fa-layer-group"></i> Layers</div>
+                <button class="btn-upload" onclick="openModal('uploadModal')"><i class="fas fa-plus"></i> Add Layer</button>
+            </div>
+            <div class="sidebar-content">
+                <div id="layerList" class="layer-list">
+                    <div class="empty-state">
+                        <div class="empty-state-icon"><i class="fas fa-folder-open"></i></div>
+                        <div class="empty-state-text">No layers loaded yet. Upload shapefiles to get started.</div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- MAIN CANVAS -->
+        <main class="canvas-area">
+            <div id="mapContainer"></div>
+
+            <!-- Zoom Controls -->
+            <div class="zoom-controls">
+                <button class="zoom-btn" id="zoomIn" title="Zoom In"><i class="fas fa-plus"></i></button>
+                <button class="zoom-btn" id="zoomOut" title="Zoom Out"><i class="fas fa-minus"></i></button>
+            </div>
+
+            <!-- Map Overlays -->
+            <div class="map-overlay">
+                <div class="north-arrow" title="North Arrow">
+    <svg width="36" height="36" viewBox="0 0 24 24">
+        <path d="M12 2 L16 10 L12 8 L8 10 Z" fill="#2563eb"/>
+        <text x="12" y="22" text-anchor="middle" font-size="10" fill="#2563eb" font-weight="700">N</text>
+    </svg>
+</div>
+                
+            </div>
+        </main>
+
+        <!-- RIGHT SIDEBAR -->
+        <aside class="sidebar-right">
+            <div class="right-sidebar-header">
+                <div class="right-sidebar-title"><i class="fas fa-toolbox"></i> Tools & Properties</div>
+                <div class="right-sidebar-subtitle">Map editing and analysis</div>
+            </div>
+
+            <div class="right-sidebar-content">
+                <!-- Annotation Tools -->
+                <div class="tool-section-group">
+                    <div class="tool-section-header" onclick="toggleSection(this)">
+                        <div class="tool-icon blue"><i class="fas fa-pen-fancy"></i></div>
+                        <div class="tool-section-info">
+                            <div class="tool-section-title">Annotation Tools</div>
+                            <div class="tool-section-desc">Add notes and labels</div>
+                        </div>
+                        <div style="color: var(--gray-400); font-size: 18px;">›</div>
+                    </div>
+                    <div class="tool-section-content collapsed">
+                        <div class="tool-buttons">
+                            <button class="tool-btn" onclick="activateAnnotation('text')">
+                                <span><i class="fas fa-font"></i> Add Text Annotation</span>
+                                <span class="tool-btn-arrow">›</span>
+                            </button>
+                            <button class="tool-btn" onclick="activateAnnotation('highlight')">
+                                <span><i class="fas fa-highlighter"></i> Highlight Feature</span>
+                                <span class="tool-btn-arrow">›</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Data Analysis -->
+                <div class="tool-section-group">
+                    <div class="tool-section-header" onclick="toggleSection(this)">
+                        <div class="tool-icon cyan"><i class="fas fa-chart-line"></i></div>
+                        <div class="tool-section-info">
+                            <div class="tool-section-title">Data Analysis</div>
+                            <div class="tool-section-desc">View and analyze data</div>
+                        </div>
+                        <div style="color: var(--gray-400); font-size: 18px;">›</div>
+                    </div>
+                    <div class="tool-section-content collapsed">
+                        <div class="tool-buttons">
+                            <button class="tool-btn" onclick="openAttributeTable()">
+                                <span><i class="fas fa-table"></i> Attribute Table</span>
+                                <span class="tool-btn-arrow">›</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Advanced Layers -->
+                <div class="tool-section-group">
+                    <div class="tool-section-header" onclick="toggleSection(this)">
+                        <div class="tool-icon purple"><i class="fas fa-flask-vial"></i></div>
+                        <div class="tool-section-info">
+                            <div class="tool-section-title">Advanced Layers</div>
+                            <div class="tool-section-desc">Add WMS and other sources</div>
+                        </div>
+                        <div style="color: var(--gray-400); font-size: 18px;">›</div>
+                    </div>
+                    <div class="tool-section-content collapsed">
+                        <div class="tool-buttons">
+                            <button class="tool-btn" onclick="openModal('wmsModal')">
+                                <span><i class="fas fa-globe"></i> Add WMS Layer</span>
+                                <span class="tool-btn-arrow">›</span>
+                            </button>
+                            <button class="tool-btn" onclick="showToast('Coming Soon', 'GeoTIFF support will be available soon', 'info')">
+                                <span><i class="fas fa-image"></i> Add GeoTIFF</span>
+                                <span class="tool-btn-arrow">›</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Map Settings -->
+                <div class="tool-section-group">
+                    <div class="tool-section-header" onclick="toggleSection(this)">
+                        <div class="tool-icon amber"><i class="fas fa-sliders"></i></div>
+                        <div class="tool-section-info">
+                            <div class="tool-section-title">Map Settings</div>
+                            <div class="tool-section-desc">Configure display options</div>
+                        </div>
+                        <div style="color: var(--gray-400); font-size: 18px;">›</div>
+                    </div>
+                    <div class="tool-section-content collapsed">
+                        <div style="font-size: 12px; display: flex; flex-direction: column; gap: var(--spacing-3);">
+                            <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-weight: 600;">
+                                <input type="checkbox" checked id="labelsToggle" style="width: 18px; height: 18px; accent-color: var(--accent);">
+                                <span>Show layer labels</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-weight: 600;">
+                                <input type="checkbox" checked id="scaleBarToggle" style="width: 18px; height: 18px; accent-color: var(--accent);">
+                                <span>Show scale bar</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-weight: 600;">
+                                <input type="checkbox" checked id="northArrowToggle" style="width: 18px; height: 18px; accent-color: var(--accent);">
+                                <span>Show north arrow</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quick Tips -->
+                <div class="quick-tips">
+                    <div class="quick-tips-header"><i class="fas fa-lightbulb"></i> Pro Tips</div>
+                    <div class="quick-tips-content">
+                        <div class="quick-tips-item">Scroll to zoom the map</div>
+                        <div class="quick-tips-item">Drag to pan around</div>
+                        <div class="quick-tips-item">Click features for info</div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <!-- MODALS -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <!-- Annotation Input Popup -->
+    <div id="annotationPopup" class="annotation-popup">
+        <div class="annotation-popup-title"><i class="fas fa-pen-fancy"></i> Add Text Annotation</div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <label style="font-size: 12px; font-weight: 600; color: var(--gray-600);">Font Size:</label>
+                <input type="number" id="annotationFontSize" class="form-input" value="12" min="8" max="48" style="width: 60px; padding: 6px;">
+                <span style="font-size: 11px; color: var(--gray-500);">px</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <label style="font-size: 12px; font-weight: 600; color: var(--gray-600);">Color:</label>
+                <input type="color" id="annotationFontColor" class="form-input" value="#000000" style="width: 50px; height: 36px; padding: 2px; cursor: pointer;">
+            </div>
+        </div>
+        <textarea id="annotationInput" class="annotation-input" placeholder="Enter your annotation text..."></textarea>
+        <div class="annotation-buttons">
+            <button class="annotation-btn" onclick="cancelAnnotation()">Cancel</button>
+            <button class="annotation-btn primary" onclick="submitAnnotation()">Add</button>
+        </div>
+    </div>
+
+    <!-- Upload Modal -->
+    <div class="modal-overlay" id="uploadModal">
+        <div class="modal">
+            <div class="modal-header">
+                <div class="modal-title"><i class="fas fa-cloud-arrow-up"></i> Add Geospatial Data</div>
+                <button class="modal-close" onclick="closeModal('uploadModal')">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <div class="form-label">Data Type</div>
+                    <select class="form-input" id="dataTypeSelect" onchange="updateDataSection()">
+                        <option value="shapefile">Shapefile (.zip)</option>
+                        <option value="geojson">GeoJSON (.json)</option>
+                        <option value="wms">WMS Layer</option>
+                        <option value="geotiff">GeoTIFF</option>
+                    </select>
+                </div>
+
+                <div id="shapefileSection" class="form-group">
+                    <div class="form-label">Select ZIP File</div>
+                    <div class="upload-area" onclick="document.getElementById('fileInput').click()">
+                        <div class="upload-icon"><i class="fas fa-file-zipper"></i></div>
+                        <div class="upload-text">Click to upload or drag and drop</div>
+                    </div>
+                    <div id="filePreview" class="file-preview">
+                        <div class="file-preview-icon"><i class="fas fa-file-zipper"></i></div>
+                        <div class="file-preview-info">
+                            <div class="file-preview-name" id="fileName"></div>
+                            <div class="file-preview-size" id="fileSize"></div>
+                        </div>
+                        <button class="file-preview-clear" onclick="clearFileSelection()" title="Clear file">&times;</button>
+                    </div>
+                    <input type="file" id="fileInput" style="display: none;" accept=".zip" onchange="handleFileSelect(event)">
+                </div>
+
+                <div id="geojsonSection" class="form-group" style="display: none;">
+                    <div class="form-label">Select GeoJSON File</div>
+                    <div class="upload-area" onclick="document.getElementById('geojsonInput').click()">
+                        <div class="upload-icon"><i class="fas fa-file-code"></i></div>
+                        <div class="upload-text">Click to upload GeoJSON file</div>
+                    </div>
+                    <div id="geojsonFilePreview" class="file-preview">
+                        <div class="file-preview-icon"><i class="fas fa-file-code"></i></div>
+                        <div class="file-preview-info">
+                            <div class="file-preview-name" id="geojsonFileName"></div>
+                            <div class="file-preview-size" id="geojsonFileSize"></div>
+                        </div>
+                        <button class="file-preview-clear" onclick="clearGeoJSONSelection()" title="Clear file">&times;</button>
+                    </div>
+                    <input type="file" id="geojsonInput" style="display: none;" accept=".json" onchange="handleGeoJSONSelect(event)">
+                </div>
+
+                <div class="form-group">
+                    <div class="form-label">Layer Name</div>
+                    <input type="text" class="form-input" placeholder="e.g., District Boundaries" id="layerName">
+                </div>
+
+                <div class="form-group">
+                    <div class="form-label">Layer Color</div>
+                    <input type="color" class="form-input" value="#2563eb" id="layerColor" style="height: 44px; cursor: pointer;">
+                </div>
+
+                <div id="uploadProgress" style="display: none;">
+                    <div style="font-size: 12px; color: var(--gray-600); margin-bottom: 10px; font-weight: 700;">Processing...</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill" style="width: 0%;"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('uploadModal')">Cancel</button>
+                <button class="btn btn-primary" id="submitBtn" onclick="submitUpload()"><i class="fas fa-upload"></i> Upload</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Export Modal -->
+    <div class="modal-overlay" id="exportModal">
+        <div class="modal">
+            <div class="modal-header">
+                <div class="modal-title"><i class="fas fa-download"></i> Export Map</div>
+                <button class="modal-close" onclick="closeModal('exportModal')">×</button>
+            </div>
+            <div class="modal-body">
+                <div id="mapPreviewContainer" style="background: linear-gradient(135deg, var(--gray-100), var(--gray-150)); height: 200px; border-radius: 10px; display: flex; align-items: center; justify-content: center; margin-bottom: var(--spacing-5); border: 1px solid var(--gray-200); position: relative; overflow: hidden;">
+                    <canvas id="mapPreviewCanvas" style="width: 100%; height: 100%; display: none;"></canvas>
+                    <div id="mapPreviewPlaceholder" style="text-align: center; color: var(--gray-400); position: absolute; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+                        <div style="font-size: 36px; margin-bottom: var(--spacing-3);"><i class="fas fa-map"></i></div>
+                        <div style="font-size: 13px; font-weight: 700;">Map Preview</div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <div class="form-label">Export Format</div>
+                    <select class="form-input" id="exportFormat">
+                        <option value="png">PNG (High Resolution)</option>
+                        <option value="jpeg">JPEG (Compressed)</option>
+                        <option value="pdf">PDF (Vector)</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <div class="form-label">Resolution</div>
+                    <select class="form-input" id="exportResolution">
+                        <option value="1920x1080">1920x1080 (Standard)</option>
+                        <option value="2560x1440">2560x1440 (High)</option>
+                        <option value="3840x2160">3840x2160 (4K)</option>
+                    </select>
+                </div>
+
+                <div class="warning-box">
+                    <i class="fas fa-info-circle"></i> Exported maps include data disclaimers. Temporary session data.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('exportModal')">Cancel</button>
+                <button class="btn btn-primary" onclick="downloadMap()"><i class="fas fa-download"></i> Download</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Share Modal -->
+    <div class="modal-overlay" id="shareModal">
+        <div class="modal">
+            <div class="modal-header">
+                <div class="modal-title"><i class="fas fa-share-nodes"></i> Share Map</div>
+                <button class="modal-close" onclick="closeModal('shareModal')">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <div class="form-label">Share Link</div>
+                    <div style="display: flex; gap: var(--spacing-2);">
+                        <input type="text" class="form-input" value="geoportal.gov.ph/map/12ab34cd" readonly>
+                        <button class="btn btn-primary" onclick="copyToClipboard()" style="white-space: nowrap;"><i class="fas fa-copy"></i> Copy</button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('shareModal')">Close</button>
+                <button class="btn btn-primary" onclick="generateLink()"><i class="fas fa-refresh"></i> New Link</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Attributes Modal -->
+    <div class="modal-overlay" id="attributesModal">
+        <div class="modal" style="max-width: 680px;">
+            <div class="modal-header">
+                <div class="modal-title"><i class="fas fa-table"></i> Attribute Table</div>
+                <button class="modal-close" onclick="closeModal('attributesModal')">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <input type="text" class="form-input" placeholder="🔍 Search...">
+                </div>
+                <div id="attributeTableContainer" style="border: 1px solid var(--gray-200); border-radius: 10px; overflow: auto; max-height: 450px;">
+                    <div style="padding: var(--spacing-8); text-align: center; color: var(--gray-500); font-size: 13px; font-weight: 700;">
+                        Select a layer to view attributes
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- WMS Layer Modal -->
+    <div class="modal-overlay" id="wmsModal">
+        <div class="modal">
+            <div class="modal-header">
+                <div class="modal-title"><i class="fas fa-globe"></i> Add WMS Layer</div>
+                <button class="modal-close" onclick="closeModal('wmsModal')">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <div class="form-label">WMS URL</div>
+                    <input type="text" class="form-input" id="wmsUrl" placeholder="e.g., http://wms.example.com/service?service=WMS&version=1.1.1&request=GetCapabilities">
+                </div>
+
+                <div class="form-group">
+                    <div class="form-label">Layer Name</div>
+                    <input type="text" class="form-input" id="wmsLayerName" placeholder="Enter WMS layer identifier">
+                </div>
+
+                <div class="form-group">
+                    <div class="form-label">Display Name (Optional)</div>
+                    <input type="text" class="form-input" id="wmsDisplayName" placeholder="e.g., Building Layer">
+                </div>
+
+                <div class="warning-box">
+                    <i class="fas fa-info-circle"></i> Ensure the WMS server supports CORS and is publicly accessible.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('wmsModal')">Cancel</button>
+                <button class="btn btn-primary" onclick="addWMSLayer()"><i class="fas fa-plus"></i> Add Layer</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- External JavaScript -->
+    <script src="main.js"></script>
+</body>
+</html>
