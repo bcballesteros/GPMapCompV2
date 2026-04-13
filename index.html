@@ -15,7 +15,8 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
     
     <!-- External CSS -->
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="src/styles/main.css">
+    <link rel="stylesheet" href="src/styles/components.css">
     
     <!-- Shpjs for Shapefile parsing -->
     <script src="https://unpkg.com/shpjs@latest/dist/shp.js"></script>
@@ -97,6 +98,15 @@
             <div class="right-sidebar-header">
                 <div class="right-sidebar-title"><i class="fas fa-toolbox"></i> Tools & Properties</div>
                 <div class="right-sidebar-subtitle">Map editing and analysis</div>
+            </div>
+            <!-- Annotation Controls (OUTSIDE MAP) -->
+            <div id="annotationControls" style="display:none; margin: 16px 0; padding: 12px; background: var(--gray-50); border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.04);">
+                <div style="font-weight:600; font-size:13px; margin-bottom:8px;">Selected Annotation</div>
+                <div style="display:flex; gap:10px;">
+                    <button id="editAnnotationBtn" class="tool-btn" style="background:var(--accent);color:white;" disabled><i class="fas fa-edit"></i> Edit</button>
+                    <button id="deleteAnnotationBtn" class="tool-btn" style="background:var(--error);color:white;" disabled><i class="fas fa-trash"></i> Delete</button>
+                    <button id="moveAnnotationBtn" class="tool-btn" style="background:var(--gray-400);color:white;" disabled><i class="fas fa-arrows-alt"></i> Move</button>
+                </div>
             </div>
 
             <div class="right-sidebar-content">
@@ -432,6 +442,6 @@
     </div>
 
     <!-- External JavaScript -->
-    <script src="main.js"></script>
+    <script type="module" src="src/main.js"></script>
 </body>
 </html>

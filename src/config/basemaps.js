@@ -1,0 +1,39 @@
+const NAMRIA_ATTRIBUTION = '\u00A9 NAMRIA';
+const ESRI_ATTRIBUTION = '\u00A9 Esri';
+
+export function createBasemapSource(name) {
+    switch (name) {
+        case 'osm':
+            return new ol.source.OSM();
+        case 'google':
+            return new ol.source.XYZ({
+                url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+                attributions: ESRI_ATTRIBUTION
+            });
+        case 'bing':
+            return new ol.source.XYZ({
+                url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}'
+            });
+        case 'stamen-terrain':
+            return new ol.source.XYZ({
+                url: 'https://tile.openstreetmap.de/tiles/osmde/{z}/{x}/{y}.png'
+            });
+        case 'esri-satellite':
+            return new ol.source.XYZ({
+                url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+                attributions: ESRI_ATTRIBUTION
+            });
+        case 'namria':
+        default:
+            return new ol.source.XYZ({
+                url: 'https://basemapserver.geoportal.gov.ph/tiles/v2/PGP/{z}/{x}/{y}.png',
+                attributions: NAMRIA_ATTRIBUTION
+            });
+    }
+}
+
+export function createBasemapLayer(name = 'namria') {
+    return new ol.layer.Tile({
+        source: createBasemapSource(name)
+    });
+}

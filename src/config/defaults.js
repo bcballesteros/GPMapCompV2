@@ -1,0 +1,4 @@
+export const DEFAULT_MAP_CENTER = [121.7740, 12.8797];
+export const DEFAULT_MAP_ZOOM = 6;
+export const DEFAULT_MAP_PROJECTION = 'EPSG:3857';
+export const DEFAULT_VIEW_PADDING = [50, 50, 50, 50];
