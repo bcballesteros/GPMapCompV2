@@ -7,6 +7,7 @@ import Point from 'ol/geom/Point.js';
 import TileLayer from 'ol/layer/Tile.js';
 import VectorLayer from 'ol/layer/Vector.js';
 import Select from 'ol/interaction/Select.js';
+import Translate from 'ol/interaction/Translate.js';
 import { defaults as defaultControls, Attribution, ScaleLine, Zoom } from 'ol/control.js';
 import { click } from 'ol/events/condition.js';
 import { isEmpty } from 'ol/extent.js';
@@ -42,7 +43,8 @@ const ol = {
         Vector: VectorLayer
     },
     interaction: {
-        Select
+        Select,
+        Translate
     },
     events: {
         condition: {

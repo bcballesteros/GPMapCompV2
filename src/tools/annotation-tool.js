@@ -9,7 +9,60 @@ let annotationClickListener = null;
 let selectedAnnotationMode = null;
 let selectedAnnotation = null;
 let annotationMoveMode = false;
-let draggedAnnotation = null;
+let annotationTranslateInteraction = null;
+const draggableAnnotations = new ol.Collection();
+
+function syncDraggableAnnotations() {
+    draggableAnnotations.clear();
+
+    if (selectedAnnotation?.get('isAnnotation')) {
+        draggableAnnotations.push(selectedAnnotation);
+    }
+}
+
+function setMoveMode(enabled) {
+    annotationMoveMode = enabled && !!selectedAnnotation;
+
+    if (annotationTranslateInteraction) {
+        annotationTranslateInteraction.setActive(annotationMoveMode);
+    }
+
+    const moveBtn = document.getElementById('moveAnnotationBtn');
+    if (moveBtn) {
+        moveBtn.classList.toggle('active', annotationMoveMode);
+    }
+
+    const viewport = getMap()?.getViewport();
+    if (viewport) {
+        viewport.style.cursor = annotationMoveMode ? 'grab' : '';
+    }
+}
+
+export function initializeAnnotationInteractions() {
+    if (annotationTranslateInteraction || !getMap()) {
+        return;
+    }
+
+    annotationTranslateInteraction = new ol.interaction.Translate({
+        features: draggableAnnotations
+    });
+    annotationTranslateInteraction.setActive(false);
+
+    annotationTranslateInteraction.on('translatestart', () => {
+        const viewport = getMap()?.getViewport();
+        if (viewport) {
+            viewport.style.cursor = 'grabbing';
+        }
+    });
+
+    annotationTranslateInteraction.on('translateend', () => {
+        ensureAnnotationLayer().layer.changed();
+        setMoveMode(false);
+        showToast('Moved', 'Annotation moved to new location', 'success', 1200);
+    });
+
+    getMap().addInteraction(annotationTranslateInteraction);
+}
 
 function resetAnnotationPlacement() {
     annotationMode = false;
@@ -115,8 +168,7 @@ export function editAnnotation(feature) {
         return;
     }
 
-    annotationMoveMode = false;
-    document.getElementById('moveAnnotationBtn')?.classList.remove('active');
+    setMoveMode(false);
 
     const text = feature.get('text');
     const fontSize = feature.get('fontSize') || 12;
@@ -205,11 +257,11 @@ export function deleteAnnotation(feature) {
         return;
     }
 
-    annotationMoveMode = false;
-    document.getElementById('moveAnnotationBtn')?.classList.remove('active');
+    setMoveMode(false);
     annotationLayer.source.removeFeature(feature);
     selectedAnnotation = null;
     setSelectedFeature(null);
+    syncDraggableAnnotations();
 
     updateAnnotationControls();
     showToast('Removed', 'Annotation deleted', 'info', 1500);
@@ -238,9 +290,16 @@ export function selectAnnotationForDeletion(event) {
 
     selectedAnnotation = hitFeatures.length > 0 ? hitFeatures[0] : null;
     setSelectedFeature(selectedAnnotation);
+    syncDraggableAnnotations();
 
     if (selectedAnnotation) {
         selectedAnnotation.set('selected', true);
+    }
+
+    if (!selectedAnnotation) {
+        setMoveMode(false);
+    } else if (annotationMoveMode) {
+        setMoveMode(true);
     }
 
     updateAnnotationControls();
@@ -273,29 +332,6 @@ export function updateAnnotationControls() {
     }
 }
 
-export function handlePointerDown() {
-    if (annotationMoveMode && selectedAnnotation?.get('isAnnotation')) {
-        draggedAnnotation = selectedAnnotation;
-        getMap().getViewport().style.cursor = 'grabbing';
-    }
-}
-
-export function handlePointerMove(event) {
-    if (annotationMoveMode && draggedAnnotation) {
-        draggedAnnotation.getGeometry().setCoordinates(event.coordinate);
-    }
-}
-
-export function handlePointerUp() {
-    if (annotationMoveMode && draggedAnnotation) {
-        draggedAnnotation = null;
-        getMap().getViewport().style.cursor = 'default';
-        annotationMoveMode = false;
-        document.getElementById('moveAnnotationBtn').classList.remove('active');
-        showToast('Moved', 'Annotation moved to new location', 'success', 1200);
-    }
-}
-
 export function bindAnnotationControls() {
     const editBtn = document.getElementById('editAnnotationBtn');
     const deleteBtn = document.getElementById('deleteAnnotationBtn');
@@ -325,12 +361,11 @@ export function bindAnnotationControls() {
                 return;
             }
 
-            annotationMoveMode = !annotationMoveMode;
-            if (annotationMoveMode) {
-                moveBtn.classList.add('active');
+            const nextMoveMode = !annotationMoveMode;
+            setMoveMode(nextMoveMode);
+
+            if (nextMoveMode) {
                 showToast('Move', 'Drag the annotation to move it', 'info', 2000);
-            } else {
-                moveBtn.classList.remove('active');
             }
         };
     }

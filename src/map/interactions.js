@@ -42,9 +42,6 @@ export function setupMapInteractions({ getSelectedAnnotationMode, onAnnotationSe
     });
 
     map.addInteraction(select);
-    map.on('pointerdown', onPointerDown);
-    map.on('pointermove', onPointerMove);
-    map.on('pointerup', onPointerUp);
     map.on('click', onAnnotationSelect);
 
     return select;

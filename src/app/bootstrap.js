@@ -1,4 +1,4 @@
-import { activateAnnotation, bindAnnotationControls, cancelAnnotation, deleteAnnotation, editAnnotation, getSelectedAnnotationMode, handlePointerDown, handlePointerMove, handlePointerUp, selectAnnotationForDeletion, submitAnnotation } from '../tools/annotation-tool.js';
+import { activateAnnotation, bindAnnotationControls, cancelAnnotation, deleteAnnotation, editAnnotation, getSelectedAnnotationMode, initializeAnnotationInteractions, selectAnnotationForDeletion, submitAnnotation } from '../tools/annotation-tool.js';
 import { copyToClipboard, downloadMap, generateLink, renderMapPreview } from '../tools/export-share.js';
 import { initializeMap } from '../map/map-init.js';
 import { changeBasemapLayer } from '../map/layer-manager.js';
@@ -50,11 +50,9 @@ export function bootstrapApp() {
     bindModalOverlayDismissal();
     initializeMap({
         getSelectedAnnotationMode,
-        onAnnotationSelect: selectAnnotationForDeletion,
-        onPointerDown: handlePointerDown,
-        onPointerMove: handlePointerMove,
-        onPointerUp: handlePointerUp
+        onAnnotationSelect: selectAnnotationForDeletion
     });
+    initializeAnnotationInteractions();
     bindAnnotationControls();
     bindGlobalHandlers();
     bindAnnotationPopupDismissal(cancelAnnotation);
