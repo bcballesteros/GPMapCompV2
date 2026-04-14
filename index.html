@@ -4,6 +4,128 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Geoportal Philippines Map Composer</title>
+    <style>
+        :root {
+            color-scheme: light;
+            --startup-bg: #f9fafb;
+            --startup-surface: rgba(255, 255, 255, 0.96);
+            --startup-text: #111827;
+            --startup-muted: #6b7280;
+            --startup-ring: rgba(37, 99, 235, 0.12);
+        }
+
+        html,
+        body {
+            margin: 0;
+            min-height: 100%;
+            background: var(--startup-bg);
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+        }
+
+        body.app-booting {
+            overflow: hidden;
+        }
+
+        body.app-booting .navbar,
+        body.app-booting .app-container,
+        body.app-booting #toastContainer,
+        body.app-booting .annotation-popup,
+        body.app-booting .modal-overlay {
+            visibility: hidden;
+        }
+
+        .startup-splash {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            background:
+                radial-gradient(circle at top, rgba(37, 99, 235, 0.12), transparent 45%),
+                linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%);
+            z-index: 4000;
+            transition: opacity 0.24s ease, visibility 0.24s ease;
+        }
+
+        .startup-card {
+            width: min(100%, 420px);
+            padding: 28px 24px;
+            border-radius: 20px;
+            background: var(--startup-surface);
+            box-shadow: 0 18px 40px rgba(15, 23, 42, 0.12);
+            border: 1px solid var(--startup-ring);
+            text-align: center;
+            backdrop-filter: blur(10px);
+        }
+
+        .startup-logo {
+            width: 56px;
+            height: 56px;
+            margin: 0 auto 16px;
+            display: grid;
+            place-items: center;
+            border-radius: 16px;
+            background: linear-gradient(135deg, #2563eb 0%, #0891b2 100%);
+            overflow: hidden;
+            box-shadow: 0 10px 24px rgba(37, 99, 235, 0.24);
+        }
+
+        .startup-logo img {
+            width: 56px;
+            height: 56px;
+            padding: 10px;
+            object-fit: contain;
+            display: block;
+        }
+
+        .startup-title {
+            color: var(--startup-text);
+            font-size: 18px;
+            font-weight: 700;
+            line-height: 1.3;
+        }
+
+        .startup-subtitle {
+            margin-top: 8px;
+            color: var(--startup-muted);
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        .startup-loader {
+            width: 84px;
+            height: 4px;
+            margin: 18px auto 0;
+            border-radius: 999px;
+            overflow: hidden;
+            background: rgba(148, 163, 184, 0.2);
+        }
+
+        .startup-loader::before {
+            content: "";
+            display: block;
+            width: 40%;
+            height: 100%;
+            border-radius: inherit;
+            background: linear-gradient(90deg, #2563eb, #60a5fa);
+            animation: startup-load 1.1s ease-in-out infinite;
+        }
+
+        body.app-ready .startup-splash {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+
+        @keyframes startup-load {
+            0% { transform: translateX(-120%); }
+            100% { transform: translateX(300%); }
+        }
+    </style>
 
     <!-- Inter Font from Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
@@ -11,13 +133,33 @@
     <!-- Font Awesome 6.4.0 -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
 </head>
-<body>
+<body class="app-booting">
+    <div class="startup-splash" aria-live="polite" aria-label="Loading application">
+        <div class="startup-card">
+            <div class="startup-logo">
+                <img
+                    src="https://geoportal.gov.ph/viewer/assets/img/gplogo.png"
+                    alt="Geoportal Logo"
+                    width="56"
+                    height="56"
+                >
+            </div>
+            <div class="startup-title">Geoportal Philippines Map Composer</div>
+            <div class="startup-subtitle">Preparing the map workspace and loading interface assets.</div>
+            <div class="startup-loader" aria-hidden="true"></div>
+        </div>
+    </div>
     <!-- TOP NAVIGATION -->
     <nav class="navbar">
         <div class="navbar-left">
             <a href="#" class="app-brand">
                 <div class="app-logo">
-                    <img src="https://geoportal.gov.ph/viewer/assets/img/gplogo.png" alt="Geoportal Logo">
+                    <img
+                        src="https://geoportal.gov.ph/viewer/assets/img/gplogo.png"
+                        alt="Geoportal Logo"
+                        width="44"
+                        height="44"
+                    >
                 </div>
                 <div class="app-title">Geoportal Philippines Map Composer</div>
             </a>

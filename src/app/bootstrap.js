@@ -9,6 +9,22 @@ import { openAttributeTable } from '../ui/sidebar.js';
 import { showToast } from '../ui/toast.js';
 import { bindAnnotationPopupDismissal } from '../ui/toolbar.js';
 
+function revealAppShell() {
+    const markReady = () => {
+        document.body.classList.remove('app-booting');
+        document.body.classList.add('app-ready');
+    };
+
+    if (typeof window.requestAnimationFrame === 'function') {
+        window.requestAnimationFrame(() => {
+            window.requestAnimationFrame(markReady);
+        });
+        return;
+    }
+
+    markReady();
+}
+
 function openModalWithHooks(modalId) {
     openModal(modalId, {
         onOpen: modalId === 'exportModal'
@@ -56,4 +72,5 @@ export function bootstrapApp() {
     bindAnnotationControls();
     bindGlobalHandlers();
     bindAnnotationPopupDismissal(cancelAnnotation);
+    revealAppShell();
 }
