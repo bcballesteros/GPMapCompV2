@@ -1,6 +1,7 @@
 import { getMap } from '../state/store.js';
 import { showToast } from '../ui/toast.js';
 import { applyLabelsVisibility } from '../tools/labels-tool.js';
+import ol from '../lib/ol.js';
 
 function createScaleControl() {
     return new ol.control.ScaleLine({

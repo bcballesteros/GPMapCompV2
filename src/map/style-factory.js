@@ -1,4 +1,5 @@
 import { DEFAULT_STYLE_OPACITY } from '../config/constants.js';
+import ol from '../lib/ol.js';
 
 export function hexToRgba(hex, alpha) {
     const r = parseInt(hex.slice(1, 3), 16);

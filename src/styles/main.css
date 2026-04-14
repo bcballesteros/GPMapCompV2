@@ -888,37 +888,44 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
     right: 0;
     bottom: 0;
     background: rgba(0, 0, 0, 0.5);
-    display: none;
     align-items: center;
     justify-content: center;
     z-index: 1000;
-    backdrop-filter: blur(4px);
+    backdrop-filter: blur(2px);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.22s ease;
+    will-change: opacity;
 }
 
 .modal-overlay.active {
     display: flex;
+    visibility: visible;
+    pointer-events: auto;
+}
+
+.modal-overlay.visible {
+    opacity: 1;
 }
 
 .modal {
     background: white;
     border-radius: 14px;
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 16px 28px rgba(0, 0, 0, 0.18);
     max-width: 520px;
     width: 90%;
     max-height: 90vh;
     overflow-y: auto;
-    animation: slideUp 0.3s ease;
+    opacity: 0;
+    transform: translate3d(0, 16px, 0) scale(0.985);
+    transition: opacity 0.22s ease, transform 0.22s ease;
+    will-change: opacity, transform;
 }
 
-@keyframes slideUp {
-    from {
-        transform: translateY(20px);
-        opacity: 0;
-    }
-    to {
-        transform: translateY(0);
-        opacity: 1;
-    }
+.modal-overlay.visible .modal {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
 }
 
 .modal-header {
@@ -1064,6 +1071,40 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
     color: #92400e;
     margin-top: var(--spacing-3);
     font-weight: 600;
+}
+
+.export-preview-shell {
+    background: linear-gradient(135deg, var(--gray-100), var(--gray-150));
+    height: 200px;
+    border-radius: 10px;
+    margin-bottom: var(--spacing-5);
+    border: 1px solid var(--gray-200);
+    position: relative;
+    overflow: hidden;
+}
+
+.export-preview-map {
+    width: 100%;
+    height: 100%;
+}
+
+.export-preview-placeholder {
+    text-align: center;
+    color: var(--gray-400);
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, var(--gray-100), var(--gray-150));
+    opacity: 1;
+    transition: opacity 0.18s ease;
+    pointer-events: none;
+}
+
+.export-preview-shell.ready .export-preview-placeholder {
+    opacity: 0;
 }
 
 /* File Preview */

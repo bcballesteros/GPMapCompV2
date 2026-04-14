@@ -1,3 +1,4 @@
+import shp from 'shpjs';
 import { geojsonToOpenLayers } from '../utils/geo.js';
 
 export async function readShapefile(file) {

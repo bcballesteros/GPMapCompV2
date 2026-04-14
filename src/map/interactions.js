@@ -1,4 +1,5 @@
 import { ANNOTATION_LAYER_ID } from '../config/constants.js';
+import ol from '../lib/ol.js';
 import { getMap, getState } from '../state/store.js';
 import { createFeatureStyle } from './style-factory.js';
 import { findLayerNameByLayer } from './layer-manager.js';

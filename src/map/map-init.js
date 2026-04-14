@@ -1,5 +1,6 @@
 import { createBasemapLayer } from '../config/basemaps.js';
 import { DEFAULT_MAP_CENTER, DEFAULT_MAP_PROJECTION, DEFAULT_MAP_ZOOM } from '../config/defaults.js';
+import ol from '../lib/ol.js';
 import { setMap } from '../state/store.js';
 import { setupMapControls } from './controls.js';
 import { setupMapInteractions } from './interactions.js';

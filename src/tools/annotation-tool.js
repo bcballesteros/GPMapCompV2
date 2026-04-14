@@ -1,4 +1,5 @@
 import { ANNOTATION_LAYER_ID } from '../config/constants.js';
+import ol from '../lib/ol.js';
 import { ensureAnnotationLayer } from '../map/layer-manager.js';
 import { getLayerRecord, getMap, removeLayerRecord, setAnnotationMode, setSelectedFeature, setSelectedTool } from '../state/store.js';
 import { showToast } from '../ui/toast.js';

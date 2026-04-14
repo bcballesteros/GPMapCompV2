@@ -1,3 +1,6 @@
+import shp from 'shpjs';
+import ol from '../lib/ol.js';
+
 export async function processShapefile(file) {
     const arrayBuffer = await file.arrayBuffer();
     return shp(arrayBuffer);

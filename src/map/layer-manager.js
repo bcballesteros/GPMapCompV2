@@ -1,5 +1,6 @@
 import { DEFAULT_LAYER_COLOR, DEFAULT_VECTOR_OPACITY, ANNOTATION_LAYER_ID } from '../config/constants.js';
 import { DEFAULT_VIEW_PADDING } from '../config/defaults.js';
+import ol from '../lib/ol.js';
 import { createBasemapSource } from '../config/basemaps.js';
 import { getLayerRecord, getMap, getState, removeLayerRecord, setActiveBasemap, setCurrentLayerName, setLayerRecord } from '../state/store.js';
 import { createAnnotationStyle, createFeatureStyle } from './style-factory.js';

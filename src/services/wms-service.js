@@ -1,3 +1,5 @@
+import ol from '../lib/ol.js';
+
 export function createWmsLayerConfig(wmsUrl, wmsLayerName) {
     let baseUrl = wmsUrl.includes('?') ? wmsUrl.split('?')[0] : wmsUrl;
     if (!baseUrl.endsWith('/')) {

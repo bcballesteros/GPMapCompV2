@@ -8,12 +8,11 @@ import { bindModalOverlayDismissal, closeModal, openModal, toggleSection } from 
 import { openAttributeTable } from '../ui/sidebar.js';
 import { showToast } from '../ui/toast.js';
 import { bindAnnotationPopupDismissal } from '../ui/toolbar.js';
-import { MAP_PREVIEW_DELAY_MS } from '../config/constants.js';
 
 function openModalWithHooks(modalId) {
     openModal(modalId, {
         onOpen: modalId === 'exportModal'
-            ? () => setTimeout(() => renderMapPreview(), MAP_PREVIEW_DELAY_MS)
+            ? () => renderMapPreview()
             : undefined
     });
 }

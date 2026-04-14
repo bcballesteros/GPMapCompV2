@@ -1,3 +1,5 @@
+import ol from '../lib/ol.js';
+
 const NAMRIA_ATTRIBUTION = '\u00A9 NAMRIA';
 const ESRI_ATTRIBUTION = '\u00A9 Esri';
 
@@ -13,15 +15,6 @@ export function createBasemapSource(name) {
         case 'bing':
             return new ol.source.XYZ({
                 url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}'
-            });
-        case 'stamen-terrain':
-            return new ol.source.XYZ({
-                url: 'https://tile.openstreetmap.de/tiles/osmde/{z}/{x}/{y}.png'
-            });
-        case 'esri-satellite':
-            return new ol.source.XYZ({
-                url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-                attributions: ESRI_ATTRIBUTION
             });
         case 'namria':
         default:
