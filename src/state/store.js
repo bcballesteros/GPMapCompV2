@@ -1,3 +1,4 @@
+
 const state = {
     map: null,
     activeBasemap: 'namria',

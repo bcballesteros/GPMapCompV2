@@ -11,10 +11,27 @@ export async function readGeoJSON(file) {
     return JSON.parse(text);
 }
 
+/**
+ * shpjs can return either a single FeatureCollection or an array of them
+ * (one per .shp file inside the zip). Normalize to a single FeatureCollection
+ * so the rest of the app always works with one consistent shape.
+ */
+function normalizeGeojson(raw) {
+    if (Array.isArray(raw)) {
+        // Merge all FeatureCollections into one
+        const allFeatures = raw.flatMap((fc) => (fc?.features ?? []));
+        return { type: 'FeatureCollection', features: allFeatures };
+    }
+    // Already a FeatureCollection
+    return raw;
+}
+
 export async function parseUploadFile(layerData) {
-    const geojson = layerData.type === 'shapefile'
+    const raw = layerData.type === 'shapefile'
         ? await readShapefile(layerData.file)
         : await readGeoJSON(layerData.file);
+
+    const geojson = normalizeGeojson(raw);
 
     return {
         geojson,

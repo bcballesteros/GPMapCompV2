@@ -12,12 +12,18 @@ export function openAttributeTable() {
     const layerName = activeLayer.querySelector('.layer-name').textContent;
     const record = getLayerRecord(layerName);
 
-    if (!record?.geojson?.features?.length) {
-        showToast('Error', 'Layer has no features', 'error');
+    // Normalize geojson: shpjs may have stored an array of FeatureCollections
+    let geojson = record?.geojson;
+    if (Array.isArray(geojson)) {
+        geojson = { type: 'FeatureCollection', features: geojson.flatMap((fc) => fc?.features ?? []) };
+    }
+
+    if (!geojson?.features?.length) {
+        showToast('No Data', 'This layer has no attribute data to display', 'warning', 2000);
         return;
     }
 
-    const features = record.geojson.features;
+    const features = geojson.features;
     const propertyKeys = new Set();
 
     features.forEach((feature) => {
