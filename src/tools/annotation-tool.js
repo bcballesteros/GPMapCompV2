@@ -36,6 +36,8 @@ function setMoveMode(enabled) {
     if (viewport) {
         viewport.style.cursor = annotationMoveMode ? 'grab' : '';
     }
+
+    updateAnnotationControls();
 }
 
 export function initializeAnnotationInteractions() {
@@ -69,6 +71,10 @@ function resetAnnotationPlacement() {
     selectedAnnotationMode = null;
     setAnnotationMode(null);
     setSelectedTool(null);
+    const viewport = getMap()?.getViewport();
+    if (viewport && !annotationMoveMode) {
+        viewport.style.cursor = '';
+    }
 
     if (annotationClickListener) {
         getMap().un('click', annotationClickListener);
@@ -82,6 +88,7 @@ export function getSelectedAnnotationMode() {
 
 export function activateAnnotation(type) {
     if (type === 'text') {
+        setMoveMode(false);
         selectedAnnotationMode = 'text';
         annotationMode = true;
         setAnnotationMode('text');
@@ -110,6 +117,7 @@ export function activateAnnotation(type) {
     }
 
     if (type === 'highlight') {
+        setMoveMode(false);
         selectedAnnotationMode = 'highlight';
         setAnnotationMode('highlight');
         setSelectedTool('annotation:highlight');
@@ -161,6 +169,7 @@ export function cancelAnnotation() {
     delete input.dataset.y;
 
     resetAnnotationPlacement();
+    updateAnnotationControls();
 }
 
 export function editAnnotation(feature) {
@@ -310,17 +319,26 @@ export function updateAnnotationControls() {
     const editBtn = document.getElementById('editAnnotationBtn');
     const deleteBtn = document.getElementById('deleteAnnotationBtn');
     const moveBtn = document.getElementById('moveAnnotationBtn');
+    const hint = document.querySelector('.annotation-controls-hint');
 
     if (selectedAnnotation) {
         controls.style.display = '';
         editBtn.disabled = false;
         deleteBtn.disabled = false;
         moveBtn.disabled = false;
+        if (hint) {
+            hint.textContent = annotationMoveMode
+                ? 'Drag the selected annotation on the map. Click Move again to finish repositioning.'
+                : 'Selected annotation is ready. Use Edit to change text, Move to reposition, or Delete to remove it.';
+        }
     } else {
         controls.style.display = 'none';
         editBtn.disabled = true;
         deleteBtn.disabled = true;
         moveBtn.disabled = true;
+        if (hint) {
+            hint.textContent = 'Select an annotation on the map to edit its text, move its position, or remove it.';
+        }
     }
 
     const annotationLayer = getLayerRecord(ANNOTATION_LAYER_ID);

@@ -1,4 +1,5 @@
 import { getMap } from '../state/store.js';
+import { DEFAULT_MAP_CENTER, DEFAULT_MAP_ZOOM } from '../config/defaults.js';
 import { showToast } from '../ui/toast.js';
 import { applyLabelsVisibility } from '../tools/labels-tool.js';
 import ol from '../lib/ol.js';
@@ -25,6 +26,8 @@ export function setupMapControls(map) {
     map.addControl(scaleControl);
     removeDefaultZoomControl(map);
 
+    const resetViewBtn = document.getElementById('resetView');
+
     document.getElementById('zoomIn').addEventListener('click', () => {
         const view = getMap().getView();
         view.setZoom(view.getZoom() + 1);
@@ -33,6 +36,17 @@ export function setupMapControls(map) {
     document.getElementById('zoomOut').addEventListener('click', () => {
         const view = getMap().getView();
         view.setZoom(view.getZoom() - 1);
+    });
+
+    resetViewBtn?.addEventListener('click', () => {
+        const view = getMap().getView();
+        view.animate({
+            center: ol.proj.fromLonLat(DEFAULT_MAP_CENTER),
+            zoom: DEFAULT_MAP_ZOOM,
+            rotation: 0,
+            duration: 350
+        });
+        showToast('View Reset', 'Map view returned to the default extent', 'info', 1500);
     });
 
     document.getElementById('labelsToggle').addEventListener('change', (event) => {

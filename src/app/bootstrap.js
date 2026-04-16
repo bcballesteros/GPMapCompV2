@@ -6,6 +6,7 @@ import { clearFileSelection, clearGeoJSONSelection, handleFileSelect, handleGeoJ
 import { removeLayer, selectLayer, updateLayerColor, updateLayerOpacity } from '../ui/layers-panel.js';
 import { bindModalOverlayDismissal, closeModal, openModal, toggleSection } from '../ui/modal.js';
 import { openAttributeTable } from '../ui/sidebar.js';
+import { initializeWorkspaceStatus } from '../ui/workspace-status.js';
 import { showToast } from '../ui/toast.js';
 import { bindAnnotationPopupDismissal } from '../ui/toolbar.js';
 
@@ -70,6 +71,7 @@ export function bootstrapApp() {
     });
     initializeAnnotationInteractions();
     bindAnnotationControls();
+    initializeWorkspaceStatus();
     bindGlobalHandlers();
     bindAnnotationPopupDismissal(cancelAnnotation);
     revealAppShell();

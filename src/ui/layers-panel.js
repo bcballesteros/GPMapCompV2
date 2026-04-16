@@ -7,8 +7,10 @@ import { showToast } from './toast.js';
 function getEmptyStateMarkup() {
     return `
         <div class="empty-state">
-            <div class="empty-state-icon"><i class="fas fa-folder-open"></i></div>
-            <div class="empty-state-text">No layers loaded yet. Upload shapefiles to get started.</div>
+            <div class="empty-state-icon" aria-hidden="true"><i class="fas fa-layer-group"></i></div>
+            <div class="empty-state-title">No layers in this workspace</div>
+            <div class="empty-state-text">Add a dataset to start styling, inspecting, and exporting your map composition.</div>
+            <div class="empty-state-formats">Supported formats: Shapefile (.zip), GeoJSON (.json), WMS, GeoTIFF</div>
         </div>
     `;
 }
@@ -37,7 +39,7 @@ export function addLayerItem(name, color, featureCount, options = {}) {
 
     const layerHTML = `
         <div class="layer-item" onclick="selectLayer(this)">
-            <input type="checkbox" class="layer-toggle" checked>
+            <input type="checkbox" class="layer-toggle" checked title="Toggle layer visibility">
             <div class="layer-info">
                 <div class="layer-name">${name}</div>
                 <div class="layer-stats">${statsText}</div>
@@ -46,7 +48,7 @@ export function addLayerItem(name, color, featureCount, options = {}) {
                     <div class="control-row">
                         <span>Opacity:</span>
                         <div class="transparency-control" style="flex: 1;">
-                            <input type="range" class="transparency-slider" min="0" max="100" value="100" onchange="updateLayerOpacity(this)">
+                            <input type="range" class="transparency-slider" min="0" max="100" value="100" onchange="updateLayerOpacity(this)" title="Adjust layer opacity">
                         </div>
                         <span style="width: 35px; text-align: right;">100%</span>
                     </div>
@@ -61,6 +63,7 @@ export function addLayerItem(name, color, featureCount, options = {}) {
     layerList.insertAdjacentHTML('beforeend', layerHTML);
 
     const newItem = layerList.lastElementChild;
+    selectLayer(newItem);
     const checkbox = newItem.querySelector('.layer-toggle');
     checkbox.addEventListener('change', (event) => {
         event.stopPropagation();
@@ -104,6 +107,7 @@ export function removeLayer(event) {
 
     const layerItem = event.target.closest('.layer-item');
     const layerName = layerItem.querySelector('.layer-name').textContent;
+    const wasActive = layerItem.classList.contains('active');
     removeManagedLayer(layerName);
 
     layerItem.remove();
@@ -112,6 +116,13 @@ export function removeLayer(event) {
     if (layerList.children.length === 0) {
         layerList.innerHTML = getEmptyStateMarkup();
         setCurrentLayerName(null);
+    } else if (wasActive) {
+        const nextItem = layerList.querySelector('.layer-item');
+        if (nextItem) {
+            selectLayer(nextItem);
+        } else {
+            setCurrentLayerName(null);
+        }
     }
 
     showToast('Layer Removed', `${layerName} has been removed from the map`, 'info', 2000);
