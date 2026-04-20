@@ -1,6 +1,5 @@
 import { getLayerRecord } from '../state/store.js';
 import { updateManagedLayerStyle } from '../map/layer-manager.js';
-import { createFeatureStyle } from '../map/style-factory.js';
 import { showToast } from '../ui/toast.js';
 
 export function updateLayerOpacity(slider) {
@@ -10,14 +9,37 @@ export function updateLayerOpacity(slider) {
     const layerName = layerItem.querySelector('.layer-name').textContent;
     const record = getLayerRecord(layerName);
 
-    slider.parentElement.nextElementSibling.textContent = `${opacityPercent}%`;
+    const valueEl = layerItem?.querySelector('.transparency-value');
+    if (valueEl) {
+        valueEl.textContent = `${opacityPercent}%`;
+    }
 
     if (!record) {
         return;
     }
 
     record.opacity = opacityDecimal;
-    updateManagedLayerStyle(layerName, () => createFeatureStyle(record.color, opacityDecimal));
+    updateManagedLayerStyle(layerName);
+    slider.dataset.lastOpacityValue = String(opacityPercent);
+    slider.dataset.opacityDirty = 'true';
+}
 
-    showToast('Opacity Updated', `Layer opacity set to ${opacityPercent}%`, 'success', 2000);
+export function commitLayerOpacity(slider) {
+    const layerItem = slider.closest('.layer-item');
+    const layerName = layerItem?.querySelector('.layer-name')?.textContent;
+    const opacityPercent = Number(slider.value);
+
+    if (!layerName || slider.dataset.opacityDirty !== 'true') {
+        return;
+    }
+
+    const commitKey = `${layerName}:${opacityPercent}`;
+    if (slider.dataset.lastOpacityToastKey === commitKey) {
+        slider.dataset.opacityDirty = 'false';
+        return;
+    }
+
+    slider.dataset.lastOpacityToastKey = commitKey;
+    slider.dataset.opacityDirty = 'false';
+    showToast('Opacity Updated', `Opacity updated to ${opacityPercent}%`, 'success', 2000);
 }

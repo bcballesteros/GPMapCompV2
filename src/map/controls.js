@@ -1,7 +1,7 @@
 import { getMap } from '../state/store.js';
 import { DEFAULT_MAP_CENTER, DEFAULT_MAP_ZOOM } from '../config/defaults.js';
 import { showToast } from '../ui/toast.js';
-import { applyLabelsVisibility } from '../tools/labels-tool.js';
+import { applyLabelsVisibility, syncLabelsToggle } from '../tools/labels-tool.js';
 import ol from '../lib/ol.js';
 
 function createScaleControl() {
@@ -25,6 +25,7 @@ export function setupMapControls(map) {
     const scaleControl = createScaleControl();
     map.addControl(scaleControl);
     removeDefaultZoomControl(map);
+    syncLabelsToggle();
 
     const resetViewBtn = document.getElementById('resetView');
 

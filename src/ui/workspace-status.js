@@ -1,43 +1,27 @@
-import { DEFAULT_MAP_PROJECTION } from '../config/defaults.js';
-import ol from '../lib/ol.js';
 import { getLayerRecord, getMap, getState } from '../state/store.js';
 
 function getStatusElement(id) {
     return document.getElementById(id);
 }
 
-function formatCoordinatePair(coordinate) {
-    if (!coordinate) {
-        return 'Move cursor over map';
-    }
-
-    const lonLat = ol.proj.transform(coordinate, DEFAULT_MAP_PROJECTION, 'EPSG:4326');
-    const [lon, lat] = lonLat;
-
-    return `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
-}
-
-function formatScale(view) {
-    const projection = view?.getProjection?.();
-    const resolution = view?.getResolution?.();
-    if (!projection || !resolution) {
-        return '--';
-    }
-
-    const metersPerUnit = projection.getMetersPerUnit?.() || 1;
-    const dpi = 25.4 / 0.28;
-    const inchesPerMeter = 39.37;
-    const scale = resolution * metersPerUnit * inchesPerMeter * dpi;
-
-    if (!Number.isFinite(scale)) {
-        return '--';
-    }
-
-    return `1:${Math.round(scale).toLocaleString()}`;
-}
-
 function getOperationalLayerNames() {
     return Object.keys(getState().uploadedLayers).filter((layerName) => layerName !== 'annotations');
+}
+
+function getActiveLayerLabel() {
+    const state = getState();
+    const activeLayerName = state.currentLayerName;
+
+    if (!activeLayerName) {
+        return 'None';
+    }
+
+    const record = getLayerRecord(activeLayerName);
+    if (!record) {
+        return activeLayerName;
+    }
+
+    return record.isWMS ? `${activeLayerName} (WMS)` : activeLayerName;
 }
 
 function buildHelpContent() {
@@ -60,10 +44,10 @@ function buildHelpContent() {
         };
     }
 
-    if (state.annotationMode === 'highlight') {
+    if (state.selectedTool === 'annotation:labels') {
         return {
-            primary: 'Click a feature to highlight it.',
-            secondary: 'Use highlight mode to focus attention on a feature without changing the layer source.'
+            primary: 'Feature labels updated.',
+            secondary: 'Use Feature Labels to toggle attribute labels for the selected vector layer.'
         };
     }
 
@@ -101,30 +85,25 @@ export function updateSmartHelpPanel() {
     secondary.textContent = content.secondary;
 }
 
-export function updateMapStatusBar(coordinate = null) {
+export function updateMapStatusBar() {
     const map = getMap();
     const view = map?.getView?.();
 
-    const coordinatesEl = getStatusElement('statusCoordinates');
     const zoomEl = getStatusElement('statusZoom');
-    const scaleEl = getStatusElement('statusScale');
     const projectionEl = getStatusElement('statusProjection');
-
-    if (coordinatesEl) {
-        coordinatesEl.textContent = formatCoordinatePair(coordinate);
-    }
+    const layerEl = getStatusElement('statusLayer');
 
     if (zoomEl) {
         const zoom = view?.getZoom?.();
         zoomEl.textContent = Number.isFinite(zoom) ? zoom.toFixed(1) : '--';
     }
 
-    if (scaleEl) {
-        scaleEl.textContent = formatScale(view);
-    }
-
     if (projectionEl) {
         projectionEl.textContent = view?.getProjection?.()?.getCode?.() || '--';
+    }
+
+    if (layerEl) {
+        layerEl.textContent = getActiveLayerLabel();
     }
 }
 
@@ -140,23 +119,14 @@ export function initializeWorkspaceStatus() {
     updateSmartHelpPanel();
     updateMapStatusBar();
 
-    map.on('pointermove', (event) => {
-        if (event.dragging) {
-            return;
-        }
-
-        updateMapStatusBar(event.coordinate);
-    });
-
-    map.getViewport().addEventListener('pointerleave', () => {
-        updateMapStatusBar();
-    });
-
     view.on('change:center', () => updateMapStatusBar());
     view.on('change:resolution', () => updateMapStatusBar());
     view.on('change:rotation', () => updateMapStatusBar());
 
-    window.addEventListener('gpmap:statechange', updateSmartHelpPanel);
+    window.addEventListener('gpmap:statechange', () => {
+        updateSmartHelpPanel();
+        updateMapStatusBar();
+    });
 
     mapContainer?.setAttribute('title', 'Scroll to zoom, drag to pan, and use the status bar for live map reference.');
 }

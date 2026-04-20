@@ -3,7 +3,7 @@ import { DEFAULT_VIEW_PADDING } from '../config/defaults.js';
 import ol from '../lib/ol.js';
 import { createBasemapSource } from '../config/basemaps.js';
 import { getLayerRecord, getMap, getState, removeLayerRecord, setActiveBasemap, setCurrentLayerName, setLayerRecord } from '../state/store.js';
-import { createAnnotationStyle, createFeatureStyle } from './style-factory.js';
+import { createAnnotationStyle, createManagedFeatureStyles, pickDefaultLabelField } from './style-factory.js';
 
 export function findLayerNameByLayer(targetLayer) {
     const uploadedLayers = getState().uploadedLayers;
@@ -12,22 +12,26 @@ export function findLayerNameByLayer(targetLayer) {
 
 export function addVectorLayer(layerName, layerColor, geojson, features) {
     const source = new ol.source.Vector({ features });
-    const layer = new ol.layer.Vector({
+    const layerRecord = {
         source,
-        style: () => createFeatureStyle(layerColor)
-    });
-
-    getMap().addLayer(layer);
-    setLayerRecord(layerName, {
-        source,
-        layer,
+        layer: null,
         geojson,
         features,
         color: layerColor,
         opacity: DEFAULT_VECTOR_OPACITY,
         geometryType: geojson.features[0]?.geometry?.type || 'Unknown',
-        isWMS: false
+        isWMS: false,
+        labelsVisible: false,
+        labelField: pickDefaultLabelField(features)
+    };
+    const layer = new ol.layer.Vector({
+        source,
+        style: (feature) => createManagedFeatureStyles(layerRecord, feature)
     });
+    layerRecord.layer = layer;
+
+    getMap().addLayer(layer);
+    setLayerRecord(layerName, layerRecord);
     setCurrentLayerName(layerName);
 
     return getLayerRecord(layerName);
@@ -81,7 +85,8 @@ export function updateManagedLayerStyle(layerName, styleFactory) {
         return;
     }
 
-    record.layer.setStyle(styleFactory);
+    record.layer.setStyle(styleFactory || ((feature) => createManagedFeatureStyles(record, feature)));
+    record.layer.changed();
 }
 
 export function ensureAnnotationLayer() {

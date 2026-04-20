@@ -33,6 +33,30 @@ export function handleGeoJSONSelect(event) {
     setCurrentLayerData({ file, type: 'geojson' });
 }
 
+export function handleKmlSelect(event) {
+    const file = event.target.files[0];
+    if (!file) {
+        return;
+    }
+
+    document.getElementById('kmlFileName').textContent = file.name;
+    document.getElementById('kmlFileSize').textContent = formatFileSize(file.size);
+    document.getElementById('kmlFilePreview').classList.add('active');
+    setCurrentLayerData({ file, type: 'kml' });
+}
+
+export function handleCsvSelect(event) {
+    const file = event.target.files[0];
+    if (!file) {
+        return;
+    }
+
+    document.getElementById('csvFileName').textContent = file.name;
+    document.getElementById('csvFileSize').textContent = formatFileSize(file.size);
+    document.getElementById('csvFilePreview').classList.add('active');
+    setCurrentLayerData({ file, type: 'csv' });
+}
+
 export function clearFileSelection() {
     document.getElementById('fileInput').value = '';
     document.getElementById('filePreview').classList.remove('active');
@@ -45,11 +69,25 @@ export function clearGeoJSONSelection() {
     setCurrentLayerData(null);
 }
 
+export function clearKmlSelection() {
+    document.getElementById('kmlInput').value = '';
+    document.getElementById('kmlFilePreview').classList.remove('active');
+    setCurrentLayerData(null);
+}
+
+export function clearCsvSelection() {
+    document.getElementById('csvInput').value = '';
+    document.getElementById('csvFilePreview').classList.remove('active');
+    setCurrentLayerData(null);
+}
+
 export function updateDataSection() {
     const dataType = document.getElementById('dataTypeSelect').value;
 
     document.getElementById('shapefileSection').style.display = dataType === 'shapefile' ? 'block' : 'none';
     document.getElementById('geojsonSection').style.display = dataType === 'geojson' ? 'block' : 'none';
+    document.getElementById('kmlSection').style.display = dataType === 'kml' ? 'block' : 'none';
+    document.getElementById('csvSection').style.display = dataType === 'csv' ? 'block' : 'none';
 }
 
 export async function submitUpload() {
@@ -79,6 +117,8 @@ export async function submitUpload() {
         document.getElementById('layerName').value = '';
         clearFileSelection();
         clearGeoJSONSelection();
+        clearKmlSelection();
+        clearCsvSelection();
 
         showToast('Success', `Layer "${layerName}" added with ${features.length} features`, 'success');
     } catch (error) {

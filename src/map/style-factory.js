@@ -37,6 +37,64 @@ export function createLabelStyle(text) {
     });
 }
 
+export function pickDefaultLabelField(features = []) {
+    const candidateCounts = new Map();
+
+    features.forEach((feature) => {
+        const properties = feature?.getProperties?.() || feature?.properties || {};
+        Object.entries(properties).forEach(([key, value]) => {
+            if (key === 'geometry' || value === null || value === undefined) {
+                return;
+            }
+
+            const normalizedValue = typeof value === 'string' ? value.trim() : value;
+            if (normalizedValue === '') {
+                return;
+            }
+
+            const isSupportedType = ['string', 'number', 'boolean'].includes(typeof normalizedValue);
+            if (!isSupportedType) {
+                return;
+            }
+
+            const score = candidateCounts.get(key) || 0;
+            const bonus = typeof normalizedValue === 'string' ? 2 : 1;
+            candidateCounts.set(key, score + bonus);
+        });
+    });
+
+    const rankedCandidates = Array.from(candidateCounts.entries()).sort((left, right) => right[1] - left[1]);
+    return rankedCandidates[0]?.[0] || null;
+}
+
+export function getFeatureLabelText(feature, labelField) {
+    if (!feature || !labelField) {
+        return '';
+    }
+
+    const value = feature.get(labelField);
+    if (value === null || value === undefined) {
+        return '';
+    }
+
+    const text = String(value).trim();
+    return text.length > 0 ? text : '';
+}
+
+export function createManagedFeatureStyles(record, feature, options = {}) {
+    const styles = [createFeatureStyle(record.color, record.opacity, options.isHighlighted)];
+    const labelsEnabled = options.labelsEnabled ?? record.labelsVisible;
+
+    if (labelsEnabled) {
+        const labelText = getFeatureLabelText(feature, record.labelField);
+        if (labelText) {
+            styles.push(createLabelStyle(labelText));
+        }
+    }
+
+    return styles;
+}
+
 export function createAnnotationStyle(feature) {
     const text = feature.get('text');
     const fontSize = feature.get('fontSize') || 12;

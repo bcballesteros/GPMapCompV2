@@ -1,8 +1,8 @@
 import { ANNOTATION_LAYER_ID } from '../config/constants.js';
 import ol from '../lib/ol.js';
 import { getMap, getState } from '../state/store.js';
-import { createFeatureStyle } from './style-factory.js';
 import { findLayerNameByLayer } from './layer-manager.js';
+import { updateManagedLayerStyle } from './layer-manager.js';
 
 function refreshHighlightStyles(select, getSelectedAnnotationMode) {
     const map = getMap();
@@ -18,13 +18,11 @@ function refreshHighlightStyles(select, getSelectedAnnotationMode) {
             return;
         }
 
-        const record = uploadedLayers[layerName];
-        const isHighlightMode = getSelectedAnnotationMode() === 'highlight';
+        if (!uploadedLayers[layerName]) {
+            return;
+        }
 
-        layer.setStyle((feature) => {
-            const isSelected = select.getFeatures().getArray().includes(feature);
-            return createFeatureStyle(record.color, record.opacity, isHighlightMode && isSelected);
-        });
+        updateManagedLayerStyle(layerName);
     });
 }
 

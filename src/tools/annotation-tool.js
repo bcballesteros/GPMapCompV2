@@ -2,6 +2,7 @@ import { ANNOTATION_LAYER_ID } from '../config/constants.js';
 import ol from '../lib/ol.js';
 import { ensureAnnotationLayer } from '../map/layer-manager.js';
 import { getLayerRecord, getMap, removeLayerRecord, setAnnotationMode, setSelectedFeature, setSelectedTool } from '../state/store.js';
+import { toggleSelectedLayerLabels } from './labels-tool.js';
 import { showToast } from '../ui/toast.js';
 
 let annotationMode = false;
@@ -116,13 +117,13 @@ export function activateAnnotation(type) {
         return;
     }
 
-    if (type === 'highlight') {
+    if (type === 'labels') {
         setMoveMode(false);
-        selectedAnnotationMode = 'highlight';
-        setAnnotationMode('highlight');
-        setSelectedTool('annotation:highlight');
-        showToast('Feature Highlight', 'Click on a feature to highlight it', 'info');
-        getMap().getViewport().style.cursor = 'pointer';
+        selectedAnnotationMode = null;
+        setAnnotationMode(null);
+        setSelectedTool('annotation:labels');
+        toggleSelectedLayerLabels();
+        getMap().getViewport().style.cursor = '';
     }
 }
 
