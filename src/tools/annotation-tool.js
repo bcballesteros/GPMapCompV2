@@ -61,7 +61,6 @@ export function initializeAnnotationInteractions() {
     annotationTranslateInteraction.on('translateend', () => {
         ensureAnnotationLayer().layer.changed();
         setMoveMode(false);
-        showToast('Moved', 'Annotation moved to new location', 'success', 1200);
     });
 
     getMap().addInteraction(annotationTranslateInteraction);
@@ -157,7 +156,6 @@ export function submitAnnotation() {
     delete input.dataset.x;
     delete input.dataset.y;
 
-    showToast('Success', 'Text annotation added. Click to select, edit, or delete.', 'success');
     updateAnnotationControls();
 }
 
@@ -252,7 +250,6 @@ export function editAnnotation(feature) {
         updateAnnotationControls();
         backdrop.remove();
         editPopup.remove();
-        showToast('Success', 'Annotation updated', 'success', 1500);
     };
 
     document.getElementById('editCancelBtn').onclick = () => {
@@ -274,7 +271,6 @@ export function deleteAnnotation(feature) {
     syncDraggableAnnotations();
 
     updateAnnotationControls();
-    showToast('Removed', 'Annotation deleted', 'info', 1500);
 
     if (annotationLayer.source.getFeatures().length === 0) {
         getMap().removeLayer(annotationLayer.layer);
@@ -382,10 +378,6 @@ export function bindAnnotationControls() {
 
             const nextMoveMode = !annotationMoveMode;
             setMoveMode(nextMoveMode);
-
-            if (nextMoveMode) {
-                showToast('Move', 'Drag the annotation to move it', 'info', 2000);
-            }
         };
     }
 }

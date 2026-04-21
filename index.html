@@ -168,6 +168,28 @@
         </div>
 
         <div class="nav-controls">
+            <form id="locationSearchForm" class="location-search" role="search">
+                <label class="location-search-label" for="locationSearchInput">
+                    <i class="fas fa-location-dot"></i>
+                    <span>Location</span>
+                </label>
+                <div class="location-search-field">
+                    <input
+                        id="locationSearchInput"
+                        type="text"
+                        class="location-search-input"
+                        placeholder="Search location..."
+                        autocomplete="off"
+                        spellcheck="false"
+                    >
+                    <button type="button" id="locationSearchClear" class="location-search-clear" aria-label="Clear location search" hidden>
+                        <i class="fas fa-times"></i>
+                    </button>
+                    <button type="submit" class="location-search-submit" aria-label="Search location">
+                        <i class="fas fa-search"></i>
+                    </button>
+                </div>
+            </form>
             <div class="basemap-selector">
                 <label for="basemapSelect">
                     <i class="fas fa-map"></i>
@@ -561,8 +583,11 @@
                 <div class="form-group">
                     <div class="form-label">Share Link</div>
                     <div style="display: flex; gap: var(--spacing-2);">
-                        <input type="text" class="form-input" value="geoportal.gov.ph/map/12ab34cd" readonly>
+                        <input type="text" class="form-input" id="shareLinkInput" value="" readonly>
                         <button class="btn btn-primary" onclick="copyToClipboard()" style="white-space: nowrap;"><i class="fas fa-copy"></i> Copy</button>
+                    </div>
+                    <div id="shareFeedback" class="inline-feedback" data-state="neutral" aria-live="polite">
+                        Share link updates here when you copy or regenerate the current map state.
                     </div>
                 </div>
             </div>

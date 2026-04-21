@@ -36,9 +36,6 @@ export function toggleSelectedLayerLabels() {
     record.labelsVisible = !record.labelsVisible;
     updateManagedLayerStyle(layerName);
     syncLabelsToggle();
-
-    const actionText = record.labelsVisible ? 'shown' : 'hidden';
-    showToast('Feature Labels', `${record.labelField} labels ${actionText} for "${layerName}"`, 'info', 1800);
 }
 
 export function syncLabelsToggle() {
@@ -77,5 +74,4 @@ export function applyLabelsVisibility(isVisible) {
     });
 
     syncLabelsToggle();
-    showToast('Labels', isVisible ? 'Available layer labels shown' : 'All layer labels hidden', 'info', 1500);
 }

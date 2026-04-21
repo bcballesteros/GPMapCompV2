@@ -2,7 +2,6 @@ import { removeManagedLayer, updateManagedLayerStyle } from '../map/layer-manage
 import { getLayerRecord, getState, setCurrentLayerName } from '../state/store.js';
 import { syncLabelsToggle } from '../tools/labels-tool.js';
 import { commitLayerOpacity as commitLayerOpacityValue, updateLayerOpacity as updateLayerOpacityValue } from '../tools/transparency-tool.js';
-import { showToast } from './toast.js';
 
 function getEmptyStateMarkup() {
     return `
@@ -38,9 +37,10 @@ export function addLayerItem(name, color, featureCount, options = {}) {
             </div>
         `;
 
+    const isVisible = options.visible !== false;
     const layerHTML = `
         <div class="layer-item" onclick="selectLayer(this)">
-            <input type="checkbox" class="layer-toggle" checked title="Toggle layer visibility">
+            <input type="checkbox" class="layer-toggle" ${isVisible ? 'checked' : ''} title="Toggle layer visibility">
             <div class="layer-info">
                 <div class="layer-name">${name}</div>
                 <div class="layer-stats">${statsText}</div>
@@ -116,8 +116,6 @@ export function updateLayerColor(colorPicker) {
 
     record.color = newColor;
     updateManagedLayerStyle(layerName);
-
-    showToast('Color Updated', `Layer color changed to ${newColor}`, 'success', 2000);
 }
 
 export function updateLayerOpacity(slider) {
@@ -152,5 +150,4 @@ export function removeLayer(event) {
     }
 
     syncLabelsToggle();
-    showToast('Layer Removed', `${layerName} has been removed from the map`, 'info', 2000);
 }

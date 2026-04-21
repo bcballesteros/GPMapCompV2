@@ -182,5 +182,4 @@ export function openAttributeTable() {
     bindAttributeSearch(rowsData.length);
 
     openModal('attributesModal');
-    showToast('Attributes', `Showing ${rowsData.length} records for "${layerName}"`, 'info', 1500);
 }

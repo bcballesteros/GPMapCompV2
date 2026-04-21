@@ -1,6 +1,5 @@
 import { getLayerRecord } from '../state/store.js';
 import { updateManagedLayerStyle } from '../map/layer-manager.js';
-import { showToast } from '../ui/toast.js';
 
 export function updateLayerOpacity(slider) {
     const opacityPercent = Number(slider.value);
@@ -26,20 +25,5 @@ export function updateLayerOpacity(slider) {
 
 export function commitLayerOpacity(slider) {
     const layerItem = slider.closest('.layer-item');
-    const layerName = layerItem?.querySelector('.layer-name')?.textContent;
-    const opacityPercent = Number(slider.value);
-
-    if (!layerName || slider.dataset.opacityDirty !== 'true') {
-        return;
-    }
-
-    const commitKey = `${layerName}:${opacityPercent}`;
-    if (slider.dataset.lastOpacityToastKey === commitKey) {
-        slider.dataset.opacityDirty = 'false';
-        return;
-    }
-
-    slider.dataset.lastOpacityToastKey = commitKey;
     slider.dataset.opacityDirty = 'false';
-    showToast('Opacity Updated', `Opacity updated to ${opacityPercent}%`, 'success', 2000);
 }

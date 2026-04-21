@@ -1,14 +1,33 @@
 import { createBasemapLayer } from '../config/basemaps.js';
-import { createExportCanvas, downloadCanvas } from '../services/export-service.js';
-import { getMap, getState } from '../state/store.js';
-import { randomToken } from '../utils/format.js';
+import { ANNOTATION_LAYER_ID } from '../config/constants.js';
+import { createExportCanvas, createPdfBlobFromCanvas, downloadBlob, downloadCanvas } from '../services/export-service.js';
+import { addWmsLayer, changeBasemapLayer, ensureAnnotationLayer, updateManagedLayerStyle } from '../map/layer-manager.js';
+import { getCurrentSearchResult, getLayerRecord, getMap, getState } from '../state/store.js';
+import { createWmsLayerConfig } from '../services/wms-service.js';
+import { addLayerItem } from '../ui/layers-panel.js';
 import { closeModal } from '../ui/modal.js';
+import { restoreSearchState } from '../ui/location-search.js';
 import { showToast } from '../ui/toast.js';
+import { syncLabelsToggle } from './labels-tool.js';
 import ol from '../lib/ol.js';
+
+const SHARE_TOKEN_KEY = 's';
+const SHARE_TOKEN_VERSION = 1;
 
 let previewMap = null;
 let previewSyncScheduled = false;
 let previewListenersBound = false;
+let sharedStateRestoreAttempted = false;
+
+function setShareFeedback(message = '', type = 'neutral') {
+    const status = document.getElementById('shareFeedback');
+    if (!status) {
+        return;
+    }
+
+    status.textContent = message || 'Share link updates here when you copy or regenerate the current map state.';
+    status.dataset.state = type;
+}
 
 function getExportPreviewElements() {
     return {
@@ -47,8 +66,6 @@ function drawMapViewportToContext(map, context, outputWidth, outputHeight) {
     if (!viewport || !size) {
         return false;
     }
-
-    map.renderSync();
 
     const [mapWidth, mapHeight] = size;
     const scaleX = outputWidth / mapWidth;
@@ -91,6 +108,19 @@ function drawMapViewportToContext(map, context, outputWidth, outputHeight) {
     return drewLayer;
 }
 
+function cloneWmsSource(source) {
+    const urls = source.getUrls?.();
+    const url = urls?.[0] || source.getUrl?.();
+
+    return new ol.source.TileWMS({
+        url,
+        params: { ...source.getParams() },
+        serverType: source.get('serverType') || 'geoserver',
+        crossOrigin: 'anonymous',
+        transition: 0
+    });
+}
+
 function clonePreviewLayer(layer, index) {
     const source = layer.getSource?.();
     if (!source) {
@@ -124,7 +154,7 @@ function clonePreviewLayer(layer, index) {
 
     if (layer instanceof ol.layer.Tile) {
         const previewLayer = new ol.layer.Tile({
-            source,
+            source: source instanceof ol.source.TileWMS ? cloneWmsSource(source) : source,
             opacity: commonOptions.opacity,
             visible: commonOptions.visible
         });
@@ -241,6 +271,407 @@ function bindPreviewSyncListeners() {
     previewListenersBound = true;
 }
 
+function serializeViewState(map) {
+    const view = map?.getView();
+    const center = view?.getCenter();
+    if (!view || !Array.isArray(center)) {
+        return null;
+    }
+
+    const [longitude, latitude] = ol.proj.toLonLat(center, view.getProjection());
+    return {
+        center: [Number(longitude.toFixed(6)), Number(latitude.toFixed(6))],
+        zoom: Number((view.getZoom() ?? 1).toFixed(2)),
+        rotation: Number((view.getRotation() || 0).toFixed(6))
+    };
+}
+
+function serializeAnnotations() {
+    const annotationLayer = getLayerRecord(ANNOTATION_LAYER_ID);
+    if (!annotationLayer?.source) {
+        return [];
+    }
+
+    return annotationLayer.source.getFeatures()
+        .map((feature) => {
+            const geometry = feature.getGeometry();
+            if (!(geometry instanceof ol.geom.Point)) {
+                return null;
+            }
+
+            const [longitude, latitude] = ol.proj.toLonLat(geometry.getCoordinates());
+            return {
+                text: feature.get('text') || '',
+                fontSize: Number(feature.get('fontSize') || 12),
+                fontColor: feature.get('fontColor') || '#000000',
+                coordinates: [Number(longitude.toFixed(6)), Number(latitude.toFixed(6))]
+            };
+        })
+        .filter(Boolean);
+}
+
+function serializeLayerSettings() {
+    return Object.entries(getState().uploadedLayers)
+        .filter(([layerName]) => layerName !== ANNOTATION_LAYER_ID)
+        .map(([layerName, record]) => {
+            const baseState = {
+                name: layerName,
+                visible: record.layer?.getVisible?.() !== false,
+                opacity: Number((record.opacity ?? record.layer?.getOpacity?.() ?? 1).toFixed(3))
+            };
+
+            if (record.isWMS) {
+                return {
+                    ...baseState,
+                    type: 'wms',
+                    wmsUrl: record.wmsUrl || '',
+                    wmsLayerName: record.wmsLayerName || '',
+                    displayName: record.displayName || layerName
+                };
+            }
+
+            return {
+                ...baseState,
+                type: 'vector',
+                color: record.color || '',
+                labelsVisible: Boolean(record.labelsVisible)
+            };
+        });
+}
+
+function serializeUiSettings() {
+    return {
+        labels: Boolean(document.getElementById('labelsToggle')?.checked),
+        scaleBar: document.getElementById('scaleBarToggle')?.checked !== false,
+        northArrow: document.getElementById('northArrowToggle')?.checked !== false
+    };
+}
+
+function buildShareState() {
+    const map = getMap();
+    return {
+        v: SHARE_TOKEN_VERSION,
+        basemap: getState().activeBasemap,
+        view: serializeViewState(map),
+        search: getCurrentSearchResult(),
+        annotations: serializeAnnotations(),
+        layers: serializeLayerSettings(),
+        settings: serializeUiSettings()
+    };
+}
+
+function encodeShareState(state) {
+    const json = JSON.stringify(state);
+    const bytes = new TextEncoder().encode(json);
+    let binary = '';
+
+    bytes.forEach((byte) => {
+        binary += String.fromCharCode(byte);
+    });
+
+    return btoa(binary)
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/g, '');
+}
+
+function decodeShareState(token) {
+    const normalizedToken = token.replace(/-/g, '+').replace(/_/g, '/');
+    const padding = normalizedToken.length % 4 === 0
+        ? ''
+        : '='.repeat(4 - (normalizedToken.length % 4));
+    const binary = atob(`${normalizedToken}${padding}`);
+    const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+    return JSON.parse(new TextDecoder().decode(bytes));
+}
+
+function getShareLinkInput() {
+    return document.getElementById('shareLinkInput');
+}
+
+function updateShareLinkInput(link) {
+    const input = getShareLinkInput();
+    if (input) {
+        input.value = link;
+    }
+}
+
+function getShareUrl() {
+    const url = new URL(window.location.href);
+    url.searchParams.set(SHARE_TOKEN_KEY, encodeShareState(buildShareState()));
+    return url.toString();
+}
+
+function setCheckboxValue(id, checked) {
+    const checkbox = document.getElementById(id);
+    if (!checkbox) {
+        return;
+    }
+
+    checkbox.checked = checked;
+    checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
+function syncLayerItemControls(layerName, layerState) {
+    const layerItem = Array.from(document.querySelectorAll('.layer-item'))
+        .find((item) => item.querySelector('.layer-name')?.textContent === layerName);
+
+    if (!layerItem) {
+        return;
+    }
+
+    const toggle = layerItem.querySelector('.layer-toggle');
+    const slider = layerItem.querySelector('.transparency-slider');
+    const value = layerItem.querySelector('.transparency-value');
+    const colorPicker = layerItem.querySelector('.color-picker');
+
+    if (toggle) {
+        toggle.checked = layerState.visible !== false;
+    }
+
+    if (slider) {
+        const opacityValue = Math.round((layerState.opacity ?? 1) * 100);
+        slider.value = String(opacityValue);
+        if (value) {
+            value.textContent = `${opacityValue}%`;
+        }
+    }
+
+    if (colorPicker && layerState.color) {
+        colorPicker.value = layerState.color;
+    }
+}
+
+function applyLayerState(layerState) {
+    if (!layerState?.name) {
+        return;
+    }
+
+    let record = getLayerRecord(layerState.name);
+
+    if (!record && layerState.type === 'wms' && layerState.wmsUrl && layerState.wmsLayerName) {
+        const { source, layer } = createWmsLayerConfig(layerState.wmsUrl, layerState.wmsLayerName);
+        record = addWmsLayer(layerState.name, source, layer, {
+            wmsUrl: layerState.wmsUrl,
+            wmsLayerName: layerState.wmsLayerName,
+            displayName: layerState.displayName || layerState.name
+        });
+        addLayerItem(layerState.name, record.color || '#2563eb', 0, {
+            isWMS: true,
+            visible: layerState.visible !== false
+        });
+    }
+
+    if (!record?.layer) {
+        return;
+    }
+
+    const visible = layerState.visible !== false;
+    const opacity = Number.isFinite(layerState.opacity) ? layerState.opacity : 1;
+
+    record.layer.setVisible(visible);
+    record.layer.setOpacity(opacity);
+    record.opacity = opacity;
+
+    if (!record.isWMS && layerState.color) {
+        record.color = layerState.color;
+    }
+
+    if (!record.isWMS && typeof layerState.labelsVisible === 'boolean') {
+        record.labelsVisible = layerState.labelsVisible;
+        updateManagedLayerStyle(layerState.name);
+    }
+
+    syncLayerItemControls(layerState.name, layerState);
+}
+
+function restoreAnnotations(annotationStates = []) {
+    const annotationLayer = ensureAnnotationLayer();
+    annotationLayer.source.clear();
+
+    annotationStates.forEach((annotationState) => {
+        if (!annotationState?.text || !Array.isArray(annotationState.coordinates)) {
+            return;
+        }
+
+        const [longitude, latitude] = annotationState.coordinates.map(Number);
+        if (!Number.isFinite(longitude) || !Number.isFinite(latitude)) {
+            return;
+        }
+
+        const feature = new ol.Feature({
+            geometry: new ol.geom.Point(ol.proj.fromLonLat([longitude, latitude])),
+            text: annotationState.text,
+            fontSize: Number(annotationState.fontSize) || 12,
+            fontColor: annotationState.fontColor || '#000000',
+            isAnnotation: true,
+            isDragging: false
+        });
+
+        annotationLayer.source.addFeature(feature);
+    });
+
+    annotationLayer.layer.changed();
+}
+
+function restoreViewState(viewState) {
+    const map = getMap();
+    const view = map?.getView();
+    if (!map || !view || !viewState?.center) {
+        return;
+    }
+
+    const [longitude, latitude] = viewState.center.map(Number);
+    if (Number.isFinite(longitude) && Number.isFinite(latitude)) {
+        view.setCenter(ol.proj.fromLonLat([longitude, latitude]));
+    }
+
+    if (Number.isFinite(viewState.zoom)) {
+        view.setZoom(viewState.zoom);
+    }
+
+    if (Number.isFinite(viewState.rotation)) {
+        view.setRotation(viewState.rotation);
+    }
+}
+
+function getTimeStampForFileName() {
+    const now = new Date();
+    const yyyy = now.getFullYear();
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const dd = String(now.getDate()).padStart(2, '0');
+    return `${yyyy}${mm}${dd}`;
+}
+
+function createExportFileName(extension) {
+    return `NAMRIA_GPMapComp_${getTimeStampForFileName()}.${extension}`;
+}
+
+function drawExportDisclaimer(context, width, height) {
+    const now = new Date();
+    const exportDate = [
+        now.getFullYear(),
+        String(now.getMonth() + 1).padStart(2, '0'),
+        String(now.getDate()).padStart(2, '0')
+    ].join('-');
+    const footerHeight = Math.max(34, Math.round(height * 0.045));
+    const fontSize = Math.max(11, Math.round(height * 0.0115));
+    const horizontalPadding = Math.max(16, Math.round(width * 0.012));
+    const baseLineY = height - Math.round((footerHeight - fontSize) / 2) + 1;
+    const disclaimer = 'Generated from NAMRIA GP Map Composer | For reference use only | Not for official survey use';
+    const dateText = `Export date ${exportDate}`;
+
+    context.save();
+    context.fillStyle = 'rgba(255, 255, 255, 0.88)';
+    context.fillRect(0, height - footerHeight, width, footerHeight);
+    context.strokeStyle = 'rgba(15, 23, 42, 0.12)';
+    context.lineWidth = 1;
+    context.beginPath();
+    context.moveTo(0, height - footerHeight + 0.5);
+    context.lineTo(width, height - footerHeight + 0.5);
+    context.stroke();
+
+    context.fillStyle = '#475569';
+    context.font = `500 ${fontSize}px Inter, "Segoe UI", sans-serif`;
+    context.textBaseline = 'alphabetic';
+    context.fillText(disclaimer, horizontalPadding, baseLineY);
+
+    const dateWidth = context.measureText(dateText).width;
+    context.fillStyle = '#64748b';
+    context.font = `500 ${fontSize}px Inter, "Segoe UI", sans-serif`;
+    context.fillText(dateText, width - horizontalPadding - dateWidth, baseLineY);
+    context.restore();
+}
+
+function createOffscreenExportTarget(width, height) {
+    const target = document.createElement('div');
+    target.style.position = 'fixed';
+    target.style.left = '-100000px';
+    target.style.top = '0';
+    target.style.width = `${width}px`;
+    target.style.height = `${height}px`;
+    target.style.pointerEvents = 'none';
+    target.style.opacity = '0';
+    document.body.appendChild(target);
+    return target;
+}
+
+function waitForRenderComplete(map) {
+    return new Promise((resolve) => {
+        let resolved = false;
+        const finish = () => {
+            if (resolved) {
+                return;
+            }
+
+            resolved = true;
+            clearTimeout(timeoutId);
+            resolve();
+        };
+
+        const timeoutId = window.setTimeout(finish, 3500);
+        map.once('rendercomplete', finish);
+        map.renderSync();
+    });
+}
+
+async function renderMapToCanvas(width, height) {
+    const mainMap = getMap();
+    const mainView = mainMap?.getView();
+    if (!mainMap || !mainView) {
+        throw new Error('Map is not ready');
+    }
+
+    const target = createOffscreenExportTarget(width, height);
+    const exportMap = new ol.Map({
+        target,
+        controls: [],
+        layers: [],
+        view: new ol.View({
+            center: mainView.getCenter(),
+            zoom: mainView.getZoom(),
+            rotation: mainView.getRotation(),
+            projection: mainView.getProjection()
+        })
+    });
+    exportMap.getInteractions().clear();
+
+    mainMap.getLayers().forEach((layer, index) => {
+        const clonedLayer = clonePreviewLayer(layer, index);
+        if (clonedLayer) {
+            exportMap.addLayer(clonedLayer);
+        }
+    });
+
+    exportMap.setSize([width, height]);
+    await waitForRenderComplete(exportMap);
+
+    const canvas = createExportCanvas(width, height);
+    const context = canvas.getContext('2d');
+    if (!context) {
+        exportMap.setTarget(null);
+        target.remove();
+        throw new Error('Failed to get canvas context');
+    }
+
+    context.fillStyle = '#ffffff';
+    context.fillRect(0, 0, width, height);
+
+    try {
+        const rendered = drawMapViewportToContext(exportMap, context, width, height);
+        if (!rendered) {
+            throw new Error('Map renderer did not produce an exportable frame');
+        }
+
+        drawExportDisclaimer(context, width, height);
+    } finally {
+        exportMap.setTarget(null);
+        target.remove();
+    }
+
+    return canvas;
+}
+
 export function renderMapPreview() {
     const { container, placeholder } = getExportPreviewElements();
     const mainMap = getMap();
@@ -265,36 +696,18 @@ export function renderMapPreview() {
     });
 }
 
-export function downloadMap() {
-    const format = document.getElementById('exportFormat').value;
-    const resolution = document.getElementById('exportResolution').value;
+export async function downloadMap() {
+    const format = document.getElementById('exportFormat')?.value || 'png';
+    const resolution = document.getElementById('exportResolution')?.value || '1920x1080';
     const [width, height] = resolution.split('x').map(Number);
-    const map = getMap();
 
     try {
-        showToast('Exporting', 'Generating map export...', 'info');
-
-        const canvas = createExportCanvas(width, height);
-        const context = canvas.getContext('2d');
-        if (!context) {
-            throw new Error('Failed to get canvas context');
-        }
-
-        context.fillStyle = '#ffffff';
-        context.fillRect(0, 0, width, height);
-        drawMapViewportToContext(map, context, width, height);
-
-        context.fillStyle = '#333333';
-        context.font = 'bold 18px Arial';
-        context.fillText('Geoportal Philippines Map', 20, 30);
-        context.font = '12px Arial';
-        context.fillStyle = '#666666';
-        context.fillText(`Exported: ${new Date().toLocaleString()}`, 20, 50);
+        const canvas = await renderMapToCanvas(width, height);
 
         if (format === 'png') {
-            downloadCanvas(canvas, 'image/png', `map_export_${Date.now()}.png`, undefined, (blob) => {
+            downloadCanvas(canvas, 'image/png', createExportFileName('png'), undefined, (blob) => {
                 if (!blob) {
-                    showToast('Error', 'Failed to create image/png blob', 'error');
+                    showToast('Error', 'Failed to create PNG export', 'error');
                     return;
                 }
 
@@ -305,9 +718,9 @@ export function downloadMap() {
         }
 
         if (format === 'jpeg') {
-            downloadCanvas(canvas, 'image/jpeg', `map_export_${Date.now()}.jpg`, 0.95, (blob) => {
+            downloadCanvas(canvas, 'image/jpeg', createExportFileName('jpg'), 0.92, (blob) => {
                 if (!blob) {
-                    showToast('Error', 'Failed to create image/jpeg blob', 'error');
+                    showToast('Error', 'Failed to create JPEG export', 'error');
                     return;
                 }
 
@@ -317,39 +730,115 @@ export function downloadMap() {
             return;
         }
 
-        downloadCanvas(canvas, 'image/png', `map_export_${Date.now()}.png`, undefined, (blob) => {
-            if (!blob) {
-                showToast('Error', 'Failed to create image/png blob', 'error');
-                return;
-            }
-
-            showToast('Info', 'PDF export downloads as high-resolution PNG', 'info');
-            closeModal('exportModal');
-        });
+        const pdfBlob = await createPdfBlobFromCanvas(canvas);
+        downloadBlob(pdfBlob, createExportFileName('pdf'));
+        showToast('Success', 'Map exported as PDF', 'success');
+        closeModal('exportModal');
     } catch (error) {
         console.error('Export error:', error);
         showToast('Error', `Failed to export map: ${error.message}`, 'error');
     }
 }
 
-export function copyToClipboard() {
-    const clickEvent = window.event;
-    const input = clickEvent?.target?.previousElementSibling;
-
-    if (!input) {
+export async function copyToClipboard() {
+    const input = getShareLinkInput();
+    if (!input?.value) {
         return;
     }
 
-    input.select();
-    document.execCommand('copy');
-    clickEvent.target.innerHTML = '<i class="fas fa-check"></i> Copied';
+    try {
+        await navigator.clipboard.writeText(input.value);
+        setShareFeedback('Share link copied to clipboard.', 'success');
+    } catch (error) {
+        try {
+            input.focus();
+            input.select();
+            const copied = document.execCommand('copy');
+            if (!copied) {
+                throw new Error('Copy command rejected');
+            }
 
-    setTimeout(() => {
-        clickEvent.target.innerHTML = '<i class="fas fa-copy"></i> Copy';
-    }, 2000);
+            setShareFeedback('Share link copied to clipboard.', 'success');
+        } catch (copyError) {
+            setShareFeedback('Copy failed. Select the link manually and copy it.', 'warning');
+            showToast('Copy Failed', 'Unable to copy the share link automatically', 'warning', 2400);
+            return;
+        }
+    }
 }
 
-export function generateLink() {
-    document.querySelector('#shareModal input').value = `geoportal.gov.ph/map/${randomToken()}`;
-    showToast('Generated', 'New share link created', 'success', 2000);
+export function generateLink({ silent = false } = {}) {
+    const link = getShareUrl();
+    updateShareLinkInput(link);
+    setShareFeedback(
+        silent
+            ? 'Share link updates here when you copy or regenerate the current map state.'
+            : 'Fresh share link generated for the current map state.',
+        silent ? 'neutral' : 'success'
+    );
+
+    if (!silent) {
+        const input = getShareLinkInput();
+        input?.focus();
+        input?.select();
+    }
+
+    return link;
+}
+
+export function restoreSharedStateFromUrl() {
+    if (sharedStateRestoreAttempted) {
+        return false;
+    }
+
+    sharedStateRestoreAttempted = true;
+
+    const url = new URL(window.location.href);
+    const token = url.searchParams.get(SHARE_TOKEN_KEY);
+    if (!token) {
+        updateShareLinkInput(generateLink({ silent: true }));
+        return false;
+    }
+
+    try {
+        const state = decodeShareState(token);
+        if (!state || state.v !== SHARE_TOKEN_VERSION) {
+            throw new Error('Unsupported share token');
+        }
+
+        if (state.basemap) {
+            changeBasemapLayer(state.basemap);
+            const basemapSelect = document.getElementById('basemapSelect');
+            if (basemapSelect) {
+                basemapSelect.value = state.basemap;
+            }
+        }
+
+        restoreViewState(state.view);
+        restoreAnnotations(state.annotations);
+
+        if (Array.isArray(state.layers)) {
+            state.layers.forEach((layerState) => applyLayerState(layerState));
+        }
+
+        if (state.search) {
+            restoreSearchState(state.search, { zoom: false });
+        }
+
+        if (state.settings) {
+            setCheckboxValue('scaleBarToggle', state.settings.scaleBar !== false);
+            setCheckboxValue('northArrowToggle', state.settings.northArrow !== false);
+            setCheckboxValue('labelsToggle', Boolean(state.settings.labels));
+            syncLabelsToggle();
+        }
+
+        updateShareLinkInput(generateLink({ silent: true }));
+        showToast('Shared State Loaded', 'Map state restored from share link', 'success', 2200);
+        return true;
+    } catch (error) {
+        console.error('Shared state restore failed:', error);
+        updateShareLinkInput(generateLink({ silent: true }));
+        showToast('Share Link Invalid', 'Unable to restore the shared map state', 'warning', 2400);
+        return false;
+    }
 }

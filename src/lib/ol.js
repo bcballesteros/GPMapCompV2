@@ -12,9 +12,9 @@ import Translate from 'ol/interaction/Translate.js';
 import { defaults as defaultControls, Attribution, ScaleLine, Zoom } from 'ol/control.js';
 import { click } from 'ol/events/condition.js';
 import { isEmpty } from 'ol/extent.js';
-import { fromLonLat } from 'ol/proj.js';
+import { fromLonLat, toLonLat } from 'ol/proj.js';
 import { OSM, TileWMS, Vector as VectorSource, XYZ } from 'ol/source.js';
-import { Circle, Fill, Stroke, Style, Text } from 'ol/style.js';
+import { Circle, Fill, Icon, Stroke, Style, Text } from 'ol/style.js';
 
 const ol = {
     Collection,
@@ -22,7 +22,8 @@ const ol = {
     Map,
     View,
     proj: {
-        fromLonLat
+        fromLonLat,
+        toLonLat
     },
     extent: {
         isEmpty
@@ -55,6 +56,7 @@ const ol = {
     style: {
         Circle,
         Fill,
+        Icon,
         Stroke,
         Style,
         Text

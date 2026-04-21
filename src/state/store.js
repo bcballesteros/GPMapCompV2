@@ -7,6 +7,7 @@ const state = {
     selectedTool: null,
     selectedFeature: null,
     annotationMode: null,
+    currentSearchResult: null,
     uploadedLayers: {}
 };
 
@@ -56,6 +57,11 @@ export function setAnnotationMode(mode) {
     emitStateChange('annotationMode', mode);
 }
 
+export function setCurrentSearchResult(searchResult) {
+    state.currentSearchResult = searchResult;
+    emitStateChange('currentSearchResult', searchResult);
+}
+
 export function getMap() {
     return state.map;
 }
@@ -66,6 +72,10 @@ export function getCurrentLayerData() {
 
 export function getCurrentLayerName() {
     return state.currentLayerName;
+}
+
+export function getCurrentSearchResult() {
+    return state.currentSearchResult;
 }
 
 export function getUploadedLayers() {

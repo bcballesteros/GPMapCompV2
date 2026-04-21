@@ -9,6 +9,31 @@ import { addLayerItem } from '../ui/layers-panel.js';
 import { closeModal } from '../ui/modal.js';
 import { showToast } from '../ui/toast.js';
 
+function setUploadBusyState(isBusy, label = 'Processing file...') {
+    const progress = document.getElementById('uploadProgress');
+    const progressFill = document.getElementById('progressFill');
+    const progressLabel = progress?.querySelector('div');
+    const submitButton = document.getElementById('submitBtn');
+
+    if (progress) {
+        progress.style.display = isBusy ? 'block' : 'none';
+    }
+
+    if (progressLabel) {
+        progressLabel.textContent = label;
+    }
+
+    if (progressFill) {
+        progressFill.style.width = isBusy ? '100%' : '0%';
+        progressFill.classList.toggle('is-indeterminate', isBusy);
+    }
+
+    if (submitButton) {
+        submitButton.disabled = isBusy;
+        submitButton.setAttribute('aria-busy', isBusy ? 'true' : 'false');
+    }
+}
+
 export function handleFileSelect(event) {
     const file = event.target.files[0];
     if (!file) {
@@ -99,8 +124,7 @@ export async function submitUpload() {
 
     const layerName = document.getElementById('layerName').value || DEFAULT_LAYER_NAME;
     const layerColor = document.getElementById('layerColor').value || DEFAULT_LAYER_COLOR;
-
-    showToast('Processing', 'Processing file...', 'info');
+    setUploadBusyState(true);
 
     try {
         const { geojson, features } = await parseUploadFile(currentLayerData);
@@ -124,6 +148,8 @@ export async function submitUpload() {
     } catch (error) {
         console.error('Error processing upload:', error);
         showToast('Error', `Failed to process file: ${error.message}`, 'error');
+    } finally {
+        setUploadBusyState(false);
     }
 }
 
@@ -138,10 +164,12 @@ export function addWMSLayerFromForm() {
     }
 
     try {
-        showToast('Loading', 'Adding WMS layer...', 'info');
-
         const { source, layer } = createWmsLayerConfig(wmsUrl, wmsLayerName);
-        addWmsLayer(wmsDisplayName, source, layer);
+        addWmsLayer(wmsDisplayName, source, layer, {
+            wmsUrl,
+            wmsLayerName,
+            displayName: wmsDisplayName
+        });
         addLayerItem(wmsDisplayName, DEFAULT_LAYER_COLOR, 0, { isWMS: true });
 
         document.getElementById('wmsUrl').value = '';

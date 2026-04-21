@@ -37,7 +37,7 @@ export function addVectorLayer(layerName, layerColor, geojson, features) {
     return getLayerRecord(layerName);
 }
 
-export function addWmsLayer(layerName, source, layer) {
+export function addWmsLayer(layerName, source, layer, metadata = {}) {
     getMap().addLayer(layer);
     setLayerRecord(layerName, {
         source,
@@ -47,7 +47,10 @@ export function addWmsLayer(layerName, source, layer) {
         color: DEFAULT_LAYER_COLOR,
         opacity: DEFAULT_VECTOR_OPACITY,
         geometryType: 'WMS',
-        isWMS: true
+        isWMS: true,
+        wmsUrl: metadata.wmsUrl || '',
+        wmsLayerName: metadata.wmsLayerName || '',
+        displayName: metadata.displayName || layerName
     });
     setCurrentLayerName(layerName);
 

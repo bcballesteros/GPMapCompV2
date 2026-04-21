@@ -1,14 +1,23 @@
 import { activateAnnotation, bindAnnotationControls, cancelAnnotation, deleteAnnotation, editAnnotation, getSelectedAnnotationMode, initializeAnnotationInteractions, selectAnnotationForDeletion, submitAnnotation } from '../tools/annotation-tool.js';
-import { copyToClipboard, downloadMap, generateLink, renderMapPreview } from '../tools/export-share.js';
+import { copyToClipboard, downloadMap, generateLink, renderMapPreview, restoreSharedStateFromUrl } from '../tools/export-share.js';
 import { initializeMap } from '../map/map-init.js';
 import { changeBasemapLayer } from '../map/layer-manager.js';
 import { addWMSLayerFromForm, clearCsvSelection, clearFileSelection, clearGeoJSONSelection, clearKmlSelection, handleCsvSelect, handleFileSelect, handleGeoJSONSelect, handleKmlSelect, submitUpload, updateDataSection } from '../tools/upload-tool.js';
 import { commitLayerOpacity, removeLayer, selectLayer, updateLayerColor, updateLayerOpacity } from '../ui/layers-panel.js';
 import { bindModalOverlayDismissal, closeModal, openModal, toggleSection } from '../ui/modal.js';
+import { initializeLocationSearch } from '../ui/location-search.js';
 import { openAttributeTable } from '../ui/sidebar.js';
 import { initializeWorkspaceStatus } from '../ui/workspace-status.js';
 import { showToast } from '../ui/toast.js';
 import { bindAnnotationPopupDismissal } from '../ui/toolbar.js';
+
+function runOptionalStartupStep(label, callback) {
+    try {
+        callback();
+    } catch (error) {
+        console.warn(`[startup] ${label} failed`, error);
+    }
+}
 
 function revealAppShell() {
     const markReady = () => {
@@ -29,8 +38,10 @@ function revealAppShell() {
 function openModalWithHooks(modalId) {
     openModal(modalId, {
         onOpen: modalId === 'exportModal'
-            ? () => renderMapPreview()
-            : undefined
+            ? () => runOptionalStartupStep('export preview render', () => renderMapPreview())
+            : modalId === 'shareModal'
+                ? () => runOptionalStartupStep('share link generation', () => generateLink({ silent: true }))
+                : undefined
     });
 }
 
@@ -69,15 +80,24 @@ function bindGlobalHandlers() {
 }
 
 export function bootstrapApp() {
-    bindModalOverlayDismissal();
-    initializeMap({
-        getSelectedAnnotationMode,
-        onAnnotationSelect: selectAnnotationForDeletion
-    });
-    initializeAnnotationInteractions();
-    bindAnnotationControls();
-    initializeWorkspaceStatus();
-    bindGlobalHandlers();
-    bindAnnotationPopupDismissal(cancelAnnotation);
-    revealAppShell();
+    try {
+        bindModalOverlayDismissal();
+        initializeMap({
+            getSelectedAnnotationMode,
+            onAnnotationSelect: selectAnnotationForDeletion
+        });
+        bindGlobalHandlers();
+
+        runOptionalStartupStep('location search init', () => initializeLocationSearch());
+        runOptionalStartupStep('annotation interaction init', () => initializeAnnotationInteractions());
+        runOptionalStartupStep('annotation controls init', () => bindAnnotationControls());
+        runOptionalStartupStep('workspace status init', () => initializeWorkspaceStatus());
+        runOptionalStartupStep('annotation popup dismissal binding', () => bindAnnotationPopupDismissal(cancelAnnotation));
+        runOptionalStartupStep('shared state restore', () => restoreSharedStateFromUrl());
+    } catch (error) {
+        console.error('[startup] critical bootstrap failure', error);
+        showToast('Startup Warning', 'Some tools failed during startup. The app loaded with reduced functionality.', 'warning', 3500);
+    } finally {
+        revealAppShell();
+    }
 }
