@@ -1,72 +1,90 @@
 # GPMapCompV2
 
-**Geoportal Philippines Map Composer v2** is a modern web-based map composition application designed to help users create, customize, export, and share map layouts using geospatial data.
+**GPMapCompV2 (Geoportal Philippines Map Composer V2)** is a public-facing web GIS application under **Geoportal Philippines**, designed to help users create, analyze, annotate, and export interactive maps directly from a browser.
 
-This project is part of the continuous enhancement of **Geoportal Philippines**, an online platform for sharing and accessing geospatial information produced by government agencies in the Philippines.
+It provides a modern, accessible mapping workspace for citizens, researchers, planners, students, government personnel, and stakeholders who need lightweight geospatial tools without installing desktop GIS software.
 
 ---
 
 ## Overview
 
-GPMapCompV2 enables users to combine basemaps and uploaded geospatial datasets into printable or shareable map layouts through an interactive browser-based interface.
+GPMapCompV2 enables users to work with spatial data through an intuitive web interface.
 
-The system is built using:
+Users can:
 
-* **OpenLayers** for web mapping
-* **Vanilla JavaScript (ES Modules)**
-* **Vite** for modern development workflow and optimized builds
-* **CSS** for styling and UI components
+* Upload supported geospatial datasets
+* Visualize layers on an interactive map
+* Manage layer styling and transparency
+* Display feature labels
+* View attribute tables
+* Add text annotations
+* Search locations instantly
+* Connect Web Map Service (WMS) layers
+* Export maps to image and document formats
+* Generate shareable map-state links
+
+The platform is optimized for modern browsers and public web access.
 
 ---
 
 ## Key Features
 
-### Map Composition
+## Interactive Web Mapping
 
-* Interactive map viewer
-* Basemap switching
-* Layer management
-* Map layout preparation
-* North arrow support
-* Annotation tools
+* Dynamic map viewer powered by OpenLayers
+* Smooth zoom and pan navigation
+* Multiple basemap support
+* Responsive map workspace
 
-### Data Support
+## Layer Management
 
-* Multiple Shapefile uploads
-* Web Map Service (WMS) layers
-* GeoTIFF loading (with defined limitations)
-* Attribute table viewing and querying
-* Feature labeling
+* Upload local geospatial files
+* Toggle visibility
+* Adjust layer opacity
+* Remove layers
+* Feature label display
 
-### Styling & Controls
+## Supported Data Formats
 
-* Layer transparency control
-* Labels display
-* Zoom / navigation tools
-* Export preview window
+* Shapefile (.zip / .shp)
+* GeoJSON
+* KML
+* CSV
+* Web Map Service (WMS)
 
-### Export & Sharing
+## Data Analysis
 
-* Export maps to image formats
-* Shareable map links
-* Projection disclaimer support
+* Attribute Table viewer
+* Feature inspection
+* Layer-based exploration
+
+## Annotation Tools
+
+* Add text annotations
+* Edit / move / delete annotations
+
+## Search & Navigation
+
+* Location search
+* Auto zoom to result
+* Search marker display
+
+## Export Tools
+
+Export maps to:
+
+* PNG
+* JPEG
+* PDF
 
 ---
 
-## Purpose
+## Technology Stack
 
-The objective of GPMapCompV2 is to provide users with an easy-to-use web tool for generating customized map outputs using local and online geospatial data sources.
-
-It supports the broader goals of **Geoportal Philippines** in promoting standardized geospatial data access, visualization, and map-based decision support.
-
----
-
-## Organization Context
-
-Developed in alignment with enhancement plans for **Geoportal Philippines** under **NAMRIA** (National Mapping and Resource Information Authority), Republic of the Philippines.
-
----
-
-## Status
-
-Active development / modernization in progress.
+| Category     | Technology                      |
+| ------------ | ------------------------------- |
+| Frontend     | Vanilla JavaScript (ES Modules) |
+| Build Tool   | Vite                            |
+| GIS Engine   | OpenLayers                      |
+| Styling      | CSS3                            |
+| Data Parsing | shpjs                           |
