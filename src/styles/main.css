@@ -52,6 +52,14 @@
     --spacing-8: 32px;
     --left-sidebar-width: 232px;
     --right-sidebar-width: 252px;
+    --nav-control-height: 44px;
+    --nav-control-radius: 12px;
+    --nav-surface: rgba(255, 255, 255, 0.065);
+    --nav-surface-strong: rgba(255, 255, 255, 0.09);
+    --nav-surface-border: rgba(255, 255, 255, 0.14);
+    --nav-control-bg: rgba(7, 12, 20, 0.32);
+    --nav-control-border: rgba(255, 255, 255, 0.12);
+    --nav-control-shadow: 0 10px 24px rgba(2, 8, 23, 0.16);
 }
 
 body {
@@ -86,59 +94,111 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
 
 /* ========== NAVBAR - PREMIUM & MODERN ========== */
 .navbar {
-    display: flex;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(320px, 440px) minmax(0, 1fr);
     align-items: center;
-    justify-content: space-between;
+    column-gap: 20px;
     padding: 0 20px 0 24px;
-    height: 70px;
-    background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 100%);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+    min-height: 70px;
+    position: relative;
+    isolation: isolate;
+    background:
+        radial-gradient(circle at top left, rgba(59, 130, 246, 0.12), transparent 34%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0) 22%),
+        linear-gradient(135deg, #08111d 0%, #101a28 48%, #162131 100%);
+    border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.08) inset,
+        0 18px 40px rgba(2, 8, 23, 0.18),
+        0 6px 16px rgba(2, 8, 23, 0.16);
     z-index: 100;
     backdrop-filter: blur(12px);
+}
+
+.navbar::before {
+    content: '';
+    position: absolute;
+    inset: 0 0 auto;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.28), transparent);
+    opacity: 0.7;
+    pointer-events: none;
+}
+
+.navbar::after {
+    content: '';
+    position: absolute;
+    inset: auto 0 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(15, 23, 42, 0.55), transparent);
+    pointer-events: none;
 }
 
 .navbar-left {
     display: flex;
     align-items: center;
-    gap: var(--spacing-6);
-    flex: 1;
+    min-width: 0;
+    justify-self: start;
+}
+
+.navbar-center {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+}
+
+.navbar-right {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12px;
+    min-width: 0;
+    justify-self: end;
 }
 
 .app-brand {
     display: flex;
     align-items: center;
-    gap: var(--spacing-3);
+    gap: 14px;
+    padding: 7px 10px 7px 8px;
+    border-radius: 16px;
     text-decoration: none;
     color: white;
     font-weight: 800;
     font-size: 18px;
     white-space: nowrap;
     letter-spacing: -0.4px;
-    transition: all 0.3s ease;
+    transition: background 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease;
 }
 
 .app-brand:hover {
-    opacity: 0.9;
+    background: rgba(255, 255, 255, 0.045);
+    box-shadow: 0 8px 22px rgba(2, 8, 23, 0.18);
 }
 
 .app-logo {
     width: 44px;
     height: 44px;
-    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 14px;
     background: linear-gradient(135deg, #2563eb 0%, #0891b2 100%);
     display: flex;
     align-items: center;
     justify-content: center;
     overflow: hidden;
     flex-shrink: 0;
-    box-shadow: 0 6px 24px rgba(37, 99, 235, 0.35);
-    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.26) inset,
+        0 10px 24px rgba(37, 99, 235, 0.3);
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
 }
 
 .app-logo:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 10px 32px rgba(37, 99, 235, 0.45);
+    transform: translateY(-1px);
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.28) inset,
+        0 14px 28px rgba(37, 99, 235, 0.34);
 }
 
 .app-logo img {
@@ -150,30 +210,34 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
 
 .app-title {
     font-size: 18px;
-    font-weight: 700;
-    color: white;
-    letter-spacing: -0.3px;
-}
-
-.nav-controls {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-3);
-    flex-shrink: 0;
-    min-width: 0;
+    font-weight: 750;
+    color: rgba(255, 255, 255, 0.98);
+    letter-spacing: -0.35px;
+    text-shadow: 0 1px 10px rgba(2, 8, 23, 0.22);
 }
 
 .location-search {
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 8px 10px 8px 12px;
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: 14px;
-    background: rgba(255, 255, 255, 0.06);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
-    min-width: 320px;
-    flex: 0 1 380px;
+    width: min(100%, 420px);
+    padding: 8px 12px;
+    border: 1px solid var(--nav-surface-border);
+    border-radius: 16px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.05));
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.06) inset,
+        var(--nav-control-shadow);
+    min-width: 0;
+    transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.location-search:hover {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.06));
+    border-color: rgba(255, 255, 255, 0.18);
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.07) inset,
+        0 14px 28px rgba(2, 8, 23, 0.18);
 }
 
 .location-search-label {
@@ -191,20 +255,24 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
 .location-search-field {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 4px;
     min-width: 0;
     flex: 1;
-    padding: 4px;
-    border: 1px solid rgba(255, 255, 255, 0.16);
-    border-radius: 12px;
-    background: rgba(15, 20, 25, 0.28);
-    transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+    min-height: var(--nav-control-height);
+    padding: 3px 4px 3px 10px;
+    border: 1px solid var(--nav-control-border);
+    border-radius: var(--nav-control-radius);
+    background: linear-gradient(180deg, rgba(6, 12, 18, 0.26), rgba(10, 16, 24, 0.4));
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease, transform 0.2s ease;
 }
 
 .location-search-field:focus-within {
     border-color: #2563eb;
-    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.22);
-    background: rgba(255, 255, 255, 0.12);
+    box-shadow:
+        0 0 0 3px rgba(37, 99, 235, 0.22),
+        0 10px 20px rgba(15, 23, 42, 0.16);
+    background: linear-gradient(180deg, rgba(15, 27, 43, 0.42), rgba(10, 20, 34, 0.5));
 }
 
 .location-search-input {
@@ -214,10 +282,11 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
     width: 100%;
     border: none;
     background: transparent;
-    color: white;
+    color: rgba(255, 255, 255, 0.98);
     font-size: 13px;
     font-weight: 600;
-    padding: 6px 8px;
+    line-height: 1.2;
+    padding: 0 8px 0 0;
 }
 
 .location-search-input::placeholder {
@@ -230,20 +299,21 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
 
 .location-search-clear,
 .location-search-submit {
-    width: 34px;
-    height: 34px;
+    width: 36px;
+    height: 36px;
     border: 1px solid transparent;
     border-radius: 10px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    flex: 0 0 auto;
     cursor: pointer;
     transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
 }
 
 .location-search-clear {
     background: transparent;
-    color: rgba(255, 255, 255, 0.72);
+    color: rgba(255, 255, 255, 0.68);
 }
 
 .location-search-clear[hidden] {
@@ -252,18 +322,24 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
 
 .location-search-clear:hover {
     background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.08);
     color: white;
 }
 
 .location-search-submit {
     background: linear-gradient(135deg, var(--accent-light) 0%, var(--accent-dark) 100%);
     color: white;
-    box-shadow: 0 6px 16px rgba(37, 99, 235, 0.28);
+    border-color: rgba(255, 255, 255, 0.08);
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.18) inset,
+        0 8px 18px rgba(37, 99, 235, 0.28);
 }
 
 .location-search-submit:hover {
     transform: translateY(-1px);
-    box-shadow: 0 8px 20px rgba(37, 99, 235, 0.36);
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.22) inset,
+        0 10px 22px rgba(37, 99, 235, 0.34);
 }
 
 .location-search.is-loading .location-search-submit {
@@ -284,11 +360,22 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 8px 10px 8px 12px;
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: 14px;
-    background: rgba(255, 255, 255, 0.06);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    padding: 8px 12px;
+    border: 1px solid var(--nav-surface-border);
+    border-radius: 16px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.045));
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.06) inset,
+        var(--nav-control-shadow);
+    transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.basemap-selector:hover {
+    border-color: rgba(255, 255, 255, 0.18);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.095), rgba(255, 255, 255, 0.05));
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.07) inset,
+        0 14px 28px rgba(2, 8, 23, 0.16);
 }
 
 .basemap-selector label {
@@ -305,13 +392,17 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
 
 .basemap-selector select {
     min-width: 160px;
+    min-height: var(--nav-control-height);
     padding: 10px 36px 10px 12px;
-    border: 1px solid rgba(255, 255, 255, 0.16);
-    border-radius: 10px;
-    background: rgba(15, 20, 25, 0.28);
-    color: white;
+    border: 1px solid var(--nav-control-border);
+    border-radius: var(--nav-control-radius);
+    background:
+        linear-gradient(180deg, rgba(6, 12, 18, 0.26), rgba(10, 16, 24, 0.4)),
+        rgba(7, 12, 20, 0.32);
+    color: rgba(255, 255, 255, 0.96);
     font-size: 12px;
     font-weight: 600;
+    line-height: 1.2;
     cursor: pointer;
     transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
     backdrop-filter: blur(10px);
@@ -328,16 +419,16 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
 }
 
 .basemap-selector select:hover {
-    background-color: rgba(255, 255, 255, 0.16);
-    border-color: rgba(255, 255, 255, 0.26);
+    border-color: rgba(255, 255, 255, 0.22);
+    box-shadow: 0 8px 18px rgba(2, 8, 23, 0.12);
 }
 
 .basemap-selector select:focus {
     outline: none;
-    background-color: rgba(255, 255, 255, 0.18);
     border-color: #2563eb;
-    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.22);
-    transform: translateY(-1px);
+    box-shadow:
+        0 0 0 3px rgba(37, 99, 235, 0.22),
+        0 10px 20px rgba(15, 23, 42, 0.16);
 }
 
 .basemap-selector select option {
@@ -348,12 +439,13 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
 
 /* Modern Button Styles */
 .btn {
-    min-height: 40px;
+    min-height: var(--nav-control-height);
     padding: 10px 16px;
     border: 1px solid transparent;
-    border-radius: 12px;
+    border-radius: var(--nav-control-radius);
     font-size: 12px;
     font-weight: 700;
+    line-height: 1.1;
     cursor: pointer;
     transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, color 0.2s ease, transform 0.2s ease;
     display: inline-flex;
@@ -362,17 +454,23 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
     text-transform: uppercase;
     letter-spacing: 0.55px;
     justify-content: center;
+    box-shadow: 0 10px 22px rgba(2, 8, 23, 0.14);
 }
 
 .btn-primary {
-    background: linear-gradient(135deg, var(--accent-light) 0%, var(--accent-dark) 100%);
+    background: linear-gradient(135deg, #4f8dfb 0%, #2563eb 42%, #1d4ed8 100%);
     color: white;
-    box-shadow: 0 6px 20px rgba(37, 99, 235, 0.3);
+    border-color: rgba(255, 255, 255, 0.1);
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.2) inset,
+        0 12px 26px rgba(29, 78, 216, 0.34);
 }
 
 .btn-primary:hover {
-    background: linear-gradient(135deg, #5b9eff 0%, #2563eb 100%);
-    box-shadow: 0 8px 28px rgba(37, 99, 235, 0.4);
+    background: linear-gradient(135deg, #68a4ff 0%, #2f6df0 48%, #2357d1 100%);
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.24) inset,
+        0 14px 30px rgba(29, 78, 216, 0.4);
     transform: translateY(-2px);
 }
 
@@ -381,20 +479,25 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
 }
 
 .btn-share {
-    background: rgba(255, 255, 255, 0.08);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.04));
     color: rgba(255, 255, 255, 0.96);
-    border-color: rgba(255, 255, 255, 0.18);
+    border-color: rgba(255, 255, 255, 0.16);
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.06) inset,
+        0 10px 22px rgba(2, 8, 23, 0.14);
 }
 
 .btn-share:hover {
-    background: rgba(255, 255, 255, 0.15);
-    border-color: rgba(255, 255, 255, 0.32);
-    box-shadow: 0 10px 22px rgba(15, 20, 25, 0.2);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.06));
+    border-color: rgba(255, 255, 255, 0.24);
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.08) inset,
+        0 12px 24px rgba(15, 20, 25, 0.18);
     transform: translateY(-1px);
 }
 
 .btn-export {
-    min-width: 108px;
+    min-width: 112px;
 }
 
 .btn-secondary {
@@ -1846,25 +1949,32 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
     }
 
     .navbar {
+        display: flex;
         flex-wrap: wrap;
-        height: auto;
+        min-height: 0;
         gap: 12px;
         padding: 14px 16px;
     }
 
     .navbar-left,
-    .nav-controls {
+    .navbar-center,
+    .navbar-right {
         width: 100%;
+        justify-self: stretch;
     }
 
-    .nav-controls {
+    .navbar-center {
+        justify-content: flex-start;
+    }
+
+    .navbar-right {
         flex-wrap: wrap;
         justify-content: flex-start;
     }
 
     .location-search {
         min-width: min(100%, 420px);
-        flex: 1 1 320px;
+        width: min(100%, 420px);
     }
 
     .map-control-stack {
@@ -1903,8 +2013,12 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
         min-width: 144px;
     }
 
+    .navbar {
+        grid-template-columns: minmax(0, 1fr) minmax(280px, 380px) minmax(0, 1fr);
+    }
+
     .location-search {
-        min-width: 280px;
+        width: min(100%, 380px);
     }
 }
 
