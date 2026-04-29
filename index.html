@@ -154,7 +154,7 @@
     <!-- TOP NAVIGATION -->
     <nav class="navbar">
         <div class="navbar-left">
-            <a href="#" class="app-brand">
+            <a href="./" class="app-brand" aria-label="Geoportal Philippines Map Composer home">
                 <div class="app-logo">
                     <img
                         src="https://geoportal.gov.ph/viewer/assets/img/gplogo.png"
@@ -163,7 +163,10 @@
                         height="44"
                     >
                 </div>
-                <div class="app-title">Geoportal Philippines Map Composer</div>
+                <div class="app-title">
+                    <span class="app-title-full">Geoportal Philippines Map Composer</span>
+                    <span class="app-title-short" aria-hidden="true">Map Composer</span>
+                </div>
             </a>
         </div>
 
@@ -206,8 +209,8 @@
                 </select>
             </div>
             <div class="nav-actions">
-                <button class="btn btn-share" onclick="openModal('shareModal')"><i class="fas fa-share-alt"></i> <span>Share</span></button>
-                <button class="btn btn-export btn-primary" onclick="openModal('exportModal')"><i class="fas fa-download"></i> <span>Export</span></button>
+                <button class="btn btn-share" onclick="openModal('shareModal')" aria-label="Share current map" title="Share current map"><i class="fas fa-share-alt"></i> <span>Share</span></button>
+                <button class="btn btn-export btn-primary" onclick="openModal('exportModal')" aria-label="Export current map" title="Export current map"><i class="fas fa-download"></i> <span>Export</span></button>
             </div>
         </div>
     </nav>
