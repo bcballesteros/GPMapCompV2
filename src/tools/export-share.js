@@ -591,19 +591,75 @@ function createExportFileName(extension) {
     return `NAMRIA_GPMapComp_${getTimeStampForFileName()}.${extension}`;
 }
 
-function drawExportDisclaimer(context, width, height) {
+function getLocalExportDate() {
     const now = new Date();
-    const exportDate = [
+    return [
         now.getFullYear(),
         String(now.getMonth() + 1).padStart(2, '0'),
         String(now.getDate()).padStart(2, '0')
     ].join('-');
+}
+
+function getMapProjectionLabel() {
+    const projection = getMap()?.getView?.()?.getProjection?.();
+    const projectionCode = projection?.getCode?.();
+
+    if (!projectionCode) {
+        return 'Unknown CRS';
+    }
+
+    if (projectionCode === 'EPSG:3857') {
+        return 'EPSG:3857 Web Mercator';
+    }
+
+    if (projectionCode === 'EPSG:4326') {
+        return 'EPSG:4326 WGS 84';
+    }
+
+    return projectionCode;
+}
+
+function getExportCrsLabel() {
+    const activeLayerName = getState().currentLayerName;
+    const activeLayerRecord = activeLayerName ? getLayerRecord(activeLayerName) : null;
+    const activeLayerCrs = activeLayerRecord?.sourceCrs;
+
+    if (
+        activeLayerRecord?.sourceCrsDetected
+        && activeLayerCrs
+        && activeLayerCrs !== 'Unknown CRS'
+    ) {
+        return activeLayerCrs;
+    }
+
+    return getMapProjectionLabel();
+}
+
+function fitTextToWidth(context, text, maxWidth) {
+    if (context.measureText(text).width <= maxWidth) {
+        return text;
+    }
+
+    const ellipsis = '...';
+    let trimmedText = text;
+
+    while (trimmedText.length > 0 && context.measureText(`${trimmedText}${ellipsis}`).width > maxWidth) {
+        trimmedText = trimmedText.slice(0, -1);
+    }
+
+    return trimmedText ? `${trimmedText}${ellipsis}` : ellipsis;
+}
+
+function drawExportDisclaimer(context, width, height) {
+    const exportDate = getLocalExportDate();
     const footerHeight = Math.max(34, Math.round(height * 0.045));
     const fontSize = Math.max(11, Math.round(height * 0.0115));
     const horizontalPadding = Math.max(16, Math.round(width * 0.012));
     const baseLineY = height - Math.round((footerHeight - fontSize) / 2) + 1;
-    const disclaimer = 'Generated from NAMRIA GP Map Composer | For reference use only | Not for official survey use';
-    const dateText = `Export date ${exportDate}`;
+    const gutter = Math.max(20, Math.round(width * 0.018));
+    const textColumnWidth = (width - (horizontalPadding * 2) - gutter) / 2;
+    const leftText = `Generated from NAMRIA GP Map Composer | Projection: ${getExportCrsLabel()}`;
+    const rightText = `Exported: ${exportDate} | For reference use only`;
 
     context.save();
     context.fillStyle = 'rgba(255, 255, 255, 0.88)';
@@ -618,12 +674,13 @@ function drawExportDisclaimer(context, width, height) {
     context.fillStyle = '#475569';
     context.font = `500 ${fontSize}px Inter, "Segoe UI", sans-serif`;
     context.textBaseline = 'alphabetic';
-    context.fillText(disclaimer, horizontalPadding, baseLineY);
+    context.textAlign = 'left';
+    context.fillText(fitTextToWidth(context, leftText, textColumnWidth), horizontalPadding, baseLineY);
 
-    const dateWidth = context.measureText(dateText).width;
     context.fillStyle = '#64748b';
     context.font = `500 ${fontSize}px Inter, "Segoe UI", sans-serif`;
-    context.fillText(dateText, width - horizontalPadding - dateWidth, baseLineY);
+    context.textAlign = 'right';
+    context.fillText(fitTextToWidth(context, rightText, textColumnWidth), width - horizontalPadding, baseLineY);
     context.restore();
 }
 
