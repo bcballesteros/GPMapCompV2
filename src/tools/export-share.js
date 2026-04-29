@@ -3,6 +3,7 @@ import { ANNOTATION_LAYER_ID } from '../config/constants.js';
 import { createExportCanvas, createPdfBlobFromCanvas, downloadBlob, downloadCanvas } from '../services/export-service.js';
 import { addWmsLayer, changeBasemapLayer, ensureAnnotationLayer, updateManagedLayerStyle } from '../map/layer-manager.js';
 import { getCurrentSearchResult, getLayerRecord, getMap, getState } from '../state/store.js';
+import { createGpLayerConfig } from '../services/gp-service.js';
 import { createWmsLayerConfig } from '../services/wms-service.js';
 import { addLayerItem } from '../ui/layers-panel.js';
 import { closeModal } from '../ui/modal.js';
@@ -317,8 +318,22 @@ function serializeLayerSettings() {
             const baseState = {
                 name: layerName,
                 visible: record.layer?.getVisible?.() !== false,
-                opacity: Number((record.opacity ?? record.layer?.getOpacity?.() ?? 1).toFixed(3))
+                opacity: Number((record.opacity ?? record.layer?.getOpacity?.() ?? 1).toFixed(3)),
+                sourceCrs: record.sourceCrs || 'Unknown CRS',
+                sourceCrsDetected: Boolean(record.sourceCrsDetected)
             };
+
+            if (record.isGP) {
+                return {
+                    ...baseState,
+                    type: 'gp',
+                    gpUrl: record.gpUrl || '',
+                    gpLayerName: record.gpLayerName || '',
+                    gpLayerType: record.gpLayerType || '',
+                    gpTileUrl: record.gpTileUrl || '',
+                    displayName: record.displayName || layerName
+                };
+            }
 
             if (record.isWMS) {
                 return {
@@ -454,10 +469,37 @@ function applyLayerState(layerState) {
         record = addWmsLayer(layerState.name, source, layer, {
             wmsUrl: layerState.wmsUrl,
             wmsLayerName: layerState.wmsLayerName,
-            displayName: layerState.displayName || layerState.name
+            displayName: layerState.displayName || layerState.name,
+            sourceCrs: layerState.sourceCrs || 'Unknown CRS',
+            sourceCrsDetected: Boolean(layerState.sourceCrsDetected)
         });
         addLayerItem(layerState.name, record.color || '#2563eb', 0, {
             isWMS: true,
+            visible: layerState.visible !== false
+        });
+    }
+
+    if (!record && layerState.type === 'gp' && layerState.gpUrl && layerState.gpLayerName) {
+        const layerInfo = {
+            name: layerState.gpLayerName,
+            title: layerState.displayName || layerState.name,
+            type: layerState.gpLayerType || 'xyz',
+            tileUrl: layerState.gpTileUrl || ''
+        };
+        const { source, layer } = createGpLayerConfig(layerState.gpUrl, layerInfo);
+        record = addWmsLayer(layerState.name, source, layer, {
+            isGP: true,
+            gpUrl: layerState.gpUrl,
+            gpLayerName: layerState.gpLayerName,
+            gpLayerType: layerState.gpLayerType || 'xyz',
+            gpTileUrl: layerState.gpTileUrl || '',
+            displayName: layerState.displayName || layerState.name,
+            sourceCrs: layerState.sourceCrs || 'Unknown CRS',
+            sourceCrsDetected: Boolean(layerState.sourceCrsDetected)
+        });
+        addLayerItem(layerState.name, record.color || '#2563eb', 0, {
+            isWMS: true,
+            isGP: true,
             visible: layerState.visible !== false
         });
     }
@@ -472,6 +514,8 @@ function applyLayerState(layerState) {
     record.layer.setVisible(visible);
     record.layer.setOpacity(opacity);
     record.opacity = opacity;
+    record.sourceCrs = layerState.sourceCrs || record.sourceCrs || 'Unknown CRS';
+    record.sourceCrsDetected = Boolean(layerState.sourceCrsDetected || record.sourceCrsDetected);
 
     if (!record.isWMS && layerState.color) {
         record.color = layerState.color;

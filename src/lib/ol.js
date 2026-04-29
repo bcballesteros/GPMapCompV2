@@ -4,6 +4,7 @@ import Map from 'ol/Map.js';
 import View from 'ol/View.js';
 import GeoJSON from 'ol/format/GeoJSON.js';
 import KML from 'ol/format/KML.js';
+import WMSCapabilities from 'ol/format/WMSCapabilities.js';
 import Point from 'ol/geom/Point.js';
 import TileLayer from 'ol/layer/Tile.js';
 import VectorLayer from 'ol/layer/Vector.js';
@@ -63,7 +64,8 @@ const ol = {
     },
     format: {
         GeoJSON,
-        KML
+        KML,
+        WMSCapabilities
     },
     geom: {
         Point

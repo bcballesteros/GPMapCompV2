@@ -10,7 +10,7 @@ export function findLayerNameByLayer(targetLayer) {
     return Object.keys(uploadedLayers).find((name) => uploadedLayers[name].layer === targetLayer) || null;
 }
 
-export function addVectorLayer(layerName, layerColor, geojson, features) {
+export function addVectorLayer(layerName, layerColor, geojson, features, metadata = {}) {
     const source = new ol.source.Vector({ features });
     const layerRecord = {
         source,
@@ -21,6 +21,8 @@ export function addVectorLayer(layerName, layerColor, geojson, features) {
         opacity: DEFAULT_VECTOR_OPACITY,
         geometryType: geojson.features[0]?.geometry?.type || 'Unknown',
         isWMS: false,
+        sourceCrs: metadata.sourceCrs || 'Unknown CRS',
+        sourceCrsDetected: Boolean(metadata.sourceCrsDetected),
         labelsVisible: false,
         labelField: pickDefaultLabelField(features)
     };
@@ -48,8 +50,15 @@ export function addWmsLayer(layerName, source, layer, metadata = {}) {
         opacity: DEFAULT_VECTOR_OPACITY,
         geometryType: 'WMS',
         isWMS: true,
+        isGP: Boolean(metadata.isGP),
+        sourceCrs: metadata.sourceCrs || 'Unknown CRS',
+        sourceCrsDetected: Boolean(metadata.sourceCrsDetected),
         wmsUrl: metadata.wmsUrl || '',
         wmsLayerName: metadata.wmsLayerName || '',
+        gpUrl: metadata.gpUrl || '',
+        gpLayerName: metadata.gpLayerName || '',
+        gpLayerType: metadata.gpLayerType || '',
+        gpTileUrl: metadata.gpTileUrl || '',
         displayName: metadata.displayName || layerName
     });
     setCurrentLayerName(layerName);

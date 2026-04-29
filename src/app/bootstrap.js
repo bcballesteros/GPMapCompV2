@@ -2,7 +2,7 @@ import { activateAnnotation, bindAnnotationControls, cancelAnnotation, deleteAnn
 import { copyToClipboard, downloadMap, generateLink, renderMapPreview, restoreSharedStateFromUrl } from '../tools/export-share.js';
 import { initializeMap } from '../map/map-init.js';
 import { changeBasemapLayer } from '../map/layer-manager.js';
-import { addWMSLayerFromForm, clearCsvSelection, clearFileSelection, clearGeoJSONSelection, clearKmlSelection, handleCsvSelect, handleFileSelect, handleGeoJSONSelect, handleKmlSelect, submitUpload, updateDataSection } from '../tools/upload-tool.js';
+import { addGPLayerFromForm, addWMSLayerFromForm, clearCsvSelection, clearFileSelection, clearGeoJSONSelection, clearKmlSelection, fetchGpLayersFromForm, fetchWmsCapabilitiesFromForm, handleCsvSelect, handleFileSelect, handleGeoJSONSelect, handleKmlSelect, initializeGpLayerForm, initializeWmsLayerForm, resetGpLayerFormSession, resetWmsLayerFormSession, submitUpload, updateDataSection } from '../tools/upload-tool.js';
 import { commitLayerOpacity, removeLayer, selectLayer, updateLayerColor, updateLayerOpacity } from '../ui/layers-panel.js';
 import { bindModalOverlayDismissal, closeModal, openModal, toggleSection } from '../ui/modal.js';
 import { initializeLocationSearch } from '../ui/location-search.js';
@@ -41,7 +41,11 @@ function openModalWithHooks(modalId) {
             ? () => runOptionalStartupStep('export preview render', () => renderMapPreview())
             : modalId === 'shareModal'
                 ? () => runOptionalStartupStep('share link generation', () => generateLink({ silent: true }))
-                : undefined
+                : modalId === 'wmsModal'
+                    ? () => runOptionalStartupStep('WMS modal reset', () => resetWmsLayerFormSession())
+                    : modalId === 'gpModal'
+                        ? () => runOptionalStartupStep('GP modal reset', () => resetGpLayerFormSession())
+                    : undefined
     });
 }
 
@@ -73,6 +77,9 @@ function bindGlobalHandlers() {
     window.deleteAnnotation = deleteAnnotation;
     window.changeBasemap = changeBasemapLayer;
     window.addWMSLayer = addWMSLayerFromForm;
+    window.fetchWMSCapabilities = fetchWmsCapabilitiesFromForm;
+    window.addGPLayer = addGPLayerFromForm;
+    window.fetchGPLayers = fetchGpLayersFromForm;
     window.downloadMap = downloadMap;
     window.renderMapPreview = renderMapPreview;
     window.copyToClipboard = copyToClipboard;
@@ -92,6 +99,8 @@ export function bootstrapApp() {
         runOptionalStartupStep('annotation interaction init', () => initializeAnnotationInteractions());
         runOptionalStartupStep('annotation controls init', () => bindAnnotationControls());
         runOptionalStartupStep('workspace status init', () => initializeWorkspaceStatus());
+        runOptionalStartupStep('WMS form init', () => initializeWmsLayerForm());
+        runOptionalStartupStep('GP form init', () => initializeGpLayerForm());
         runOptionalStartupStep('annotation popup dismissal binding', () => bindAnnotationPopupDismissal(cancelAnnotation));
         runOptionalStartupStep('shared state restore', () => restoreSharedStateFromUrl());
     } catch (error) {

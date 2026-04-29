@@ -1105,38 +1105,66 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
 .tool-icon {
     width: 38px;
     height: 38px;
-    border-radius: 12px;
+    border-radius: 10px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 15px;
+    font-size: 14px;
+    line-height: 1;
     flex-shrink: 0;
     transition: transform 0.2s ease, box-shadow 0.2s ease;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+.tool-icon i {
+    width: 1em;
+    height: 1em;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
 }
 
 .tool-section-group:hover .tool-icon {
-    transform: scale(1.04);
+    transform: scale(1.02);
 }
 
 .tool-icon.blue {
-    background: var(--blue-100);
+    background: rgba(219, 234, 254, 0.72);
     color: var(--blue-500);
+    border: 1px solid rgba(37, 99, 235, 0.12);
 }
 
 .tool-icon.cyan {
-    background: #cffafe;
+    background: rgba(207, 250, 254, 0.72);
     color: #0891b2;
+    border: 1px solid rgba(8, 145, 178, 0.12);
 }
 
 .tool-icon.purple {
-    background: var(--purple-50);
+    background: rgba(250, 245, 255, 0.82);
     color: var(--purple-500);
+    border: 1px solid rgba(147, 51, 234, 0.12);
+}
+
+.tool-icon.gis-layers {
+    background: linear-gradient(135deg, rgba(238, 242, 255, 0.88) 0%, rgba(241, 245, 249, 0.82) 100%);
+    color: #4f46e5;
+    border: 1px solid rgba(79, 70, 229, 0.14);
+}
+
+.advanced-layers-section .tool-section-header {
+    background: linear-gradient(180deg, rgba(248, 250, 252, 0.95) 0%, rgba(255, 255, 255, 0.99) 100%);
+}
+
+.advanced-layers-section .tool-btn i {
+    color: #4f46e5;
 }
 
 .tool-icon.amber {
-    background: var(--orange-50);
+    background: rgba(255, 247, 237, 0.86);
     color: var(--orange-500);
+    border: 1px solid rgba(234, 88, 12, 0.12);
 }
 
 .tool-section-info {
@@ -1217,6 +1245,44 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
     display: inline-flex;
     align-items: center;
     gap: 8px;
+    min-width: 0;
+}
+
+.tool-section-content .tool-btn {
+    color: var(--gray-800);
+}
+
+.tool-section-content .tool-btn:hover {
+    color: var(--gray-900);
+    border-color: #cbd5e1;
+}
+
+.tool-section-content .tool-btn span:first-child i {
+    width: 16px;
+    height: 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 16px;
+    font-size: 13px;
+    line-height: 1;
+    text-align: center;
+}
+
+.annotation-tools-section .tool-section-content .tool-btn i {
+    color: var(--blue-500);
+}
+
+.data-analysis-section .tool-section-content .tool-btn i {
+    color: #0891b2;
+}
+
+.advanced-layers-section .tool-section-content .tool-btn i {
+    color: #4f46e5;
+}
+
+.map-settings-section .tool-section-content .tool-btn i {
+    color: var(--orange-500);
 }
 
 .tool-btn-arrow {
@@ -1563,6 +1629,95 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
     border-color: var(--accent);
     box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
     background: var(--blue-50);
+}
+
+.form-input-action-row {
+    display: flex;
+    align-items: stretch;
+    gap: var(--spacing-2);
+}
+
+.form-input-action-row .form-input {
+    min-width: 0;
+}
+
+.form-input-action {
+    flex: 0 0 auto;
+    white-space: nowrap;
+}
+
+.wms-layer-picker {
+    position: relative;
+}
+
+.wms-layer-picker-trigger {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-3);
+    color: var(--gray-700);
+    cursor: pointer;
+    text-align: left;
+}
+
+.wms-layer-picker-trigger i {
+    color: var(--gray-500);
+    font-size: 11px;
+}
+
+.wms-layer-checklist {
+    margin-top: var(--spacing-2);
+    max-height: 240px;
+    overflow-y: auto;
+    border: 1px solid var(--gray-300);
+    border-radius: 10px;
+    background: white;
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
+}
+
+.wms-layer-checklist-item {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: var(--spacing-3);
+    align-items: start;
+    padding: var(--spacing-3);
+    border-bottom: 1px solid var(--gray-100);
+    cursor: pointer;
+}
+
+.wms-layer-checklist-item:last-child {
+    border-bottom: 0;
+}
+
+.wms-layer-checklist-item:hover {
+    background: var(--gray-50);
+}
+
+.wms-layer-checklist-item input {
+    margin-top: 2px;
+}
+
+.wms-layer-checklist-title {
+    display: block;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--gray-900);
+    line-height: 1.25;
+}
+
+.wms-layer-checklist-name {
+    display: block;
+    margin-top: 2px;
+    font-size: 11px;
+    color: var(--gray-500);
+    overflow-wrap: anywhere;
+}
+
+.wms-layer-empty {
+    padding: var(--spacing-4);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--gray-500);
 }
 
 .upload-area {

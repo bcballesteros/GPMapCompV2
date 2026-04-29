@@ -1,10 +1,14 @@
 import shp from 'shpjs';
+import { iter } from 'but-unzip';
 import ol from '../lib/ol.js';
 import { geojsonToOpenLayers } from '../utils/geo.js';
 
 export async function readShapefile(file) {
     const arrayBuffer = await file.arrayBuffer();
-    return shp(arrayBuffer);
+    const sourceCrs = await detectShapefileZipCrs(arrayBuffer);
+    const raw = await shp(arrayBuffer);
+
+    return { raw, sourceCrs };
 }
 
 export async function readGeoJSON(file) {
@@ -24,6 +28,97 @@ export async function readKml(file) {
         dataProjection: 'EPSG:4326',
         featureProjection: 'EPSG:3857'
     });
+}
+
+function uniqueValues(values) {
+    return [...new Set(values.filter(Boolean))];
+}
+
+function readZipTextEntries(arrayBuffer, extension) {
+    const decoder = new TextDecoder();
+    const entries = [];
+
+    for (const entry of iter(new Uint8Array(arrayBuffer))) {
+        if (!entry.filename.toLowerCase().endsWith(extension)) {
+            continue;
+        }
+
+        entries.push(Promise.resolve(entry.read()).then((bytes) => ({
+            filename: entry.filename,
+            text: decoder.decode(bytes)
+        })));
+    }
+
+    return Promise.all(entries);
+}
+
+function normalizeCrsText(value) {
+    return String(value || '').trim().replace(/\s+/g, ' ');
+}
+
+function parseCrsFromText(value) {
+    const text = normalizeCrsText(value);
+    if (!text) {
+        return null;
+    }
+
+    if (/PRS[_\s-]*1992|Philippine Reference System 1992/i.test(text)) {
+        const epsgMatch = text.match(/AUTHORITY\s*\[\s*["']EPSG["']\s*,\s*["']?(\d+)["']?\s*\]/i)
+            || text.match(/EPSG[:"'\s,]+(\d{3,6})/i);
+        return epsgMatch ? `PRS92 (EPSG:${epsgMatch[1]})` : 'PRS92';
+    }
+
+    const authorityMatch = text.match(/AUTHORITY\s*\[\s*["']EPSG["']\s*,\s*["']?(\d+)["']?\s*\]/i);
+    if (authorityMatch) {
+        return `EPSG:${authorityMatch[1]}`;
+    }
+
+    const epsgMatch = text.match(/EPSG[:"'\s,]+(\d{3,6})/i);
+    if (epsgMatch) {
+        return `EPSG:${epsgMatch[1]}`;
+    }
+
+    const nameMatch = text.match(/^(?:GEOGCS|PROJCS)\s*\[\s*["']([^"']+)["']/i);
+    return nameMatch ? nameMatch[1] : null;
+}
+
+function buildCrsMetadata(crsValues, fallback = 'Unknown CRS') {
+    const uniqueCrs = uniqueValues(crsValues);
+
+    if (uniqueCrs.length === 1) {
+        return {
+            sourceCrs: uniqueCrs[0],
+            sourceCrsDetected: uniqueCrs[0] !== 'Unknown CRS'
+        };
+    }
+
+    if (uniqueCrs.length > 1) {
+        return {
+            sourceCrs: `Multiple CRS (${uniqueCrs.join(', ')})`,
+            sourceCrsDetected: true
+        };
+    }
+
+    return {
+        sourceCrs: fallback,
+        sourceCrsDetected: fallback !== 'Unknown CRS'
+    };
+}
+
+async function detectShapefileZipCrs(arrayBuffer) {
+    const prjEntries = await readZipTextEntries(arrayBuffer, '.prj');
+    return buildCrsMetadata(prjEntries.map((entry) => parseCrsFromText(entry.text)));
+}
+
+function detectGeojsonCrs(geojson) {
+    const crs = geojson?.crs;
+    const crsText = crs?.properties?.name || crs?.properties?.href || crs?.name || '';
+    const parsedCrs = parseCrsFromText(crsText);
+
+    return {
+        sourceCrs: parsedCrs || 'EPSG:4326',
+        sourceCrsDetected: Boolean(parsedCrs) || geojson?.type === 'FeatureCollection' || geojson?.type === 'Feature'
+    };
 }
 
 function parseCsvLine(line) {
@@ -130,18 +225,22 @@ function normalizeGeojson(raw) {
 
 export async function parseUploadFile(layerData) {
     let raw;
+    let sourceCrsMetadata;
     switch (layerData.type) {
     case 'shapefile':
-        raw = await readShapefile(layerData.file);
+        ({ raw, sourceCrs: sourceCrsMetadata } = await readShapefile(layerData.file));
         break;
     case 'geojson':
         raw = await readGeoJSON(layerData.file);
+        sourceCrsMetadata = detectGeojsonCrs(raw);
         break;
     case 'kml':
         raw = await readKml(layerData.file);
+        sourceCrsMetadata = { sourceCrs: 'EPSG:4326', sourceCrsDetected: true };
         break;
     case 'csv':
         raw = await readCsv(layerData.file);
+        sourceCrsMetadata = { sourceCrs: 'EPSG:4326', sourceCrsDetected: true };
         break;
     default:
         throw new Error(`Unsupported upload type: ${layerData.type}`);
@@ -151,6 +250,8 @@ export async function parseUploadFile(layerData) {
 
     return {
         geojson,
-        features: geojsonToOpenLayers(geojson)
+        features: geojsonToOpenLayers(geojson),
+        sourceCrs: sourceCrsMetadata?.sourceCrs || 'Unknown CRS',
+        sourceCrsDetected: Boolean(sourceCrsMetadata?.sourceCrsDetected)
     };
 }

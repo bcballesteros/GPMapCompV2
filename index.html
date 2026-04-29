@@ -293,7 +293,7 @@
 
             <div class="right-sidebar-content">
                 <!-- Annotation Tools -->
-                <div class="tool-section-group">
+                <div class="tool-section-group annotation-tools-section">
                     <div class="tool-section-header" onclick="toggleSection(this)">
                         <div class="tool-icon blue"><i class="fas fa-pen-fancy"></i></div>
                         <div class="tool-section-info">
@@ -317,7 +317,7 @@
                 </div>
 
                 <!-- Data Analysis -->
-                <div class="tool-section-group">
+                <div class="tool-section-group data-analysis-section">
                     <div class="tool-section-header" onclick="toggleSection(this)">
                         <div class="tool-icon cyan"><i class="fas fa-chart-line"></i></div>
                         <div class="tool-section-info">
@@ -337,9 +337,9 @@
                 </div>
 
                 <!-- Advanced Layers -->
-                <div class="tool-section-group">
+                <div class="tool-section-group advanced-layers-section">
                     <div class="tool-section-header" onclick="toggleSection(this)">
-                        <div class="tool-icon purple"><i class="fas fa-flask-vial"></i></div>
+                        <div class="tool-icon gis-layers"><i class="fas fa-layer-group"></i></div>
                         <div class="tool-section-info">
                             <div class="tool-section-title">Advanced Layers</div>
                             <div class="tool-section-desc">Connect remote and raster data sources</div>
@@ -352,6 +352,10 @@
                                 <span><i class="fas fa-globe"></i> Add WMS Layer</span>
                                 <span class="tool-btn-arrow">&rsaquo;</span>
                             </button>
+                            <button class="tool-btn" onclick="openModal('gpModal')" title="Connect a Geoportal Philippines or internal map service layer">
+                                <span><i class="fas fa-map-location-dot"></i> Add GP Layer</span>
+                                <span class="tool-btn-arrow">&rsaquo;</span>
+                            </button>
                             <button class="tool-btn" onclick="showToast('Coming Soon', 'GeoTIFF support will be available soon', 'info')" title="Raster import is planned but not available yet">
                                 <span><i class="fas fa-image"></i> Add GeoTIFF</span>
                                 <span class="tool-btn-arrow">&rsaquo;</span>
@@ -361,7 +365,7 @@
                 </div>
 
                 <!-- Map Settings -->
-                <div class="tool-section-group">
+                <div class="tool-section-group map-settings-section">
                     <div class="tool-section-header" onclick="toggleSection(this)">
                         <div class="tool-icon amber"><i class="fas fa-sliders"></i></div>
                         <div class="tool-section-info">
@@ -627,6 +631,47 @@
         </div>
     </div>
 
+    <!-- GP Layer Modal -->
+    <div class="modal-overlay" id="gpModal">
+        <div class="modal">
+            <div class="modal-header">
+                <div class="modal-title"><i class="fas fa-map-location-dot"></i> Add GP Layer</div>
+                <button class="modal-close" onclick="closeModal('gpModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <div class="form-label">GP URL</div>
+                    <div class="form-input-action-row">
+                        <input type="text" class="form-input" id="gpUrl" value="https://geoportal.gov.ph/" placeholder="e.g., https://geoportal.gov.ph/ or an internal WMS/map service endpoint">
+                        <button type="button" class="btn btn-secondary form-input-action" id="gpFetchButton"><i class="fas fa-cloud-arrow-down"></i> Fetch</button>
+                    </div>
+                    <div id="gpFetchFeedback" class="inline-feedback" aria-live="polite"></div>
+                </div>
+
+                <div class="form-group">
+                    <div class="form-label">Layer Name</div>
+                    <div class="wms-layer-picker" id="gpLayerPicker">
+                        <button type="button" class="form-input wms-layer-picker-trigger" id="gpLayerPickerTrigger" aria-expanded="false" aria-controls="gpLayerChecklist">
+                            <span id="gpLayerPickerSummary">Fetch layers to select</span>
+                            <i class="fas fa-chevron-down"></i>
+                        </button>
+                        <div class="wms-layer-checklist" id="gpLayerChecklist" hidden>
+                            <div class="wms-layer-empty">Fetch Geoportal layers to show available layers.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="warning-box">
+                    <i class="fas fa-info-circle"></i> Connect a Geoportal Philippines WMS/map service endpoint for live layers. The default portal URL uses a demo catalog until a service endpoint is configured.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('gpModal')">Cancel</button>
+                <button class="btn btn-primary" onclick="closeModal('gpModal')"><i class="fas fa-check"></i> Done</button>
+            </div>
+        </div>
+    </div>
+
     <!-- WMS Layer Modal -->
     <div class="modal-overlay" id="wmsModal">
         <div class="modal">
@@ -637,17 +682,24 @@
             <div class="modal-body">
                 <div class="form-group">
                     <div class="form-label">WMS URL</div>
-                    <input type="text" class="form-input" id="wmsUrl" placeholder="e.g., http://wms.example.com/service?service=WMS&version=1.1.1&request=GetCapabilities">
+                    <div class="form-input-action-row">
+                        <input type="text" class="form-input" id="wmsUrl" value="http://192.168.8.87:8080/geoserver/wms" placeholder="e.g., http://wms.example.com/service?service=WMS&version=1.1.1&request=GetCapabilities">
+                        <button type="button" class="btn btn-secondary form-input-action" id="wmsFetchButton"><i class="fas fa-cloud-arrow-down"></i> Fetch</button>
+                    </div>
+                    <div id="wmsFetchFeedback" class="inline-feedback" aria-live="polite"></div>
                 </div>
 
                 <div class="form-group">
                     <div class="form-label">Layer Name</div>
-                    <input type="text" class="form-input" id="wmsLayerName" placeholder="Enter WMS layer identifier">
-                </div>
-
-                <div class="form-group">
-                    <div class="form-label">Display Name (Optional)</div>
-                    <input type="text" class="form-input" id="wmsDisplayName" placeholder="e.g., Building Layer">
+                    <div class="wms-layer-picker" id="wmsLayerPicker">
+                        <button type="button" class="form-input wms-layer-picker-trigger" id="wmsLayerPickerTrigger" aria-expanded="false" aria-controls="wmsLayerChecklist">
+                            <span id="wmsLayerPickerSummary">Fetch layers to select</span>
+                            <i class="fas fa-chevron-down"></i>
+                        </button>
+                        <div class="wms-layer-checklist" id="wmsLayerChecklist" hidden>
+                            <div class="wms-layer-empty">Fetch WMS capabilities to show available layers.</div>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="warning-box">
@@ -656,7 +708,7 @@
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="closeModal('wmsModal')">Cancel</button>
-                <button class="btn btn-primary" onclick="addWMSLayer()"><i class="fas fa-plus"></i> Add Layer</button>
+                <button class="btn btn-primary" onclick="closeModal('wmsModal')"><i class="fas fa-check"></i> Done</button>
             </div>
         </div>
     </div>

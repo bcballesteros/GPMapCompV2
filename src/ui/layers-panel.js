@@ -21,9 +21,10 @@ export function addLayerItem(name, color, featureCount, options = {}) {
     }
 
     const isWms = Boolean(options.isWMS);
+    const isGp = Boolean(options.isGP || getLayerRecord(name)?.isGP);
     const opacityValue = Math.round((getLayerRecord(name)?.opacity ?? 1) * 100);
     const statsText = isWms
-        ? 'WMS Layer • Remote'
+        ? `${isGp ? 'GP Layer' : 'WMS Layer'} • Remote`
         : `${featureCount} features • ${getState().uploadedLayers[name]?.geometryType || 'Mixed'}`;
 
     const colorControl = isWms
@@ -131,12 +132,24 @@ export function removeLayer(event) {
 
     const layerItem = event.target.closest('.layer-item');
     const layerName = layerItem.querySelector('.layer-name').textContent;
+    removeLayerItem(layerName);
+}
+
+export function removeLayerItem(layerName) {
+    const layerList = document.getElementById('layerList');
+    const layerItem = Array.from(layerList?.querySelectorAll('.layer-item') || [])
+        .find((item) => item.querySelector('.layer-name')?.textContent === layerName);
+
+    if (!layerItem) {
+        removeManagedLayer(layerName);
+        return;
+    }
+
     const wasActive = layerItem.classList.contains('active');
     removeManagedLayer(layerName);
 
     layerItem.remove();
 
-    const layerList = document.getElementById('layerList');
     if (layerList.children.length === 0) {
         layerList.innerHTML = getEmptyStateMarkup();
         setCurrentLayerName(null);

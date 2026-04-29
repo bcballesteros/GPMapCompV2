@@ -21,7 +21,31 @@ function getActiveLayerLabel() {
         return activeLayerName;
     }
 
+    if (record.isGP) {
+        return `${activeLayerName} (GP)`;
+    }
+
     return record.isWMS ? `${activeLayerName} (WMS)` : activeLayerName;
+}
+
+function getProjectionLabel(view) {
+    const mapProjection = view?.getProjection?.()?.getCode?.() || '--';
+    const activeLayerName = getState().currentLayerName;
+    const activeLayerRecord = activeLayerName ? getLayerRecord(activeLayerName) : null;
+
+    if (!activeLayerRecord) {
+        return mapProjection;
+    }
+
+    if (activeLayerRecord.sourceCrsDetected && activeLayerRecord.sourceCrs) {
+        return activeLayerRecord.sourceCrs;
+    }
+
+    if (activeLayerRecord.sourceCrs === 'Unknown CRS') {
+        return `Unknown CRS (map ${mapProjection})`;
+    }
+
+    return mapProjection;
 }
 
 function buildHelpContent() {
@@ -99,7 +123,7 @@ export function updateMapStatusBar() {
     }
 
     if (projectionEl) {
-        projectionEl.textContent = view?.getProjection?.()?.getCode?.() || '--';
+        projectionEl.textContent = getProjectionLabel(view);
     }
 
     if (layerEl) {
