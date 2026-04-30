@@ -14,6 +14,15 @@ function getEmptyStateMarkup() {
     `;
 }
 
+function escapeHtml(value) {
+    return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
 export function addLayerItem(name, color, featureCount, options = {}) {
     const layerList = document.getElementById('layerList');
     if (layerList.querySelector('.empty-state')) {
@@ -39,11 +48,14 @@ export function addLayerItem(name, color, featureCount, options = {}) {
         `;
 
     const isVisible = options.visible !== false;
+    const safeName = escapeHtml(name);
     const layerHTML = `
         <div class="layer-item" onclick="selectLayer(this)">
             <input type="checkbox" class="layer-toggle" ${isVisible ? 'checked' : ''} title="Toggle layer visibility">
             <div class="layer-info">
-                <div class="layer-name">${name}</div>
+                <div class="layer-name-wrap" data-tooltip="${safeName}">
+                    <div class="layer-name" tabindex="0" aria-label="Layer name: ${safeName}">${safeName}</div>
+                </div>
                 <div class="layer-stats">${statsText}</div>
                 <div class="layer-controls">
                     ${colorControl}
