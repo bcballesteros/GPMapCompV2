@@ -131,7 +131,7 @@ export async function submitUpload() {
 
     const layerName = document.getElementById('layerName').value || DEFAULT_LAYER_NAME;
     const layerColor = document.getElementById('layerColor').value || DEFAULT_LAYER_COLOR;
-    setUploadBusyState(true);
+    setUploadBusyState(true, 'Uploading...');
 
     try {
         const { geojson, features, sourceCrs, sourceCrsDetected } = await parseUploadFile(currentLayerData);
@@ -157,7 +157,7 @@ export async function submitUpload() {
         showToast('Success', `Layer "${layerName}" added with ${features.length} features`, 'success');
     } catch (error) {
         console.error('Error processing upload:', error);
-        showToast('Error', `Failed to process file: ${error.message}`, 'error');
+        showToast('Error', 'Failed to load file. Unsupported or corrupted format.', 'error');
     } finally {
         setUploadBusyState(false);
     }
@@ -478,6 +478,7 @@ export async function fetchWmsCapabilitiesFromForm() {
         availableWmsLayers = [];
         renderWmsLayerChecklist([]);
         setWmsFetchFeedback('Could not fetch WMS capabilities. Check the URL, network access, or CORS settings.', 'warning');
+        showToast('Error', 'Failed to fetch WMS layers. Check URL or network.', 'error');
     } finally {
         if (requestId === wmsFetchRequestId) {
             setWmsFetchBusyState(false);
@@ -826,6 +827,9 @@ export async function fetchGpLayersFromForm() {
         }
 
         setGpFetchFeedback(result.message, result.isDemo ? 'warning' : 'success');
+        if (result.isDemo) {
+            showToast('Error', 'Failed to fetch Geoportal layers.', 'error');
+        }
     } finally {
         if (requestId === gpFetchRequestId) {
             setGpFetchBusyState(false);

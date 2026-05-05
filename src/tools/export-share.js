@@ -20,14 +20,17 @@ let previewSyncScheduled = false;
 let previewListenersBound = false;
 let sharedStateRestoreAttempted = false;
 
-function setShareFeedback(message = '', type = 'neutral') {
-    const status = document.getElementById('shareFeedback');
-    if (!status) {
+function setExportBusyState(isBusy) {
+    const downloadButton = document.getElementById('downloadBtn');
+    if (!downloadButton) {
         return;
     }
 
-    status.textContent = message || 'Share link updates here when you copy or regenerate the current map state.';
-    status.dataset.state = type;
+    downloadButton.disabled = isBusy;
+    downloadButton.setAttribute('aria-busy', isBusy ? 'true' : 'false');
+    downloadButton.innerHTML = isBusy
+        ? '<i class="fas fa-spinner fa-spin"></i> Exporting'
+        : '<i class="fas fa-download"></i> Download';
 }
 
 function getExportPreviewElements() {
@@ -802,6 +805,8 @@ export async function downloadMap() {
     const resolution = document.getElementById('exportResolution')?.value || '1920x1080';
     const [width, height] = resolution.split('x').map(Number);
 
+    setExportBusyState(true);
+
     try {
         const canvas = await renderMapToCanvas(width, height);
 
@@ -837,7 +842,9 @@ export async function downloadMap() {
         closeModal('exportModal');
     } catch (error) {
         console.error('Export error:', error);
-        showToast('Error', `Failed to export map: ${error.message}`, 'error');
+        showToast('Error', 'Export failed. Please try again.', 'error');
+    } finally {
+        setExportBusyState(false);
     }
 }
 
