@@ -97,6 +97,10 @@ export function updateManagedLayerStyle(layerName, styleFactory) {
         return;
     }
 
+    if (!styleFactory && typeof record.color !== 'string') {
+        return;
+    }
+
     record.layer.setStyle(styleFactory || ((feature) => createManagedFeatureStyles(record, feature)));
     record.layer.changed();
 }

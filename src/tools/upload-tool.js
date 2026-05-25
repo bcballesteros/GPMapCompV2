@@ -16,6 +16,53 @@ let wmsFetchRequestId = 0;
 let availableGpLayers = [];
 let gpFetchRequestId = 0;
 
+function formatLayerNameFromFileName(fileName = '') {
+    const baseName = fileName
+        .replace(/\.(geojson|json|kml|kmz|csv|zip|shp)$/i, '')
+        .replace(/[_-]+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    if (!baseName) {
+        return '';
+    }
+
+    return baseName.replace(/\w\S*/g, (word) => {
+        return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+    });
+}
+
+function makeUniqueLayerName(baseName) {
+    const normalizedName = baseName || DEFAULT_LAYER_NAME;
+
+    if (!getLayerRecord(normalizedName)) {
+        return normalizedName;
+    }
+
+    let index = 2;
+    while (getLayerRecord(`${normalizedName} ${index}`)) {
+        index += 1;
+    }
+
+    return `${normalizedName} ${index}`;
+}
+
+function applyDefaultLayerName(file) {
+    const layerNameInput = document.getElementById('layerName');
+    if (!layerNameInput || !file) {
+        return;
+    }
+
+    const shouldAutofill = !layerNameInput.value.trim() || layerNameInput.dataset.autoLayerName === 'true';
+    if (!shouldAutofill) {
+        return;
+    }
+
+    const defaultName = makeUniqueLayerName(formatLayerNameFromFileName(file.name));
+    layerNameInput.value = defaultName;
+    layerNameInput.dataset.autoLayerName = 'true';
+}
+
 function setUploadBusyState(isBusy, label = 'Processing file...') {
     const progress = document.getElementById('uploadProgress');
     const progressFill = document.getElementById('progressFill');
@@ -51,6 +98,7 @@ export function handleFileSelect(event) {
     document.getElementById('fileSize').textContent = formatFileSize(file.size);
     document.getElementById('filePreview').classList.add('active');
     setCurrentLayerData({ file, type: 'shapefile' });
+    applyDefaultLayerName(file);
 }
 
 export function handleGeoJSONSelect(event) {
@@ -63,6 +111,7 @@ export function handleGeoJSONSelect(event) {
     document.getElementById('geojsonFileSize').textContent = formatFileSize(file.size);
     document.getElementById('geojsonFilePreview').classList.add('active');
     setCurrentLayerData({ file, type: 'geojson' });
+    applyDefaultLayerName(file);
 }
 
 export function handleKmlSelect(event) {
@@ -75,6 +124,7 @@ export function handleKmlSelect(event) {
     document.getElementById('kmlFileSize').textContent = formatFileSize(file.size);
     document.getElementById('kmlFilePreview').classList.add('active');
     setCurrentLayerData({ file, type: 'kml' });
+    applyDefaultLayerName(file);
 }
 
 export function handleCsvSelect(event) {
@@ -87,6 +137,7 @@ export function handleCsvSelect(event) {
     document.getElementById('csvFileSize').textContent = formatFileSize(file.size);
     document.getElementById('csvFilePreview').classList.add('active');
     setCurrentLayerData({ file, type: 'csv' });
+    applyDefaultLayerName(file);
 }
 
 export function clearFileSelection() {
@@ -129,7 +180,8 @@ export async function submitUpload() {
         return;
     }
 
-    const layerName = document.getElementById('layerName').value || DEFAULT_LAYER_NAME;
+    const enteredLayerName = document.getElementById('layerName').value.trim();
+    const layerName = makeUniqueLayerName(enteredLayerName || formatLayerNameFromFileName(currentLayerData.file?.name) || DEFAULT_LAYER_NAME);
     const layerColor = document.getElementById('layerColor').value || DEFAULT_LAYER_COLOR;
     setUploadBusyState(true, 'Uploading...');
 
@@ -149,6 +201,7 @@ export async function submitUpload() {
 
         closeModal('uploadModal');
         document.getElementById('layerName').value = '';
+        document.getElementById('layerName').dataset.autoLayerName = 'true';
         clearFileSelection();
         clearGeoJSONSelection();
         clearKmlSelection();
@@ -161,6 +214,18 @@ export async function submitUpload() {
     } finally {
         setUploadBusyState(false);
     }
+}
+
+export function initializeUploadForm() {
+    const layerNameInput = document.getElementById('layerName');
+    if (!layerNameInput) {
+        return;
+    }
+
+    layerNameInput.dataset.autoLayerName = 'true';
+    layerNameInput.addEventListener('input', () => {
+        layerNameInput.dataset.autoLayerName = layerNameInput.value.trim() ? 'false' : 'true';
+    });
 }
 
 export function addWMSLayerFromForm() {

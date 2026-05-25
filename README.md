@@ -52,9 +52,9 @@ The platform is optimized for modern browsers and public web access.
 * CSV
 * Web Map Service (WMS)
 
-## Data Analysis
+## Layer Information
 
-* Attribute Table viewer
+* View Attribute Table workflow
 * Feature inspection
 * Layer-based exploration
 

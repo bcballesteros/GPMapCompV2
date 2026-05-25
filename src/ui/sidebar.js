@@ -175,7 +175,7 @@ export function openAttributeTable() {
 
     const modalTitle = document.querySelector('#attributesModal .modal-title');
     if (modalTitle) {
-        modalTitle.innerHTML = `<i class="fas fa-table"></i> Attribute Table: ${layerName}`;
+        modalTitle.innerHTML = `<i class="fas fa-table"></i> View Attribute Table: ${layerName}`;
     }
 
     updateAttributeTableStatus(rowsData.length, rowsData.length);

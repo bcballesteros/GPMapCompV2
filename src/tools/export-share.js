@@ -638,6 +638,10 @@ function getExportCrsLabel() {
     return getMapProjectionLabel();
 }
 
+function getStandardExportDisclaimer() {
+    return `Generated from NAMRIA GP Map Composer | Projection: ${getExportCrsLabel()} | Exported: ${getLocalExportDate()} | For reference use only`;
+}
+
 function fitTextToWidth(context, text, maxWidth) {
     if (context.measureText(text).width <= maxWidth) {
         return text;
@@ -654,15 +658,11 @@ function fitTextToWidth(context, text, maxWidth) {
 }
 
 function drawExportDisclaimer(context, width, height) {
-    const exportDate = getLocalExportDate();
     const footerHeight = Math.max(34, Math.round(height * 0.045));
     const fontSize = Math.max(11, Math.round(height * 0.0115));
     const horizontalPadding = Math.max(16, Math.round(width * 0.012));
     const baseLineY = height - Math.round((footerHeight - fontSize) / 2) + 1;
-    const gutter = Math.max(20, Math.round(width * 0.018));
-    const textColumnWidth = (width - (horizontalPadding * 2) - gutter) / 2;
-    const leftText = `Generated from NAMRIA GP Map Composer | Projection: ${getExportCrsLabel()}`;
-    const rightText = `Exported: ${exportDate} | For reference use only`;
+    const disclaimerText = getStandardExportDisclaimer();
 
     context.save();
     context.fillStyle = 'rgba(255, 255, 255, 0.88)';
@@ -677,13 +677,8 @@ function drawExportDisclaimer(context, width, height) {
     context.fillStyle = '#475569';
     context.font = `500 ${fontSize}px Inter, "Segoe UI", sans-serif`;
     context.textBaseline = 'alphabetic';
-    context.textAlign = 'left';
-    context.fillText(fitTextToWidth(context, leftText, textColumnWidth), horizontalPadding, baseLineY);
-
-    context.fillStyle = '#64748b';
-    context.font = `500 ${fontSize}px Inter, "Segoe UI", sans-serif`;
-    context.textAlign = 'right';
-    context.fillText(fitTextToWidth(context, rightText, textColumnWidth), width - horizontalPadding, baseLineY);
+    context.textAlign = 'center';
+    context.fillText(fitTextToWidth(context, disclaimerText, width - (horizontalPadding * 2)), width / 2, baseLineY);
     context.restore();
 }
 

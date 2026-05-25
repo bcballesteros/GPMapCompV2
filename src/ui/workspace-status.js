@@ -57,7 +57,7 @@ function buildHelpContent() {
     if (!hasLayers) {
         return {
             primary: 'Upload a layer to begin.',
-            secondary: 'Add a dataset from the Layers panel to start styling, analysis, and export.'
+            secondary: 'Add a dataset from the Layers panel to start styling, layer information review, and export.'
         };
     }
 
@@ -75,10 +75,24 @@ function buildHelpContent() {
         };
     }
 
+    if (state.selectedTool === 'measurement:distance') {
+        return {
+            primary: 'Distance measurement active.',
+            secondary: 'Click map to start measuring, add vertices for path distance, and double-click to finish.'
+        };
+    }
+
+    if (state.selectedTool === 'measurement:area') {
+        return {
+            primary: 'Area measurement active.',
+            secondary: 'Click map to add polygon vertices, then double-click to calculate area and perimeter.'
+        };
+    }
+
     if (state.selectedFeature?.get?.('isAnnotation')) {
         return {
             primary: 'Annotation selected.',
-            secondary: 'Use Edit, Move, or Delete in the annotation panel to update the selected note.'
+            secondary: 'Use Edit, Move, Hide/Show, or Delete in the annotation panel to update the selected note.'
         };
     }
 
@@ -87,7 +101,7 @@ function buildHelpContent() {
             primary: `${activeLayerName} is selected.`,
             secondary: activeLayerRecord.isWMS
                 ? 'Use Map Settings and layer visibility controls to manage this remote service layer.'
-                : 'Use Data Analysis to inspect attributes, then adjust styling and opacity from the Layers panel.'
+                : 'Use Layer Information to inspect attributes, then adjust styling and opacity from the Layers panel.'
         };
     }
 

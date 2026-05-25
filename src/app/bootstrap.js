@@ -1,8 +1,8 @@
-import { activateAnnotation, bindAnnotationControls, cancelAnnotation, deleteAnnotation, editAnnotation, getSelectedAnnotationMode, initializeAnnotationInteractions, selectAnnotationForDeletion, submitAnnotation } from '../tools/annotation-tool.js';
+import { activateAnnotation, activateDrawing, activateMeasureArea, activateMeasureDistance, bindAnnotationControls, bindAnnotationVisibilityToggle, cancelAnnotation, clearDrawings, clearMeasurements, deleteAnnotation, deleteSelectedDrawing, deleteSelectedMeasurement, editAnnotation, getSelectedAnnotationMode, initializeAnnotationInteractions, initializeDrawingSelectionControls, initializeMeasurementControls, selectAnnotationForDeletion, submitAnnotation } from '../tools/annotation-tool.js';
 import { copyToClipboard, downloadMap, generateLink, renderMapPreview, restoreSharedStateFromUrl } from '../tools/export-share.js';
 import { initializeMap } from '../map/map-init.js';
 import { changeBasemapLayer } from '../map/layer-manager.js';
-import { addGPLayerFromForm, addWMSLayerFromForm, clearCsvSelection, clearFileSelection, clearGeoJSONSelection, clearKmlSelection, fetchGpLayersFromForm, fetchWmsCapabilitiesFromForm, handleCsvSelect, handleFileSelect, handleGeoJSONSelect, handleKmlSelect, initializeGpLayerForm, initializeWmsLayerForm, resetGpLayerFormSession, resetWmsLayerFormSession, submitUpload, updateDataSection } from '../tools/upload-tool.js';
+import { addGPLayerFromForm, addWMSLayerFromForm, clearCsvSelection, clearFileSelection, clearGeoJSONSelection, clearKmlSelection, fetchGpLayersFromForm, fetchWmsCapabilitiesFromForm, handleCsvSelect, handleFileSelect, handleGeoJSONSelect, handleKmlSelect, initializeGpLayerForm, initializeUploadForm, initializeWmsLayerForm, resetGpLayerFormSession, resetWmsLayerFormSession, submitUpload, updateDataSection } from '../tools/upload-tool.js';
 import { commitLayerOpacity, removeLayer, selectLayer, updateLayerColor, updateLayerOpacity } from '../ui/layers-panel.js';
 import { bindModalOverlayDismissal, closeModal, openModal, toggleSection } from '../ui/modal.js';
 import { initializeLocationSearch } from '../ui/location-search.js';
@@ -71,6 +71,13 @@ function bindGlobalHandlers() {
     window.removeLayer = removeLayer;
     window.openAttributeTable = openAttributeTable;
     window.activateAnnotation = activateAnnotation;
+    window.activateDrawing = activateDrawing;
+    window.clearDrawings = clearDrawings;
+    window.deleteSelectedDrawing = deleteSelectedDrawing;
+    window.activateMeasureDistance = activateMeasureDistance;
+    window.activateMeasureArea = activateMeasureArea;
+    window.deleteSelectedMeasurement = deleteSelectedMeasurement;
+    window.clearMeasurements = clearMeasurements;
     window.submitAnnotation = submitAnnotation;
     window.cancelAnnotation = cancelAnnotation;
     window.editAnnotation = editAnnotation;
@@ -98,7 +105,11 @@ export function bootstrapApp() {
         runOptionalStartupStep('location search init', () => initializeLocationSearch());
         runOptionalStartupStep('annotation interaction init', () => initializeAnnotationInteractions());
         runOptionalStartupStep('annotation controls init', () => bindAnnotationControls());
+        runOptionalStartupStep('annotation visibility toggle init', () => bindAnnotationVisibilityToggle());
+        runOptionalStartupStep('drawing selection controls init', () => initializeDrawingSelectionControls());
+        runOptionalStartupStep('measurement controls init', () => initializeMeasurementControls());
         runOptionalStartupStep('workspace status init', () => initializeWorkspaceStatus());
+        runOptionalStartupStep('upload form init', () => initializeUploadForm());
         runOptionalStartupStep('WMS form init', () => initializeWmsLayerForm());
         runOptionalStartupStep('GP form init', () => initializeGpLayerForm());
         runOptionalStartupStep('annotation popup dismissal binding', () => bindAnnotationPopupDismissal(cancelAnnotation));

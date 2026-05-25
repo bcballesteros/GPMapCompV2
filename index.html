@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -287,6 +287,7 @@
                     <button id="editAnnotationBtn" class="tool-btn tool-btn-solid tool-btn-accent" disabled title="Edit the selected annotation text and style"><i class="fas fa-edit"></i> Edit</button>
                     <button id="deleteAnnotationBtn" class="tool-btn tool-btn-solid tool-btn-danger" disabled title="Delete the selected annotation from the map"><i class="fas fa-trash"></i> Delete</button>
                     <button id="moveAnnotationBtn" class="tool-btn tool-btn-solid tool-btn-muted" disabled title="Drag the selected annotation to a new location"><i class="fas fa-arrows-alt"></i> Move</button>
+                    <button id="toggleAnnotationVisibilityBtn" class="tool-btn tool-btn-solid tool-btn-muted" disabled title="Hide or show the selected annotation text" aria-pressed="false" data-state="visible"><i class="fas fa-eye-slash"></i> Hide</button>
                     </div>
                     <div class="annotation-controls-hint">Select an annotation on the map to edit its text, move its position, or remove it.</div>
                 </div>
@@ -304,7 +305,7 @@
                     </div>
                     <div class="tool-section-content collapsed">
                         <div class="tool-buttons">
-                            <button class="tool-btn" onclick="activateAnnotation('text')">
+                            <button id="addTextAnnotationBtn" class="tool-btn" onclick="activateAnnotation('text')">
                                 <span><i class="fas fa-font"></i> Add Text Annotation</span>
                                 <span class="tool-btn-arrow">&rsaquo;</span>
                             </button>
@@ -316,12 +317,126 @@
                     </div>
                 </div>
 
-                <!-- Data Analysis -->
+                <!-- Drawing Tools -->
+                <div class="tool-section-group annotation-tools-section">
+                    <div class="tool-section-header" onclick="toggleSection(this)">
+                        <div class="tool-icon blue"><i class="fas fa-draw-polygon"></i></div>
+                        <div class="tool-section-info">
+                            <div class="tool-section-title">Drawing Tools</div>
+                            <div class="tool-section-desc">Sketch point, line, polygon, and freehand geometry</div>
+                        </div>
+                        <div class="tool-section-chevron" aria-hidden="true">&rsaquo;</div>
+                    </div>
+                    <div class="tool-section-content collapsed">
+                        <div class="tool-buttons">
+                            <button class="tool-btn" data-draw-mode="point" onclick="activateDrawing('point')" title="Activate point drawing">
+                                <span><i class="fas fa-location-dot"></i> Draw Point</span>
+                                <span class="tool-btn-arrow">&rsaquo;</span>
+                            </button>
+                            <button class="tool-btn" data-draw-mode="line" onclick="activateDrawing('line')" title="Activate line drawing">
+                                <span><i class="fas fa-slash"></i> Draw Line</span>
+                                <span class="tool-btn-arrow">&rsaquo;</span>
+                            </button>
+                            <button class="tool-btn" data-draw-mode="polygon" onclick="activateDrawing('polygon')" title="Activate polygon drawing">
+                                <span><i class="fas fa-draw-polygon"></i> Draw Polygon</span>
+                                <span class="tool-btn-arrow">&rsaquo;</span>
+                            </button>
+                            <button class="tool-btn" data-draw-mode="freehand" onclick="activateDrawing('freehand')" title="Activate freehand line drawing">
+                                <span><i class="fas fa-signature"></i> Freehand</span>
+                                <span class="tool-btn-arrow">&rsaquo;</span>
+                            </button>
+                            <div id="drawingSelectionControls" class="drawing-selection-controls" style="display:none;">
+                                <div class="drawing-selection-title">
+                                    <span class="drawing-selection-label">Selected Drawing</span>
+                                    <strong id="selectedDrawingType">None</strong>
+                                </div>
+                                <div class="drawing-selection-hint">Click a drawing on the map to select it for individual deletion.</div>
+                                <button id="deleteSelectedDrawingBtn" class="tool-btn delete-selected-drawing-btn" disabled title="Delete only the selected drawing">
+                                    <span><i class="fas fa-trash"></i> Delete Selected Drawing</span>
+                                </button>
+                            </div>
+                            <button class="tool-btn tool-btn-solid tool-btn-danger clear-drawings-btn" onclick="clearDrawings()" title="Remove all drawing geometries">
+                                <span><i class="fas fa-eraser"></i> Clear Drawings</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Measurement Tools -->
+                <div class="tool-section-group data-analysis-section measurement-section">
+                    <div class="tool-section-header" onclick="toggleSection(this)">
+                        <div class="tool-icon cyan"><i class="fas fa-ruler-combined"></i></div>
+                        <div class="tool-section-info">
+                            <div class="tool-section-title measurement-section-title">Measurement</div>
+                            <div class="tool-section-desc">Measure distance, area, and perimeter</div>
+                        </div>
+                        <div class="tool-section-chevron" aria-hidden="true">&rsaquo;</div>
+                    </div>
+                    <div class="tool-section-content collapsed">
+                        <div class="tool-buttons">
+                            <button id="measureDistanceBtn" class="tool-btn" onclick="activateMeasureDistance()" title="Measure geodesic distance on the map">
+                                <span><i class="fas fa-ruler-horizontal"></i> Measure Distance</span>
+                                <span class="tool-btn-arrow">&rsaquo;</span>
+                            </button>
+                            <button id="measureAreaBtn" class="tool-btn" onclick="activateMeasureArea()" title="Measure geodesic polygon area and perimeter on the map">
+                                <span><i class="fas fa-draw-polygon"></i> Measure Area</span>
+                                <span class="tool-btn-arrow">&rsaquo;</span>
+                            </button>
+                            <div class="measure-controls-inline" aria-label="Measurement controls">
+                                <div id="measureResultsPanel" class="measure-results-panel empty" aria-live="polite">
+                                    <div class="measure-results-title">Measurement Results</div>
+                                    <div class="measure-results-section" data-measure-section="distance">
+                                        <div class="measure-results-subtitle">Distance</div>
+                                        <div class="measure-results-grid">
+                                            <div class="measure-result-chip"><span class="measure-result-label">Meters (m)</span><strong class="measure-result-value" data-measure-distance-value="m">--</strong></div>
+                                            <div class="measure-result-chip"><span class="measure-result-label">Kilometers (km)</span><strong class="measure-result-value" data-measure-distance-value="km">--</strong></div>
+                                            <div class="measure-result-chip"><span class="measure-result-label">Miles (mi)</span><strong class="measure-result-value" data-measure-distance-value="mi">--</strong></div>
+                                            <div class="measure-result-chip"><span class="measure-result-label">Feet (ft)</span><strong class="measure-result-value" data-measure-distance-value="ft">--</strong></div>
+                                            <div class="measure-result-chip"><span class="measure-result-label">Nautical miles (nmi)</span><strong class="measure-result-value" data-measure-distance-value="nmi">--</strong></div>
+                                        </div>
+                                    </div>
+                                    <div class="measure-results-section" data-measure-section="area" hidden>
+                                        <div class="measure-results-subtitle">Area</div>
+                                        <div class="measure-results-grid">
+                                            <div class="measure-result-chip"><span class="measure-result-label">Meters (m&sup2;)</span><strong class="measure-result-value" data-measure-area-value="m2">--</strong></div>
+                                            <div class="measure-result-chip"><span class="measure-result-label">Kilometers (km&sup2;)</span><strong class="measure-result-value" data-measure-area-value="km2">--</strong></div>
+                                            <div class="measure-result-chip"><span class="measure-result-label">Hectares (ha)</span><strong class="measure-result-value" data-measure-area-value="ha">--</strong></div>
+                                            <div class="measure-result-chip"><span class="measure-result-label">Acres (ac)</span><strong class="measure-result-value" data-measure-area-value="ac">--</strong></div>
+                                        </div>
+                                        <div class="measure-results-subtitle">Perimeter</div>
+                                        <div class="measure-results-grid">
+                                            <div class="measure-result-chip"><span class="measure-result-label">Meters (m)</span><strong class="measure-result-value" data-measure-perimeter-value="m">--</strong></div>
+                                            <div class="measure-result-chip"><span class="measure-result-label">Kilometers (km)</span><strong class="measure-result-value" data-measure-perimeter-value="km">--</strong></div>
+                                            <div class="measure-result-chip"><span class="measure-result-label">Miles (mi)</span><strong class="measure-result-value" data-measure-perimeter-value="mi">--</strong></div>
+                                            <div class="measure-result-chip"><span class="measure-result-label">Feet (ft)</span><strong class="measure-result-value" data-measure-perimeter-value="ft">--</strong></div>
+                                            <div class="measure-result-chip"><span class="measure-result-label">Nautical miles (nmi)</span><strong class="measure-result-value" data-measure-perimeter-value="nmi">--</strong></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div id="measurementSelectionControls" class="measurement-selection-controls" style="display:none;">
+                                    <div class="measurement-selection-title">
+                                        <span class="measurement-selection-label">Selected Measurement</span>
+                                        <strong id="selectedMeasurementType" class="measurement-selection-type">None</strong>
+                                    </div>
+                                    <div class="measurement-selection-hint">Click a measurement on the map to select it for individual deletion.</div>
+                                    <button id="deleteSelectedMeasurementBtn" class="tool-btn delete-selected-measurement-btn" disabled title="Delete only the selected measurement">
+                                        <span><i class="fas fa-trash"></i> Delete Selected Measurement</span>
+                                    </button>
+                                </div>
+                                <button class="tool-btn tool-btn-solid clear-measurements-btn" onclick="clearMeasurements()" title="Clear all measurement lines">
+                                    <span><i class="fas fa-broom"></i> Clear Measurements</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Layer Information -->
                 <div class="tool-section-group data-analysis-section">
                     <div class="tool-section-header" onclick="toggleSection(this)">
                         <div class="tool-icon cyan"><i class="fas fa-chart-line"></i></div>
                         <div class="tool-section-info">
-                            <div class="tool-section-title">Data Analysis</div>
+                            <div class="tool-section-title">Layer Information</div>
                             <div class="tool-section-desc">Inspect attributes and source details</div>
                         </div>
                         <div class="tool-section-chevron" aria-hidden="true">&rsaquo;</div>
@@ -329,7 +444,7 @@
                     <div class="tool-section-content collapsed">
                         <div class="tool-buttons">
                             <button class="tool-btn" onclick="openAttributeTable()" title="Open the attribute table for the currently selected layer">
-                                <span><i class="fas fa-table"></i> Attribute Table</span>
+                                <span><i class="fas fa-table"></i> View Attribute Table</span>
                                 <span class="tool-btn-arrow">&rsaquo;</span>
                             </button>
                         </div>
@@ -379,6 +494,10 @@
                             <label class="settings-item" title="Toggle label visibility for supported vector layers">
                                 <input type="checkbox" id="labelsToggle">
                                 <span>Show all active labels</span>
+                            </label>
+                            <label class="settings-item" title="Show or hide annotation text while keeping anchors selectable">
+                                <input type="checkbox" checked id="annotationsToggle">
+                                <span>Show annotation text</span>
                             </label>
                             <label class="settings-item" title="Show or hide the live map scale overlay">
                                 <input type="checkbox" checked id="scaleBarToggle">
@@ -432,9 +551,24 @@
         <div class="modal">
             <div class="modal-header">
                 <div class="modal-title"><i class="fas fa-cloud-arrow-up"></i> Add Geospatial Data</div>
-                <button class="modal-close" onclick="closeModal('uploadModal')">×</button>
+                <button class="modal-close" onclick="closeModal('uploadModal')">&times;</button>
             </div>
             <div class="modal-body">
+                <div class="layer-source-actions" aria-label="Layer source options">
+                    <button type="button" class="layer-source-btn active" title="Upload a local dataset">
+                        <i class="fas fa-file-arrow-up"></i>
+                        <span>Upload Dataset</span>
+                    </button>
+                    <button type="button" class="layer-source-btn" onclick="closeModal('uploadModal'); openModal('wmsModal')" title="Connect a remote WMS service">
+                        <i class="fas fa-globe"></i>
+                        <span>WMS Layer</span>
+                    </button>
+                    <button type="button" class="layer-source-btn" onclick="closeModal('uploadModal'); openModal('gpModal')" title="Connect a Geoportal Philippines or internal map service layer">
+                        <i class="fas fa-map-location-dot"></i>
+                        <span>GP Layer</span>
+                    </button>
+                </div>
+
                 <div class="form-group">
                     <div class="form-label">Data Type</div>
                     <select class="form-input" id="dataTypeSelect" onchange="updateDataSection()">
@@ -515,7 +649,7 @@
 
                 <div class="form-group">
                     <div class="form-label">Layer Name</div>
-                    <input type="text" class="form-input" placeholder="e.g., District Boundaries" id="layerName">
+                    <input type="text" class="form-input" placeholder="Defaults to uploaded filename" id="layerName">
                 </div>
 
                 <div class="form-group">
@@ -528,6 +662,10 @@
                     <div class="progress-bar">
                         <div class="progress-fill" id="progressFill" style="width: 0%;"></div>
                     </div>
+                </div>
+
+                <div class="notice-box">
+                    <i class="fas fa-info-circle"></i> Uploaded datasets are processed temporarily and may not be permanently stored.
                 </div>
             </div>
             <div class="modal-footer">
@@ -542,7 +680,7 @@
         <div class="modal">
             <div class="modal-header">
                 <div class="modal-title"><i class="fas fa-download"></i> Export Map</div>
-                <button class="modal-close" onclick="closeModal('exportModal')">×</button>
+                <button class="modal-close" onclick="closeModal('exportModal')">&times;</button>
             </div>
             <div class="modal-body">
                 <div id="mapPreviewContainer" class="export-preview-shell">
@@ -572,7 +710,10 @@
                 </div>
 
                 <div class="warning-box">
-                    <i class="fas fa-info-circle"></i> Exported maps include data disclaimers. Temporary session data.
+                    <i class="fas fa-info-circle"></i> Generated from NAMRIA GP Map Composer | Projection: current map CRS | Exported: YYYY-MM-DD | For reference use only
+                </div>
+                <div class="notice-box">
+                    <i class="fas fa-info-circle"></i> Uploaded datasets are processed temporarily and may not be permanently stored.
                 </div>
             </div>
             <div class="modal-footer">
@@ -587,7 +728,7 @@
         <div class="modal">
             <div class="modal-header">
                 <div class="modal-title"><i class="fas fa-share-nodes"></i> Share Map</div>
-                <button class="modal-close" onclick="closeModal('shareModal')">×</button>
+                <button class="modal-close" onclick="closeModal('shareModal')">&times;</button>
             </div>
             <div class="modal-body">
                 <div class="form-group">
@@ -598,6 +739,9 @@
                     </div>
                     <div id="shareFeedback" class="inline-feedback" data-state="neutral" aria-live="polite">
                         Share link updates here when you copy or regenerate the current map state.
+                    </div>
+                    <div class="notice-box">
+                        <i class="fas fa-info-circle"></i> Uploaded datasets are processed temporarily and may not be permanently stored.
                     </div>
                 </div>
             </div>
@@ -612,8 +756,8 @@
     <div class="modal-overlay" id="attributesModal">
         <div class="modal" style="max-width: 680px;">
             <div class="modal-header">
-                <div class="modal-title"><i class="fas fa-table"></i> Attribute Table</div>
-                <button class="modal-close" onclick="closeModal('attributesModal')">×</button>
+                <div class="modal-title"><i class="fas fa-table"></i> View Attribute Table</div>
+                <button class="modal-close" onclick="closeModal('attributesModal')">&times;</button>
             </div>
             <div class="modal-body">
                 <div class="form-group">
@@ -677,7 +821,7 @@
         <div class="modal">
             <div class="modal-header">
                 <div class="modal-title"><i class="fas fa-globe"></i> Add WMS Layer</div>
-                <button class="modal-close" onclick="closeModal('wmsModal')">×</button>
+                <button class="modal-close" onclick="closeModal('wmsModal')">&times;</button>
             </div>
             <div class="modal-body">
                 <div class="form-group">
@@ -716,5 +860,6 @@
     <script type="module" src="src/main.js"></script>
 </body>
 </html>
+
 
 

@@ -3,6 +3,9 @@ import { getLayerRecord, getState, setCurrentLayerName } from '../state/store.js
 import { syncLabelsToggle } from '../tools/labels-tool.js';
 import { commitLayerOpacity as commitLayerOpacityValue, updateLayerOpacity as updateLayerOpacityValue } from '../tools/transparency-tool.js';
 
+let layerNameTooltipElement = null;
+let layerNameTooltipListenersBound = false;
+
 function getEmptyStateMarkup() {
     return `
         <div class="empty-state">
@@ -21,6 +24,96 @@ function escapeHtml(value) {
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
+}
+
+function ensureLayerNameTooltip() {
+    if (layerNameTooltipElement || typeof document === 'undefined') {
+        return layerNameTooltipElement;
+    }
+
+    layerNameTooltipElement = document.createElement('div');
+    layerNameTooltipElement.className = 'layer-name-tooltip';
+    layerNameTooltipElement.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(layerNameTooltipElement);
+
+    if (!layerNameTooltipListenersBound) {
+        const hideTooltip = () => hideLayerNameTooltip();
+        window.addEventListener('scroll', hideTooltip, true);
+        window.addEventListener('resize', hideTooltip);
+        layerNameTooltipListenersBound = true;
+    }
+
+    return layerNameTooltipElement;
+}
+
+function isLayerNameTruncated(nameElement) {
+    return Boolean(nameElement && nameElement.scrollWidth > nameElement.clientWidth + 1);
+}
+
+function positionLayerNameTooltip(anchorElement, tooltipElement) {
+    if (!anchorElement || !tooltipElement) {
+        return;
+    }
+
+    const rect = anchorElement.getBoundingClientRect();
+    const spacing = 10;
+    const viewportPadding = 12;
+    const tooltipRect = tooltipElement.getBoundingClientRect();
+    const maxLeft = window.innerWidth - tooltipRect.width - viewportPadding;
+    const centeredLeft = rect.left + ((rect.width - tooltipRect.width) / 2);
+    const left = Math.min(Math.max(centeredLeft, viewportPadding), Math.max(viewportPadding, maxLeft));
+
+    let top = rect.bottom + spacing;
+    if (top + tooltipRect.height > window.innerHeight - viewportPadding) {
+        top = rect.top - tooltipRect.height - spacing;
+    }
+    if (top < viewportPadding) {
+        top = viewportPadding;
+    }
+
+    tooltipElement.style.left = `${left}px`;
+    tooltipElement.style.top = `${top}px`;
+}
+
+function showLayerNameTooltip(nameElement) {
+    const tooltipElement = ensureLayerNameTooltip();
+    if (!tooltipElement || !isLayerNameTruncated(nameElement)) {
+        hideLayerNameTooltip();
+        return;
+    }
+
+    tooltipElement.textContent = nameElement.textContent;
+    tooltipElement.classList.add('visible');
+    positionLayerNameTooltip(nameElement, tooltipElement);
+}
+
+function hideLayerNameTooltip() {
+    if (!layerNameTooltipElement) {
+        return;
+    }
+
+    layerNameTooltipElement.classList.remove('visible');
+}
+
+function attachLayerNameTooltip(layerItem) {
+    const nameElement = layerItem?.querySelector('.layer-name');
+    if (!nameElement) {
+        return;
+    }
+
+    const showTooltip = () => showLayerNameTooltip(nameElement);
+    const hideTooltip = () => hideLayerNameTooltip();
+    const updateTooltip = () => {
+        if (layerNameTooltipElement?.classList.contains('visible')) {
+            showLayerNameTooltip(nameElement);
+        }
+    };
+
+    nameElement.addEventListener('mouseenter', showTooltip);
+    nameElement.addEventListener('focus', showTooltip);
+    nameElement.addEventListener('mousemove', updateTooltip);
+    nameElement.addEventListener('mouseleave', hideTooltip);
+    nameElement.addEventListener('blur', hideTooltip);
 }
 
 export function addLayerItem(name, color, featureCount, options = {}) {
@@ -88,6 +181,7 @@ export function addLayerItem(name, color, featureCount, options = {}) {
 
     const newItem = layerList.lastElementChild;
     selectLayer(newItem);
+    attachLayerNameTooltip(newItem);
     const checkbox = newItem.querySelector('.layer-toggle');
     const opacitySlider = newItem.querySelector('.transparency-slider');
 
@@ -159,6 +253,7 @@ export function removeLayerItem(layerName) {
 
     const wasActive = layerItem.classList.contains('active');
     removeManagedLayer(layerName);
+    hideLayerNameTooltip();
 
     layerItem.remove();
 

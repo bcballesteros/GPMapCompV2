@@ -100,16 +100,21 @@ export function createAnnotationStyle(feature) {
     const fontSize = feature.get('fontSize') || 12;
     const fontColor = feature.get('fontColor') || '#000000';
     const isSelected = feature.get('selected');
+    const isVisible = feature.get('annotationVisible') !== false;
+    const markerColor = isSelected ? '#dc2626' : isVisible ? '#2563eb' : '#64748b';
 
-    return [
+    const styles = [
         new ol.style.Style({
             image: new ol.style.Circle({
-                radius: isSelected ? 7 : 5,
-                fill: new ol.style.Fill({ color: isSelected ? '#dc2626' : '#2563eb' }),
+                radius: isSelected ? 7 : isVisible ? 5 : 4,
+                fill: new ol.style.Fill({ color: markerColor }),
                 stroke: new ol.style.Stroke({ color: '#fff', width: 2 })
             })
-        }),
-        new ol.style.Style({
+        })
+    ];
+
+    if (isVisible) {
+        styles.push(new ol.style.Style({
             text: new ol.style.Text({
                 text,
                 font: `bold ${fontSize}px Arial, sans-serif`,
@@ -117,6 +122,8 @@ export function createAnnotationStyle(feature) {
                 stroke: new ol.style.Stroke({ color: '#fff', width: 3 }),
                 offsetY: -15
             })
-        })
-    ];
+        }));
+    }
+
+    return styles;
 }
