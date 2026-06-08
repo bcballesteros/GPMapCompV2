@@ -1,4 +1,4 @@
-import { DEFAULT_STYLE_OPACITY } from '../config/constants.js';
+import { DEFAULT_LINE_STROKE_WIDTH, DEFAULT_POINT_SIZE, DEFAULT_STYLE_OPACITY } from '../config/constants.js';
 import ol from '../lib/ol.js';
 
 export function hexToRgba(hex, alpha) {
@@ -9,18 +9,29 @@ export function hexToRgba(hex, alpha) {
     return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
-export function createFeatureStyle(color, opacity = DEFAULT_STYLE_OPACITY, isHighlight = false) {
-    const fillColor = hexToRgba(color, opacity);
-    const strokeColor = isHighlight ? 'rgba(255, 223, 0, 0.9)' : hexToRgba(color, opacity);
-    const strokeWidth = isHighlight ? 4 : 2;
+export function createFeatureStyle(
+    color,
+    opacity = DEFAULT_STYLE_OPACITY,
+    isHighlight = false,
+    pointSize = DEFAULT_POINT_SIZE,
+    strokeWidth = DEFAULT_LINE_STROKE_WIDTH,
+    options = {}
+) {
+    const fillHex = options.fillColor || color;
+    const strokeHex = options.strokeColor || color;
+    const fillColor = hexToRgba(fillHex, opacity);
+    const strokeColor = isHighlight ? 'rgba(255, 223, 0, 0.9)' : hexToRgba(strokeHex, opacity);
+    const safeStrokeWidth = Number.isFinite(strokeWidth) ? strokeWidth : DEFAULT_LINE_STROKE_WIDTH;
+    const renderedStrokeWidth = isHighlight ? Math.max(safeStrokeWidth + 2, 4) : safeStrokeWidth;
+    const safePointSize = Number.isFinite(pointSize) ? pointSize : DEFAULT_POINT_SIZE;
 
     return new ol.style.Style({
         fill: new ol.style.Fill({ color: fillColor }),
-        stroke: new ol.style.Stroke({ color: strokeColor, width: strokeWidth }),
+        stroke: new ol.style.Stroke({ color: strokeColor, width: renderedStrokeWidth }),
         image: new ol.style.Circle({
-            radius: isHighlight ? 8 : 5,
+            radius: isHighlight ? Math.max(safePointSize + 3, 8) : safePointSize,
             fill: new ol.style.Fill({ color: fillColor }),
-            stroke: new ol.style.Stroke({ color: strokeColor, width: strokeWidth })
+            stroke: new ol.style.Stroke({ color: strokeColor, width: renderedStrokeWidth })
         })
     });
 }
@@ -82,7 +93,23 @@ export function getFeatureLabelText(feature, labelField) {
 }
 
 export function createManagedFeatureStyles(record, feature, options = {}) {
-    const styles = [createFeatureStyle(record.color, record.opacity, options.isHighlighted)];
+    const strokeWidth = record.isPolygonLayer
+        ? record.polygonStrokeWidth
+        : record.lineStrokeWidth;
+    const colorOptions = record.isPolygonLayer
+        ? {
+            fillColor: record.polygonFillColor || record.color,
+            strokeColor: record.polygonStrokeColor || record.color
+        }
+        : {};
+    const styles = [createFeatureStyle(
+        record.color,
+        record.opacity,
+        options.isHighlighted,
+        record.pointSize,
+        strokeWidth,
+        colorOptions
+    )];
     const labelsEnabled = options.labelsEnabled ?? record.labelsVisible;
 
     if (labelsEnabled) {

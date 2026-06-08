@@ -352,6 +352,11 @@ function serializeLayerSettings() {
                 ...baseState,
                 type: 'vector',
                 color: record.color || '',
+                pointSize: Number(record.pointSize) || undefined,
+                lineStrokeWidth: Number(record.lineStrokeWidth) || undefined,
+                polygonFillColor: record.polygonFillColor || undefined,
+                polygonStrokeColor: record.polygonStrokeColor || undefined,
+                polygonStrokeWidth: Number(record.polygonStrokeWidth) || undefined,
                 labelsVisible: Boolean(record.labelsVisible)
             };
         });
@@ -442,6 +447,14 @@ function syncLayerItemControls(layerName, layerState) {
     const slider = layerItem.querySelector('.transparency-slider');
     const value = layerItem.querySelector('.transparency-value');
     const colorPicker = layerItem.querySelector('.color-picker');
+    const polygonFillPicker = layerItem.querySelector('.polygon-fill-picker');
+    const polygonStrokePicker = layerItem.querySelector('.polygon-stroke-picker');
+    const pointSizeSlider = layerItem.querySelector('.point-size-slider');
+    const pointSizeValue = layerItem.querySelector('.point-size-value');
+    const lineWidthSlider = layerItem.querySelector('.line-width-slider');
+    const lineWidthValue = layerItem.querySelector('.line-width-value');
+    const polygonWidthSlider = layerItem.querySelector('.polygon-width-slider');
+    const polygonWidthValue = layerItem.querySelector('.polygon-width-value');
 
     if (toggle) {
         toggle.checked = layerState.visible !== false;
@@ -457,6 +470,35 @@ function syncLayerItemControls(layerName, layerState) {
 
     if (colorPicker && layerState.color) {
         colorPicker.value = layerState.color;
+    }
+
+    if (polygonFillPicker && layerState.polygonFillColor) {
+        polygonFillPicker.value = layerState.polygonFillColor;
+    }
+
+    if (polygonStrokePicker && layerState.polygonStrokeColor) {
+        polygonStrokePicker.value = layerState.polygonStrokeColor;
+    }
+
+    if (pointSizeSlider && Number.isFinite(layerState.pointSize)) {
+        pointSizeSlider.value = String(layerState.pointSize);
+        if (pointSizeValue) {
+            pointSizeValue.textContent = `${layerState.pointSize}px`;
+        }
+    }
+
+    if (lineWidthSlider && Number.isFinite(layerState.lineStrokeWidth)) {
+        lineWidthSlider.value = String(layerState.lineStrokeWidth);
+        if (lineWidthValue) {
+            lineWidthValue.textContent = `${layerState.lineStrokeWidth}px`;
+        }
+    }
+
+    if (polygonWidthSlider && Number.isFinite(layerState.polygonStrokeWidth)) {
+        polygonWidthSlider.value = String(layerState.polygonStrokeWidth);
+        if (polygonWidthValue) {
+            polygonWidthValue.textContent = `${layerState.polygonStrokeWidth}px`;
+        }
     }
 }
 
@@ -524,8 +566,32 @@ function applyLayerState(layerState) {
         record.color = layerState.color;
     }
 
+    if (!record.isWMS && Number.isFinite(layerState.pointSize)) {
+        record.pointSize = layerState.pointSize;
+    }
+
+    if (!record.isWMS && Number.isFinite(layerState.lineStrokeWidth)) {
+        record.lineStrokeWidth = layerState.lineStrokeWidth;
+    }
+
+    if (!record.isWMS && layerState.polygonFillColor) {
+        record.polygonFillColor = layerState.polygonFillColor;
+        record.color = layerState.polygonFillColor;
+    }
+
+    if (!record.isWMS && layerState.polygonStrokeColor) {
+        record.polygonStrokeColor = layerState.polygonStrokeColor;
+    }
+
+    if (!record.isWMS && Number.isFinite(layerState.polygonStrokeWidth)) {
+        record.polygonStrokeWidth = layerState.polygonStrokeWidth;
+    }
+
     if (!record.isWMS && typeof layerState.labelsVisible === 'boolean') {
         record.labelsVisible = layerState.labelsVisible;
+    }
+
+    if (!record.isWMS) {
         updateManagedLayerStyle(layerState.name);
     }
 

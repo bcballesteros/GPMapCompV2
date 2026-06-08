@@ -40,6 +40,7 @@ let measureContextMenuHandler = null;
 let measurementEscapeKeyHandler = null;
 let selectedMeasurement = null;
 let hoveredMeasurement = null;
+let hasLatestMeasurementResult = false;
 const DRAW_INTERACTION_KIND = 'drawing';
 const MEASURE_INTERACTION_KIND = 'measurement';
 const DRAWING_HIT_TOLERANCE_PX = 10;
@@ -409,6 +410,28 @@ function setSelectedDrawing(feature) {
     selectedDrawing = feature ?? null;
     if (selectedDrawing) {
         selectedDrawing.set('selectedDrawing', true);
+        clearSelectedMeasurementContext();
+        clearSelectedAnnotationContext();
+    }
+
+    if (drawingLayer?.layer) {
+        drawingLayer.layer.changed();
+    }
+
+    updateDrawingControls();
+    updateContextualInspectorVisibility();
+}
+
+function clearSelectedDrawingContext() {
+    const drawingLayer = getLayerRecord(DRAWING_LAYER_ID);
+    const clearedDrawing = selectedDrawing;
+    if (selectedDrawing) {
+        selectedDrawing.set('selectedDrawing', false);
+        selectedDrawing = null;
+    }
+
+    if (getState().selectedFeature === clearedDrawing) {
+        setSelectedFeature(null);
     }
 
     if (drawingLayer?.layer) {
@@ -474,10 +497,71 @@ function setSelectedMeasurement(feature) {
     }
 
     selectedMeasurement = feature ?? null;
+    hasLatestMeasurementResult = Boolean(selectedMeasurement);
+
+    if (selectedMeasurement) {
+        clearSelectedDrawingContext();
+        clearSelectedAnnotationContext();
+    } else {
+        updateMeasurementResultPanel(Number.NaN);
+    }
+
     if (measureLayer) {
         measureLayer.changed();
     }
+
+    if (selectedMeasurement) {
+        updateMeasurementResultPanel(getMeasurementValues(selectedMeasurement));
+    } else {
+        updateMeasurementControls();
+    }
+
+    updateContextualInspectorVisibility();
+}
+
+function clearSelectedMeasurementContext() {
+    if (!selectedMeasurement && !hasLatestMeasurementResult) {
+        updateMeasurementControls();
+        return;
+    }
+
+    selectedMeasurement = null;
+    hasLatestMeasurementResult = false;
+    if (measureLayer) {
+        measureLayer.changed();
+    }
+    updateMeasurementResultPanel(Number.NaN);
     updateMeasurementControls();
+}
+
+function clearSelectedAnnotationContext() {
+    if (!selectedAnnotation) {
+        updateAnnotationControls();
+        return;
+    }
+
+    const clearedAnnotation = selectedAnnotation;
+    selectedAnnotation.set('selected', false);
+    selectedAnnotation = null;
+    if (getState().selectedFeature === clearedAnnotation) {
+        setSelectedFeature(null);
+    }
+    setMoveMode(false);
+    syncDraggableAnnotations();
+    updateAnnotationControls();
+}
+
+function updateContextualInspectorVisibility() {
+    const inspector = document.querySelector('.contextual-inspector');
+    if (!inspector) {
+        return;
+    }
+
+    const hasVisibleContext = Array.from(inspector.children).some((child) => {
+        return child instanceof HTMLElement && child.style.display !== 'none' && !child.hidden;
+    });
+
+    inspector.hidden = !hasVisibleContext;
 }
 
 function createMeasureTooltip() {
@@ -622,6 +706,40 @@ function formatNumberForDisplay(value, decimals) {
         minimumFractionDigits: decimals,
         maximumFractionDigits: decimals
     });
+}
+
+function splitMeasurementValueParts(text) {
+    const normalized = typeof text === 'string' ? text.trim() : '--';
+    const separatorIndex = normalized.lastIndexOf(' ');
+    if (separatorIndex <= 0 || normalized === '--') {
+        return { value: normalized, unit: '' };
+    }
+
+    return {
+        value: normalized.slice(0, separatorIndex),
+        unit: normalized.slice(separatorIndex + 1)
+    };
+}
+
+function setMeasurementCellValue(cell, text) {
+    if (!cell) {
+        return;
+    }
+
+    const { value, unit } = splitMeasurementValueParts(text);
+    cell.replaceChildren();
+
+    const valueSpan = document.createElement('span');
+    valueSpan.className = 'measure-value-number';
+    valueSpan.textContent = value;
+    cell.appendChild(valueSpan);
+
+    if (unit) {
+        const unitSpan = document.createElement('span');
+        unitSpan.className = 'measure-value-unit';
+        unitSpan.textContent = unit;
+        cell.appendChild(unitSpan);
+    }
 }
 
 function getGeodesicLengthMeters(lineGeometry) {
@@ -779,13 +897,14 @@ function updateMeasurementResultPanel(measurement) {
         : measurement;
     const hasMeasurement = Boolean(values && Number.isFinite(values.lengthMeters ?? values.areaSquareMeters));
     const measurementType = values?.type ?? MEASUREMENT_TYPE_DISTANCE;
+    hasLatestMeasurementResult = hasMeasurement;
 
     panel.classList.toggle('empty', !hasMeasurement);
     panel.dataset.measurementType = hasMeasurement ? measurementType : 'none';
 
-    const title = panel.querySelector('.measure-results-title');
+    const title = panel.querySelector('.measure-results-title-text');
     if (title) {
-        title.textContent = 'Measurement Results';
+        title.textContent = 'Selected Measurement Result';
     }
 
     panel.querySelectorAll('[data-measure-section]').forEach((section) => {
@@ -795,32 +914,35 @@ function updateMeasurementResultPanel(measurement) {
     DISTANCE_UNITS.forEach((unit) => {
         const cell = document.querySelector(`[data-measure-distance-value="${unit}"]`);
         if (cell) {
-            cell.textContent = hasMeasurement && measurementType === MEASUREMENT_TYPE_DISTANCE
+            setMeasurementCellValue(cell, hasMeasurement && measurementType === MEASUREMENT_TYPE_DISTANCE
                 ? formatDistanceForUnit(values.lengthMeters, unit)
-                : '--';
+                : '--');
         }
     });
 
     AREA_UNITS.forEach((unit) => {
         const cell = document.querySelector(`[data-measure-area-value="${unit}"]`);
         if (cell) {
-            cell.textContent = hasMeasurement && measurementType === MEASUREMENT_TYPE_AREA
+            setMeasurementCellValue(cell, hasMeasurement && measurementType === MEASUREMENT_TYPE_AREA
                 ? formatAreaForUnit(values.areaSquareMeters, unit)
-                : '--';
+                : '--');
         }
     });
 
     DISTANCE_UNITS.forEach((unit) => {
         const cell = document.querySelector(`[data-measure-perimeter-value="${unit}"]`);
         if (cell) {
-            cell.textContent = hasMeasurement && measurementType === MEASUREMENT_TYPE_AREA
+            setMeasurementCellValue(cell, hasMeasurement && measurementType === MEASUREMENT_TYPE_AREA
                 ? formatDistanceForUnit(values.perimeterMeters, unit)
-                : '--';
+                : '--');
         }
     });
+
+    updateMeasurementControls();
 }
 
 function updateMeasurementControls() {
+    const contextPanel = document.getElementById('measurementContextPanel');
     const controls = document.getElementById('measurementSelectionControls');
     const deleteBtn = document.getElementById('deleteSelectedMeasurementBtn');
     const hint = document.querySelector('.measurement-selection-hint');
@@ -830,6 +952,15 @@ function updateMeasurementControls() {
         return;
     }
 
+    if (contextPanel) {
+        contextPanel.style.display = selectedMeasurement ? '' : 'none';
+    }
+
+    const resultTitle = document.querySelector('#measureResultsPanel .measure-results-title-text');
+    if (resultTitle) {
+        resultTitle.textContent = 'Selected Measurement Result';
+    }
+
     if (selectedMeasurement) {
         const measurementType = selectedMeasurement.get?.('measurementType') === MEASUREMENT_TYPE_AREA
             ? 'Area'
@@ -837,21 +968,24 @@ function updateMeasurementControls() {
         controls.style.display = '';
         deleteBtn.disabled = false;
         if (typeLabel) {
-            typeLabel.textContent = measurementType;
+            setTypeBadge(typeLabel, measurementType);
         }
         if (hint) {
-            hint.textContent = 'Selected measurement is highlighted on the map. Delete removes only this result.';
+            hint.textContent = 'Selected measurement is highlighted on the map. Delete removes only this measurement.';
         }
     } else {
         controls.style.display = 'none';
         deleteBtn.disabled = true;
         if (typeLabel) {
             typeLabel.textContent = 'None';
+            delete typeLabel.dataset.badgeType;
         }
         if (hint) {
             hint.textContent = 'Click a measurement on the map to select it for individual deletion.';
         }
     }
+
+    updateContextualInspectorVisibility();
 }
 
 function bindMeasurementHover() {
@@ -921,7 +1055,6 @@ function bindMeasurementSelection() {
 
         if (!hitFeature) {
             setSelectedMeasurement(null);
-            updateMeasurementResultPanel(Number.NaN);
             return;
         }
 
@@ -1244,6 +1377,8 @@ function selectAnnotationFeature(feature) {
     syncDraggableAnnotations();
 
     if (selectedAnnotation) {
+        clearSelectedDrawingContext();
+        clearSelectedMeasurementContext();
         selectedAnnotation.set('selected', true);
     }
 
@@ -1254,6 +1389,7 @@ function selectAnnotationFeature(feature) {
     }
 
     updateAnnotationControls();
+    updateContextualInspectorVisibility();
 }
 
 function setMoveMode(enabled) {
@@ -1524,6 +1660,15 @@ function getDrawingLabel(feature) {
     return 'Drawing';
 }
 
+function setTypeBadge(labelElement, value) {
+    if (!labelElement) {
+        return;
+    }
+
+    labelElement.textContent = value;
+    labelElement.dataset.badgeType = value.toLowerCase();
+}
+
 export function updateDrawingControls() {
     const controls = document.getElementById('drawingSelectionControls');
     const deleteBtn = document.getElementById('deleteSelectedDrawingBtn');
@@ -1538,7 +1683,7 @@ export function updateDrawingControls() {
         controls.style.display = '';
         deleteBtn.disabled = false;
         if (typeLabel) {
-            typeLabel.textContent = getDrawingLabel(selectedDrawing);
+            setTypeBadge(typeLabel, getDrawingLabel(selectedDrawing));
         }
         if (hint) {
             hint.textContent = 'Selected drawing is highlighted on the map. Delete removes only this drawing.';
@@ -1548,11 +1693,14 @@ export function updateDrawingControls() {
         deleteBtn.disabled = true;
         if (typeLabel) {
             typeLabel.textContent = 'None';
+            delete typeLabel.dataset.badgeType;
         }
         if (hint) {
             hint.textContent = 'Click a drawing on the map to select it for individual deletion.';
         }
     }
+
+    updateContextualInspectorVisibility();
 }
 
 export function deleteSelectedDrawing() {
@@ -1905,6 +2053,36 @@ export function deleteAnnotation(feature) {
     }
 }
 
+export function clearAnnotations() {
+    const annotationLayer = getLayerRecord(ANNOTATION_LAYER_ID);
+    if (!annotationLayer?.source) {
+        showToast('No Annotations', 'There are no text annotations to clear.', 'info', 1500);
+        return;
+    }
+
+    const annotationCount = annotationLayer.source.getFeatures().filter((feature) => feature.get('isAnnotation')).length;
+    if (annotationCount === 0) {
+        showToast('No Annotations', 'There are no text annotations to clear.', 'info', 1500);
+        return;
+    }
+
+    setMoveMode(false);
+    annotationLayer.source.clear();
+    selectedAnnotation = null;
+    hoveredAnnotation = null;
+    setSelectedFeature(null);
+    syncDraggableAnnotations();
+    updateAnnotationCursor();
+    updateAnnotationControls();
+
+    const map = getMap();
+    if (map) {
+        map.removeLayer(annotationLayer.layer);
+    }
+    removeLayerRecord(ANNOTATION_LAYER_ID);
+    showToast('Annotations Cleared', 'All text annotations were removed.', 'success', 1700);
+}
+
 export function selectAnnotationForDeletion(event) {
     if (annotationMoveMode || isDrawingActive() || isMeasurementActive()) {
         return;
@@ -1919,6 +2097,7 @@ export function updateAnnotationControls() {
     const deleteBtn = document.getElementById('deleteAnnotationBtn');
     const moveBtn = document.getElementById('moveAnnotationBtn');
     const visibilityBtn = document.getElementById('toggleAnnotationVisibilityBtn');
+    const clearBtn = document.getElementById('clearAnnotationsBtn');
     const hint = document.querySelector('.annotation-controls-hint');
 
     if (!controls || !editBtn || !deleteBtn || !moveBtn) {
@@ -1931,6 +2110,9 @@ export function updateAnnotationControls() {
         editBtn.disabled = false;
         deleteBtn.disabled = false;
         moveBtn.disabled = false;
+        if (clearBtn) {
+            clearBtn.disabled = false;
+        }
         if (visibilityBtn) {
             visibilityBtn.disabled = false;
             visibilityBtn.classList.toggle('active', !annotationVisible);
@@ -1957,6 +2139,9 @@ export function updateAnnotationControls() {
         editBtn.disabled = true;
         deleteBtn.disabled = true;
         moveBtn.disabled = true;
+        if (clearBtn) {
+            clearBtn.disabled = true;
+        }
         if (visibilityBtn) {
             visibilityBtn.disabled = true;
             visibilityBtn.classList.remove('active');
@@ -1977,6 +2162,8 @@ export function updateAnnotationControls() {
         });
         annotationLayer.layer.changed();
     }
+
+    updateContextualInspectorVisibility();
 }
 
 export function bindAnnotationControls() {
@@ -1984,6 +2171,7 @@ export function bindAnnotationControls() {
     const deleteBtn = document.getElementById('deleteAnnotationBtn');
     const moveBtn = document.getElementById('moveAnnotationBtn');
     const visibilityBtn = document.getElementById('toggleAnnotationVisibilityBtn');
+    const clearBtn = document.getElementById('clearAnnotationsBtn');
 
     if (editBtn) {
         editBtn.onclick = () => {
@@ -2032,6 +2220,12 @@ export function bindAnnotationControls() {
                 'info',
                 1800
             );
+        };
+    }
+
+    if (clearBtn) {
+        clearBtn.onclick = () => {
+            clearAnnotations();
         };
     }
 }

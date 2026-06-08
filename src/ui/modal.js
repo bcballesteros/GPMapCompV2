@@ -42,8 +42,44 @@ export function closeModal(modalId) {
 
 export function toggleSection(header) {
     const content = header.nextElementSibling;
-    if (content) {
-        content.classList.toggle('collapsed');
+    if (!content) {
+        return;
+    }
+
+    const group = header.closest?.('.tool-section-group');
+    const isOpening = content.classList.contains('collapsed');
+
+    content.classList.toggle('collapsed');
+    group?.classList.toggle('expanded', isOpening);
+    group?.classList.toggle('active-section', isOpening);
+
+    if (!isOpening) {
+        group?.classList.remove('active-section');
+        return;
+    }
+
+    group.dataset.openedAt = String(Date.now());
+
+    const sidebar = header.closest?.('.right-sidebar-content');
+    if (!sidebar) {
+        return;
+    }
+
+    const openGroups = Array.from(sidebar.querySelectorAll('.tool-section-group'))
+        .filter((section) => !section.querySelector('.tool-section-content')?.classList.contains('collapsed'));
+
+    if (openGroups.length <= 2) {
+        return;
+    }
+
+    const collapseCandidate = openGroups
+        .filter((section) => section !== group && !section.querySelector('.tool-btn.active'))
+        .sort((a, b) => Number(a.dataset.openedAt || 0) - Number(b.dataset.openedAt || 0))[0];
+
+    const candidateContent = collapseCandidate?.querySelector('.tool-section-content');
+    if (candidateContent) {
+        candidateContent.classList.add('collapsed');
+        collapseCandidate.classList.remove('expanded', 'active-section');
     }
 }
 

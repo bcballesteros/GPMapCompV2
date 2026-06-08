@@ -280,17 +280,97 @@
                 <div class="right-sidebar-title"><i class="fas fa-toolbox"></i> Tools & Properties</div>
                 <div class="right-sidebar-subtitle">Editing, analysis, and workspace display controls</div>
             </div>
+            <div class="contextual-inspector" aria-label="Contextual selection inspector" hidden>
             <!-- Annotation Controls (OUTSIDE MAP) -->
-                <div id="annotationControls" class="annotation-controls-panel" style="display:none;">
-                    <div class="annotation-controls-title">Selected Annotation</div>
+                <div id="annotationControls" class="annotation-controls-panel context-controls-panel annotation-context-panel" style="display:none;">
+                    <div class="annotation-controls-title">
+                        <span class="context-title-mark"><i class="fas fa-pen-fancy"></i></span>
+                        <span class="context-title-copy">
+                            <span class="context-controls-label">Annotation Workspace</span>
+                            <span class="context-controls-subtitle">Selected map note</span>
+                        </span>
+                        <strong data-badge-type="text">Text</strong>
+                    </div>
                     <div class="annotation-controls-actions">
                     <button id="editAnnotationBtn" class="tool-btn tool-btn-solid tool-btn-accent" disabled title="Edit the selected annotation text and style"><i class="fas fa-edit"></i> Edit</button>
                     <button id="deleteAnnotationBtn" class="tool-btn tool-btn-solid tool-btn-danger" disabled title="Delete the selected annotation from the map"><i class="fas fa-trash"></i> Delete</button>
                     <button id="moveAnnotationBtn" class="tool-btn tool-btn-solid tool-btn-muted" disabled title="Drag the selected annotation to a new location"><i class="fas fa-arrows-alt"></i> Move</button>
                     <button id="toggleAnnotationVisibilityBtn" class="tool-btn tool-btn-solid tool-btn-muted" disabled title="Hide or show the selected annotation text" aria-pressed="false" data-state="visible"><i class="fas fa-eye-slash"></i> Hide</button>
+                    <button id="clearAnnotationsBtn" class="tool-btn context-clear-btn clear-annotations-btn" disabled title="Remove all text annotations from the map"><i class="fas fa-eraser"></i> Clear All Annotations</button>
                     </div>
                     <div class="annotation-controls-hint">Select an annotation on the map to edit its text, move its position, or remove it.</div>
                 </div>
+                <div id="drawingSelectionControls" class="context-controls-panel drawing-selection-controls" style="display:none;">
+                    <div class="context-controls-title">
+                        <span class="context-title-mark"><i class="fas fa-draw-polygon"></i></span>
+                        <span class="context-title-copy">
+                            <span class="context-controls-label">Drawing Workspace</span>
+                            <span class="context-controls-subtitle">Selected geometry</span>
+                        </span>
+                        <strong id="selectedDrawingType">None</strong>
+                    </div>
+                    <div class="drawing-selection-hint context-controls-hint">Click a drawing on the map to select it for individual deletion.</div>
+                    <div class="context-controls-actions">
+                        <button id="deleteSelectedDrawingBtn" class="tool-btn delete-selected-drawing-btn" disabled title="Delete only the selected drawing">
+                            <span><i class="fas fa-trash"></i> Delete Selected</span>
+                        </button>
+                        <button class="tool-btn clear-drawings-btn context-clear-btn" onclick="clearDrawings()" title="Remove all drawing geometries">
+                            <span><i class="fas fa-eraser"></i> Clear All Drawings</span>
+                        </button>
+                    </div>
+                </div>
+                <div id="measurementContextPanel" class="context-controls-panel measurement-context-panel" style="display:none;">
+                    <div id="measureResultsPanel" class="measure-results-panel empty" aria-live="polite">
+                        <div class="measure-results-title">
+                            <span class="context-title-mark"><i class="fas fa-ruler-combined"></i></span>
+                            <span class="measure-results-title-text">Selected Measurement Result</span>
+                        </div>
+                        <div class="measure-results-section" data-measure-section="distance">
+                            <div class="measure-result-primary">
+                                <span class="measure-result-label">Distance</span>
+                                <strong class="measure-result-value" data-measure-distance-value="m">--</strong>
+                            </div>
+                            <div class="measure-results-grid">
+                                <div class="measure-result-chip"><span class="measure-result-label">Kilometers</span><strong class="measure-result-value" data-measure-distance-value="km">--</strong></div>
+                                <div class="measure-result-chip"><span class="measure-result-label">Miles</span><strong class="measure-result-value" data-measure-distance-value="mi">--</strong></div>
+                                <div class="measure-result-chip"><span class="measure-result-label">Feet</span><strong class="measure-result-value" data-measure-distance-value="ft">--</strong></div>
+                                <div class="measure-result-chip"><span class="measure-result-label">Nautical mi</span><strong class="measure-result-value" data-measure-distance-value="nmi">--</strong></div>
+                            </div>
+                        </div>
+                        <div class="measure-results-section" data-measure-section="area" hidden>
+                            <div class="measure-result-primary">
+                                <span class="measure-result-label">Area</span>
+                                <strong class="measure-result-value" data-measure-area-value="m2">--</strong>
+                            </div>
+                            <div class="measure-results-grid">
+                                <div class="measure-result-chip"><span class="measure-result-label">km&sup2;</span><strong class="measure-result-value" data-measure-area-value="km2">--</strong></div>
+                                <div class="measure-result-chip"><span class="measure-result-label">Hectares</span><strong class="measure-result-value" data-measure-area-value="ha">--</strong></div>
+                                <div class="measure-result-chip"><span class="measure-result-label">Acres</span><strong class="measure-result-value" data-measure-area-value="ac">--</strong></div>
+                                <div class="measure-result-chip"><span class="measure-result-label">Perimeter</span><strong class="measure-result-value" data-measure-perimeter-value="m">--</strong></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="measurementSelectionControls" class="measurement-selection-controls" style="display:none;">
+                        <div class="context-controls-title">
+                            <span class="context-title-mark"><i class="fas fa-location-crosshairs"></i></span>
+                            <span class="context-title-copy">
+                                <span class="context-controls-label">Measurement Workspace</span>
+                                <span class="context-controls-subtitle">Selected result</span>
+                            </span>
+                            <strong id="selectedMeasurementType" class="measurement-selection-type">None</strong>
+                        </div>
+                        <div class="measurement-selection-hint context-controls-hint">Click a measurement on the map to select it for individual deletion.</div>
+                        <div class="context-controls-actions">
+                            <button id="deleteSelectedMeasurementBtn" class="tool-btn delete-selected-measurement-btn" disabled title="Delete only the selected measurement">
+                                <span><i class="fas fa-trash"></i> Delete Selected</span>
+                            </button>
+                            <button class="tool-btn clear-measurements-btn context-clear-btn" onclick="clearMeasurements()" title="Clear all measurement lines">
+                                <span><i class="fas fa-broom"></i> Clear All Measurements</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
             <div class="right-sidebar-content">
                 <!-- Annotation Tools -->
@@ -318,7 +398,7 @@
                 </div>
 
                 <!-- Drawing Tools -->
-                <div class="tool-section-group annotation-tools-section">
+                <div class="tool-section-group annotation-tools-section drawing-tools-section">
                     <div class="tool-section-header" onclick="toggleSection(this)">
                         <div class="tool-icon blue"><i class="fas fa-draw-polygon"></i></div>
                         <div class="tool-section-info">
@@ -345,19 +425,6 @@
                                 <span><i class="fas fa-signature"></i> Freehand</span>
                                 <span class="tool-btn-arrow">&rsaquo;</span>
                             </button>
-                            <div id="drawingSelectionControls" class="drawing-selection-controls" style="display:none;">
-                                <div class="drawing-selection-title">
-                                    <span class="drawing-selection-label">Selected Drawing</span>
-                                    <strong id="selectedDrawingType">None</strong>
-                                </div>
-                                <div class="drawing-selection-hint">Click a drawing on the map to select it for individual deletion.</div>
-                                <button id="deleteSelectedDrawingBtn" class="tool-btn delete-selected-drawing-btn" disabled title="Delete only the selected drawing">
-                                    <span><i class="fas fa-trash"></i> Delete Selected Drawing</span>
-                                </button>
-                            </div>
-                            <button class="tool-btn tool-btn-solid tool-btn-danger clear-drawings-btn" onclick="clearDrawings()" title="Remove all drawing geometries">
-                                <span><i class="fas fa-eraser"></i> Clear Drawings</span>
-                            </button>
                         </div>
                     </div>
                 </div>
@@ -382,51 +449,6 @@
                                 <span><i class="fas fa-draw-polygon"></i> Measure Area</span>
                                 <span class="tool-btn-arrow">&rsaquo;</span>
                             </button>
-                            <div class="measure-controls-inline" aria-label="Measurement controls">
-                                <div id="measureResultsPanel" class="measure-results-panel empty" aria-live="polite">
-                                    <div class="measure-results-title">Measurement Results</div>
-                                    <div class="measure-results-section" data-measure-section="distance">
-                                        <div class="measure-results-subtitle">Distance</div>
-                                        <div class="measure-results-grid">
-                                            <div class="measure-result-chip"><span class="measure-result-label">Meters (m)</span><strong class="measure-result-value" data-measure-distance-value="m">--</strong></div>
-                                            <div class="measure-result-chip"><span class="measure-result-label">Kilometers (km)</span><strong class="measure-result-value" data-measure-distance-value="km">--</strong></div>
-                                            <div class="measure-result-chip"><span class="measure-result-label">Miles (mi)</span><strong class="measure-result-value" data-measure-distance-value="mi">--</strong></div>
-                                            <div class="measure-result-chip"><span class="measure-result-label">Feet (ft)</span><strong class="measure-result-value" data-measure-distance-value="ft">--</strong></div>
-                                            <div class="measure-result-chip"><span class="measure-result-label">Nautical miles (nmi)</span><strong class="measure-result-value" data-measure-distance-value="nmi">--</strong></div>
-                                        </div>
-                                    </div>
-                                    <div class="measure-results-section" data-measure-section="area" hidden>
-                                        <div class="measure-results-subtitle">Area</div>
-                                        <div class="measure-results-grid">
-                                            <div class="measure-result-chip"><span class="measure-result-label">Meters (m&sup2;)</span><strong class="measure-result-value" data-measure-area-value="m2">--</strong></div>
-                                            <div class="measure-result-chip"><span class="measure-result-label">Kilometers (km&sup2;)</span><strong class="measure-result-value" data-measure-area-value="km2">--</strong></div>
-                                            <div class="measure-result-chip"><span class="measure-result-label">Hectares (ha)</span><strong class="measure-result-value" data-measure-area-value="ha">--</strong></div>
-                                            <div class="measure-result-chip"><span class="measure-result-label">Acres (ac)</span><strong class="measure-result-value" data-measure-area-value="ac">--</strong></div>
-                                        </div>
-                                        <div class="measure-results-subtitle">Perimeter</div>
-                                        <div class="measure-results-grid">
-                                            <div class="measure-result-chip"><span class="measure-result-label">Meters (m)</span><strong class="measure-result-value" data-measure-perimeter-value="m">--</strong></div>
-                                            <div class="measure-result-chip"><span class="measure-result-label">Kilometers (km)</span><strong class="measure-result-value" data-measure-perimeter-value="km">--</strong></div>
-                                            <div class="measure-result-chip"><span class="measure-result-label">Miles (mi)</span><strong class="measure-result-value" data-measure-perimeter-value="mi">--</strong></div>
-                                            <div class="measure-result-chip"><span class="measure-result-label">Feet (ft)</span><strong class="measure-result-value" data-measure-perimeter-value="ft">--</strong></div>
-                                            <div class="measure-result-chip"><span class="measure-result-label">Nautical miles (nmi)</span><strong class="measure-result-value" data-measure-perimeter-value="nmi">--</strong></div>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div id="measurementSelectionControls" class="measurement-selection-controls" style="display:none;">
-                                    <div class="measurement-selection-title">
-                                        <span class="measurement-selection-label">Selected Measurement</span>
-                                        <strong id="selectedMeasurementType" class="measurement-selection-type">None</strong>
-                                    </div>
-                                    <div class="measurement-selection-hint">Click a measurement on the map to select it for individual deletion.</div>
-                                    <button id="deleteSelectedMeasurementBtn" class="tool-btn delete-selected-measurement-btn" disabled title="Delete only the selected measurement">
-                                        <span><i class="fas fa-trash"></i> Delete Selected Measurement</span>
-                                    </button>
-                                </div>
-                                <button class="tool-btn tool-btn-solid clear-measurements-btn" onclick="clearMeasurements()" title="Clear all measurement lines">
-                                    <span><i class="fas fa-broom"></i> Clear Measurements</span>
-                                </button>
-                            </div>
                         </div>
                     </div>
                 </div>

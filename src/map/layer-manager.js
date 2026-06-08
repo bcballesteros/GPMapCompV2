@@ -1,4 +1,4 @@
-import { DEFAULT_LAYER_COLOR, DEFAULT_VECTOR_OPACITY, ANNOTATION_LAYER_ID } from '../config/constants.js';
+import { DEFAULT_LAYER_COLOR, DEFAULT_LINE_STROKE_WIDTH, DEFAULT_POINT_SIZE, DEFAULT_VECTOR_OPACITY, ANNOTATION_LAYER_ID } from '../config/constants.js';
 import { DEFAULT_VIEW_PADDING } from '../config/defaults.js';
 import ol from '../lib/ol.js';
 import { createBasemapSource } from '../config/basemaps.js';
@@ -10,6 +10,55 @@ export function findLayerNameByLayer(targetLayer) {
     return Object.keys(uploadedLayers).find((name) => uploadedLayers[name].layer === targetLayer) || null;
 }
 
+function isPointGeometryType(type) {
+    return type === 'Point' || type === 'MultiPoint';
+}
+
+function isLineGeometryType(type) {
+    return type === 'LineString' || type === 'MultiLineString';
+}
+
+function isPolygonGeometryType(type) {
+    return type === 'Polygon' || type === 'MultiPolygon';
+}
+
+function getLayerGeometryType(geojson) {
+    const geometryTypes = (geojson?.features || [])
+        .map((feature) => feature?.geometry?.type)
+        .filter(Boolean);
+
+    if (geometryTypes.length === 0) {
+        return 'Unknown';
+    }
+
+    const uniqueTypes = [...new Set(geometryTypes)];
+    return uniqueTypes.length === 1 ? uniqueTypes[0] : 'Mixed';
+}
+
+function isPointLayer(geojson) {
+    const geometryTypes = (geojson?.features || [])
+        .map((feature) => feature?.geometry?.type)
+        .filter(Boolean);
+
+    return geometryTypes.length > 0 && geometryTypes.every(isPointGeometryType);
+}
+
+function isLineLayer(geojson) {
+    const geometryTypes = (geojson?.features || [])
+        .map((feature) => feature?.geometry?.type)
+        .filter(Boolean);
+
+    return geometryTypes.length > 0 && geometryTypes.every(isLineGeometryType);
+}
+
+function isPolygonLayer(geojson) {
+    const geometryTypes = (geojson?.features || [])
+        .map((feature) => feature?.geometry?.type)
+        .filter(Boolean);
+
+    return geometryTypes.length > 0 && geometryTypes.every(isPolygonGeometryType);
+}
+
 export function addVectorLayer(layerName, layerColor, geojson, features, metadata = {}) {
     const source = new ol.source.Vector({ features });
     const layerRecord = {
@@ -19,7 +68,15 @@ export function addVectorLayer(layerName, layerColor, geojson, features, metadat
         features,
         color: layerColor,
         opacity: DEFAULT_VECTOR_OPACITY,
-        geometryType: geojson.features[0]?.geometry?.type || 'Unknown',
+        pointSize: DEFAULT_POINT_SIZE,
+        lineStrokeWidth: DEFAULT_LINE_STROKE_WIDTH,
+        polygonFillColor: layerColor,
+        polygonStrokeColor: layerColor,
+        polygonStrokeWidth: DEFAULT_LINE_STROKE_WIDTH,
+        geometryType: getLayerGeometryType(geojson),
+        isPointLayer: isPointLayer(geojson),
+        isLineLayer: isLineLayer(geojson),
+        isPolygonLayer: isPolygonLayer(geojson),
         isWMS: false,
         sourceCrs: metadata.sourceCrs || 'Unknown CRS',
         sourceCrsDetected: Boolean(metadata.sourceCrsDetected),

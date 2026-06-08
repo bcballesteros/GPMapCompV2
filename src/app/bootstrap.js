@@ -1,9 +1,9 @@
-import { activateAnnotation, activateDrawing, activateMeasureArea, activateMeasureDistance, bindAnnotationControls, bindAnnotationVisibilityToggle, cancelAnnotation, clearDrawings, clearMeasurements, deleteAnnotation, deleteSelectedDrawing, deleteSelectedMeasurement, editAnnotation, getSelectedAnnotationMode, initializeAnnotationInteractions, initializeDrawingSelectionControls, initializeMeasurementControls, selectAnnotationForDeletion, submitAnnotation } from '../tools/annotation-tool.js';
+import { activateAnnotation, activateDrawing, activateMeasureArea, activateMeasureDistance, bindAnnotationControls, bindAnnotationVisibilityToggle, cancelAnnotation, clearAnnotations, clearDrawings, clearMeasurements, deleteAnnotation, deleteSelectedDrawing, deleteSelectedMeasurement, editAnnotation, getSelectedAnnotationMode, initializeAnnotationInteractions, initializeDrawingSelectionControls, initializeMeasurementControls, selectAnnotationForDeletion, submitAnnotation } from '../tools/annotation-tool.js';
 import { copyToClipboard, downloadMap, generateLink, renderMapPreview, restoreSharedStateFromUrl } from '../tools/export-share.js';
 import { initializeMap } from '../map/map-init.js';
 import { changeBasemapLayer } from '../map/layer-manager.js';
 import { addGPLayerFromForm, addWMSLayerFromForm, clearCsvSelection, clearFileSelection, clearGeoJSONSelection, clearKmlSelection, fetchGpLayersFromForm, fetchWmsCapabilitiesFromForm, handleCsvSelect, handleFileSelect, handleGeoJSONSelect, handleKmlSelect, initializeGpLayerForm, initializeUploadForm, initializeWmsLayerForm, resetGpLayerFormSession, resetWmsLayerFormSession, submitUpload, updateDataSection } from '../tools/upload-tool.js';
-import { commitLayerOpacity, removeLayer, selectLayer, updateLayerColor, updateLayerOpacity } from '../ui/layers-panel.js';
+import { commitLayerOpacity, removeLayer, selectLayer, updateLayerColor, updateLayerOpacity, updateLineStrokeWidth } from '../ui/layers-panel.js';
 import { bindModalOverlayDismissal, closeModal, openModal, toggleSection } from '../ui/modal.js';
 import { initializeLocationSearch } from '../ui/location-search.js';
 import { openAttributeTable } from '../ui/sidebar.js';
@@ -67,6 +67,7 @@ function bindGlobalHandlers() {
     window.selectLayer = selectLayer;
     window.updateLayerColor = updateLayerColor;
     window.updateLayerOpacity = updateLayerOpacity;
+    window.updateLineStrokeWidth = updateLineStrokeWidth;
     window.commitLayerOpacity = commitLayerOpacity;
     window.removeLayer = removeLayer;
     window.openAttributeTable = openAttributeTable;
@@ -78,6 +79,7 @@ function bindGlobalHandlers() {
     window.activateMeasureArea = activateMeasureArea;
     window.deleteSelectedMeasurement = deleteSelectedMeasurement;
     window.clearMeasurements = clearMeasurements;
+    window.clearAnnotations = clearAnnotations;
     window.submitAnnotation = submitAnnotation;
     window.cancelAnnotation = cancelAnnotation;
     window.editAnnotation = editAnnotation;
