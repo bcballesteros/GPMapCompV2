@@ -353,6 +353,7 @@ function serializeLayerSettings() {
                 type: 'vector',
                 color: record.color || '',
                 pointSize: Number(record.pointSize) || undefined,
+                svgMarkerDataUrl: record.svgMarkerDataUrl || undefined,
                 lineStrokeWidth: Number(record.lineStrokeWidth) || undefined,
                 polygonFillColor: record.polygonFillColor || undefined,
                 polygonStrokeColor: record.polygonStrokeColor || undefined,
@@ -568,6 +569,10 @@ function applyLayerState(layerState) {
 
     if (!record.isWMS && Number.isFinite(layerState.pointSize)) {
         record.pointSize = layerState.pointSize;
+    }
+
+    if (!record.isWMS && typeof layerState.svgMarkerDataUrl === 'string') {
+        record.svgMarkerDataUrl = layerState.svgMarkerDataUrl;
     }
 
     if (!record.isWMS && Number.isFinite(layerState.lineStrokeWidth)) {

@@ -3,6 +3,7 @@ import { removeManagedLayer, updateManagedLayerStyle } from '../map/layer-manage
 import { getLayerRecord, getState, setCurrentLayerName } from '../state/store.js';
 import { syncLabelsToggle } from '../tools/labels-tool.js';
 import { commitLayerOpacity as commitLayerOpacityValue, updateLayerOpacity as updateLayerOpacityValue } from '../tools/transparency-tool.js';
+import { showToast } from './toast.js';
 
 let layerNameTooltipElement = null;
 let layerNameTooltipListenersBound = false;
@@ -25,6 +26,154 @@ function escapeHtml(value) {
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
+}
+
+function getSvgGallery(record) {
+    if (!record) {
+        return [];
+    }
+    if (Array.isArray(record.svgMarkerGallery)) {
+        return record.svgMarkerGallery;
+    }
+    if (record.svgMarkerDataUrl) {
+        return [{
+            id: 'uploaded-svg-1',
+            name: 'Uploaded SVG',
+            dataUrl: record.svgMarkerDataUrl
+        }];
+    }
+    return [];
+}
+
+function getActiveSvgMarker(record) {
+    const gallery = getSvgGallery(record);
+    if (gallery.length === 0) {
+        return null;
+    }
+
+    let index = Number.isInteger(record.activeSvgMarkerIndex) ? record.activeSvgMarkerIndex : 0;
+    if (index < 0 || index >= gallery.length) {
+        index = 0;
+    }
+    record.activeSvgMarkerIndex = index;
+    return gallery[index];
+}
+
+function syncSvgMarkerState(record) {
+    if (!record) {
+        return;
+    }
+
+    const active = getActiveSvgMarker(record);
+    record.svgMarkerDataUrl = active ? active.dataUrl : null;
+    if (active) {
+        record.markerPresetType = null;
+    }
+}
+
+function createSvgMarkerId(fileName) {
+    return `${fileName}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function renderSvgMarkerGallery(record, layerItem) {
+    if (!layerItem) {
+        return;
+    }
+
+    const galleryContainer = layerItem.querySelector('.svg-marker-gallery');
+    const statusEl = layerItem.querySelector('.svg-marker-upload-status');
+    const gallery = getSvgGallery(record);
+    const activeIndex = Number.isInteger(record.activeSvgMarkerIndex) ? record.activeSvgMarkerIndex : 0;
+    const isSvgActive = Boolean(record.svgMarkerDataUrl && !record.markerPresetType);
+
+    if (statusEl) {
+        statusEl.textContent = gallery.length > 0 ? `${gallery.length} uploaded` : 'None';
+    }
+
+    if (!galleryContainer) {
+        return;
+    }
+
+    if (gallery.length === 0) {
+        galleryContainer.innerHTML = `<div class="svg-marker-gallery-empty">No uploaded SVGs</div>`;
+        return;
+    }
+
+    galleryContainer.innerHTML = gallery.map((item, index) => {
+        const label = escapeHtml(item.name);
+        const activeClass = isSvgActive && index === activeIndex ? ' active' : '';
+        return `
+            <button type="button" class="svg-marker-thumbnail${activeClass}" data-svg-index="${index}" title="${label}" aria-label="Select ${label}">
+                <img src="${item.dataUrl}" alt="${label}" />
+                <span class="svg-marker-delete" role="button" aria-label="Delete ${label}" title="Delete ${label}">×</span>
+            </button>
+        `;
+    }).join('');
+
+    galleryContainer.querySelectorAll('.svg-marker-thumbnail').forEach((thumb) => {
+        const deleteButton = thumb.querySelector('.svg-marker-delete');
+        if (deleteButton) {
+            deleteButton.addEventListener('pointerdown', (event) => event.stopPropagation());
+            deleteButton.addEventListener('click', (event) => {
+                event.stopPropagation();
+                const index = Number(thumb.getAttribute('data-svg-index'));
+                const record = getLayerRecord(layerItem.querySelector('.layer-name').textContent);
+                if (!record || !Number.isFinite(index)) {
+                    return;
+                }
+                record.activeSvgMarkerIndex = index;
+                removeActiveSvgMarker(record, layerItem);
+            });
+        }
+
+        thumb.addEventListener('pointerdown', (event) => event.stopPropagation());
+        thumb.addEventListener('click', (event) => {
+            event.stopPropagation();
+            const index = Number(thumb.getAttribute('data-svg-index'));
+            const record = getLayerRecord(layerItem.querySelector('.layer-name').textContent);
+            if (!record || !Number.isFinite(index)) {
+                return;
+            }
+            setActiveSvgMarker(record, index, layerItem);
+        });
+    });
+}
+
+function setActiveSvgMarker(record, index, layerItem) {
+    const gallery = getSvgGallery(record);
+    if (gallery.length === 0 || index < 0 || index >= gallery.length) {
+        return;
+    }
+
+    record.activeSvgMarkerIndex = index;
+    syncSvgMarkerState(record);
+    updateSvgMarkerPreview(layerItem, record.svgMarkerDataUrl);
+    renderSvgMarkerGallery(record, layerItem);
+    updateManagedLayerStyle(layerItem.querySelector('.layer-name').textContent);
+}
+
+function removeActiveSvgMarker(record, layerItem) {
+    const gallery = getSvgGallery(record).slice();
+    if (gallery.length === 0) {
+        return;
+    }
+
+    const indexToRemove = Number.isInteger(record.activeSvgMarkerIndex) ? record.activeSvgMarkerIndex : 0;
+    gallery.splice(indexToRemove, 1);
+    record.svgMarkerGallery = gallery;
+    record.activeSvgMarkerIndex = Math.min(indexToRemove, gallery.length - 1);
+    if (gallery.length === 0) {
+        record.svgMarkerDataUrl = null;
+        record.activeSvgMarkerIndex = 0;
+    } else {
+        syncSvgMarkerState(record);
+    }
+
+    if (layerItem) {
+        syncMarkerTypeWidgets(record, layerItem);
+        updateSvgMarkerPreview(layerItem, record.svgMarkerDataUrl);
+        renderSvgMarkerGallery(record, layerItem);
+    }
 }
 
 function ensureLayerNameTooltip() {
@@ -123,14 +272,19 @@ export function addLayerItem(name, color, featureCount, options = {}) {
         layerList.innerHTML = '';
     }
 
-    const isWms = Boolean(options.isWMS);
     const record = getLayerRecord(name);
+    const isWms = Boolean(record?.isWMS) || Boolean(options.isWMS);
     const isGp = Boolean(options.isGP || record?.isGP);
     const isPointLayer = Boolean(record?.isPointLayer);
     const isLineLayer = Boolean(record?.isLineLayer);
     const isPolygonLayer = Boolean(record?.isPolygonLayer);
     const opacityValue = Math.round((record?.opacity ?? 1) * 100);
     const pointSizeValue = Math.round(record?.pointSize ?? DEFAULT_POINT_SIZE);
+    const svgMarkerDataUrl = record?.svgMarkerDataUrl || '';
+    const markerPresetType = record?.markerPresetType || null;
+    const markerStrokeColor = record?.markerStrokeColor || color;
+    const markerStrokeWidth = Math.round(record?.markerStrokeWidth ?? 1);
+    const markerStrokeEnabled = Boolean(record?.markerStrokeEnabled);
     const lineStrokeWidthValue = Math.round(record?.lineStrokeWidth ?? DEFAULT_LINE_STROKE_WIDTH);
     const polygonFillColor = record?.polygonFillColor || color;
     const polygonStrokeColor = record?.polygonStrokeColor || color;
@@ -139,18 +293,158 @@ export function addLayerItem(name, color, featureCount, options = {}) {
         ? `${isGp ? 'GP Layer' : 'WMS Layer'} • Remote`
         : `${featureCount} features • ${getState().uploadedLayers[name]?.geometryType || 'Mixed'}`;
 
-    const colorControl = isWms || isPolygonLayer
-        ? ''
-        : `
+    // Build controls strictly by geometry type. WMS only gets opacity.
+    let colorControl = '';
+    let polygonStyleControls = '';
+    let lineWidthControl = '';
+    let pointSizeControl = '';
+    let opacityLabel = 'Opacity';
+
+    if (isWms) {
+        // WMS layers: only opacity control (already handled below)
+    } else if (isPointLayer) {
+        colorControl = `
             <div class="control-row">
                 <label>
-                    <span>${isPointLayer ? 'Point color:' : 'Color:'}</span>
+                    <span>Point color:</span>
                     <input type="color" class="color-picker" value="${color}" onchange="updateLayerColor(this)">
                 </label>
             </div>
         `;
-    const polygonStyleControls = !isWms && isPolygonLayer
-        ? `
+        pointSizeControl = `
+            <div class="control-row control-row-stack point-size-row">
+                <div class="transparency-header">
+                    <span class="control-label">Point size</span>
+                    <span class="point-size-value">${pointSizeValue}px</span>
+                </div>
+                <div class="transparency-control">
+                    <input
+                        type="range"
+                        class="point-size-slider"
+                        min="2"
+                        max="18"
+                        step="1"
+                        value="${pointSizeValue}"
+                        title="Adjust point size"
+                        aria-label="Adjust point size"
+                    >
+                </div>
+            </div>
+                <div class="control-row control-row-stack marker-style-row">
+                <div class="marker-style-header">
+                </div>
+
+                <div class="control-row">
+                    <label style="display:flex;align-items:center;gap:8px;width:100%;">
+                        <span>Marker type:</span>
+                        <!-- Native select retained for logic, visually replaced by custom icon dropdown -->
+                        <select class="marker-type-select" aria-hidden="true" style="position:absolute;opacity:0;pointer-events:none;">
+                            <option value="circle" ${markerPresetType === 'circle' || (!markerPresetType && !svgMarkerDataUrl) ? 'selected' : ''}>Default Circle</option>
+                            <option value="square" ${markerPresetType === 'square' ? 'selected' : ''}>Square</option>
+                            <option value="star" ${markerPresetType === 'star' ? 'selected' : ''}>Star</option>
+                            <option value="triangle" ${markerPresetType === 'triangle' ? 'selected' : ''}>Triangle</option>
+                            <option value="diamond" ${markerPresetType === 'diamond' ? 'selected' : ''}>Diamond</option>
+                            <option value="custom" ${svgMarkerDataUrl ? 'selected' : ''}>Custom SVG</option>
+                        </select>
+
+                        <div class="marker-type-dropdown" data-selected="${markerPresetType || (svgMarkerDataUrl ? 'custom' : 'circle')}">
+                            <button type="button" class="marker-type-current" aria-haspopup="listbox" aria-expanded="false" title="Select marker type" aria-label="Select marker type">
+                                <!-- current icon preview inserted by JS on init; fallback: simple circle -->
+                                <span class="marker-type-icon marker-type-icon-circle" aria-hidden="true"></span>
+                                <i class="fas fa-caret-down" style="margin-left:8px;color:var(--gray-400);"></i>
+                            </button>
+                            <div class="marker-type-options" role="listbox" tabindex="-1">
+                                <button type="button" class="marker-type-option" data-value="circle" role="option" aria-label="Circle"><span class="marker-type-icon marker-type-icon-circle" aria-hidden="true"></span></button>
+                                <button type="button" class="marker-type-option" data-value="square" role="option" aria-label="Square"><span class="marker-type-icon marker-type-icon-square" aria-hidden="true"></span></button>
+                                <button type="button" class="marker-type-option" data-value="star" role="option" aria-label="Star"><span class="marker-type-icon marker-type-icon-star" aria-hidden="true"></span></button>
+                                <button type="button" class="marker-type-option" data-value="triangle" role="option" aria-label="Triangle"><span class="marker-type-icon marker-type-icon-triangle" aria-hidden="true"></span></button>
+                                <button type="button" class="marker-type-option" data-value="diamond" role="option" aria-label="Diamond"><span class="marker-type-icon marker-type-icon-diamond" aria-hidden="true"></span></button>
+                            </div>
+                        </div>
+                    </label>
+                </div>
+
+                <div class="marker-svg-section">
+                    <div class="marker-svg-header">
+                        <span class="marker-svg-label">Custom SVG:</span>
+                        <span class="svg-marker-upload-status">${svgMarkerDataUrl ? 'Uploaded' : 'None'}</span>
+                    </div>
+                    <div class="marker-control-row">
+                        <button type="button" class="svg-marker-upload-button btn-secondary">Upload SVG</button>
+                        <input type="file" class="svg-marker-input" accept=".svg" multiple />
+                    </div>
+                    <div class="svg-marker-gallery"></div>
+                </div>
+
+                <div class="marker-stroke-section">
+                    <div class="marker-stroke-toggle">
+                        <label class="checkbox-label">
+                            <input type="checkbox" class="marker-stroke-enabled" ${markerStrokeEnabled ? 'checked' : ''}>
+                            <span>Add stroke</span>
+                        </label>
+                    </div>
+                    <div class="marker-stroke-controls" style="display: ${markerStrokeEnabled ? 'block' : 'none'};">
+                        <div class="marker-stroke-color-row">
+                            <label>
+                                <span class="marker-stroke-color-label">Stroke color:</span>
+                                <input type="color" class="marker-stroke-color-picker" value="${markerStrokeColor}">
+                            </label>
+                        </div>
+                        <div class="marker-stroke-width-row">
+                            <div class="transparency-header">
+                                <span class="control-label">Stroke width</span>
+                                <span class="marker-stroke-width-value">${markerStrokeWidth}px</span>
+                            </div>
+                            <div class="transparency-control">
+                                <input
+                                    type="range"
+                                    class="marker-stroke-width-slider"
+                                    min="0"
+                                    max="4"
+                                    step="1"
+                                    value="${markerStrokeWidth}"
+                                    title="Adjust marker stroke width"
+                                    aria-label="Adjust marker stroke width"
+                                >
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        opacityLabel = 'Point opacity';
+    } else if (isLineLayer) {
+        colorControl = `
+            <div class="control-row">
+                <label>
+                    <span>Stroke color:</span>
+                    <input type="color" class="color-picker" value="${color}" onchange="updateLayerColor(this)">
+                </label>
+            </div>
+        `;
+        lineWidthControl = `
+            <div class="control-row control-row-stack line-width-row">
+                <div class="transparency-header">
+                    <span class="control-label">Stroke width</span>
+                    <span class="line-width-value">${lineStrokeWidthValue}px</span>
+                </div>
+                <div class="transparency-control">
+                    <input
+                        type="range"
+                        class="line-width-slider"
+                        min="1"
+                        max="12"
+                        step="1"
+                        value="${lineStrokeWidthValue}"
+                        title="Adjust line stroke width"
+                        aria-label="Adjust line stroke width"
+                    >
+                </div>
+            </div>
+        `;
+        opacityLabel = 'Line opacity';
+    } else if (isPolygonLayer) {
+        polygonStyleControls = `
             <div class="control-row">
                 <label>
                     <span>Fill color:</span>
@@ -181,57 +475,12 @@ export function addLayerItem(name, color, featureCount, options = {}) {
                     >
                 </div>
             </div>
-        `
-        : '';
-    const lineWidthControl = !isWms && isLineLayer
-        ? `
-            <div class="control-row control-row-stack line-width-row">
-                <div class="transparency-header">
-                    <span class="control-label">Stroke width</span>
-                    <span class="line-width-value">${lineStrokeWidthValue}px</span>
-                </div>
-                <div class="transparency-control">
-                    <input
-                        type="range"
-                        class="line-width-slider"
-                        min="1"
-                        max="12"
-                        step="1"
-                        value="${lineStrokeWidthValue}"
-                        title="Adjust line stroke width"
-                        aria-label="Adjust line stroke width"
-                    >
-                </div>
-            </div>
-        `
-        : '';
-    const pointSizeControl = !isWms && isPointLayer
-        ? `
-            <div class="control-row control-row-stack point-size-row">
-                <div class="transparency-header">
-                    <span class="control-label">Point size</span>
-                    <span class="point-size-value">${pointSizeValue}px</span>
-                </div>
-                <div class="transparency-control">
-                    <input
-                        type="range"
-                        class="point-size-slider"
-                        min="2"
-                        max="18"
-                        step="1"
-                        value="${pointSizeValue}"
-                        title="Adjust point size"
-                        aria-label="Adjust point size"
-                    >
-                </div>
-            </div>
-        `
-        : '';
-    const opacityLabel = !isWms && isPointLayer
-        ? 'Point opacity'
-        : !isWms && isLineLayer
-            ? 'Line opacity'
-            : 'Opacity';
+        `;
+        opacityLabel = 'Opacity';
+    } else {
+        // Unknown or mixed geometry types: only allow opacity to avoid cross-geometry controls
+        opacityLabel = 'Opacity';
+    }
 
     const isVisible = options.visible !== false;
     const safeName = escapeHtml(name);
@@ -286,6 +535,12 @@ export function addLayerItem(name, color, featureCount, options = {}) {
     const pointSizeSlider = newItem.querySelector('.point-size-slider');
     const lineWidthSlider = newItem.querySelector('.line-width-slider');
     const polygonWidthSlider = newItem.querySelector('.polygon-width-slider');
+    const svgMarkerInput = newItem.querySelector('.svg-marker-input');
+    const svgMarkerUploadButton = newItem.querySelector('.svg-marker-upload-button');
+    const markerPresetButtons = newItem.querySelectorAll('.marker-preset-btn');
+    const markerStrokeEnabledCheckbox = newItem.querySelector('.marker-stroke-enabled');
+    const markerStrokeColorPicker = newItem.querySelector('.marker-stroke-color-picker');
+    const markerStrokeWidthSlider = newItem.querySelector('.marker-stroke-width-slider');
 
     checkbox.addEventListener('change', (event) => {
         event.stopPropagation();
@@ -329,6 +584,112 @@ export function addLayerItem(name, color, featureCount, options = {}) {
         pointSizeSlider.addEventListener('change', () => updatePointSize(pointSizeSlider));
     }
 
+    if (svgMarkerUploadButton) {
+        svgMarkerUploadButton.addEventListener('pointerdown', (event) => event.stopPropagation());
+        svgMarkerUploadButton.addEventListener('click', (event) => {
+            event.stopPropagation();
+            if (svgMarkerInput) {
+                svgMarkerInput.click();
+            }
+        });
+    }
+
+    if (svgMarkerInput) {
+        svgMarkerInput.addEventListener('pointerdown', (event) => event.stopPropagation());
+        svgMarkerInput.addEventListener('click', (event) => event.stopPropagation());
+        svgMarkerInput.addEventListener('change', (event) => handleSvgMarkerUpload(event, name));
+    }
+
+    
+
+    // Marker type select (native select kept for logic) + custom icon dropdown
+    const markerTypeSelect = newItem.querySelector('.marker-type-select');
+    const markerTypeDropdown = newItem.querySelector('.marker-type-dropdown');
+    const markerTypeCurrent = newItem.querySelector('.marker-type-current');
+    const markerTypeOptions = newItem.querySelectorAll('.marker-type-option');
+    // Initialize custom dropdown visuals to match current record state
+    if (markerTypeDropdown) {
+        const initialSel = markerPresetType || (svgMarkerDataUrl ? 'custom' : 'circle');
+        markerTypeDropdown.setAttribute('data-selected', initialSel);
+        markerTypeOptions.forEach((opt) => opt.classList.toggle('active', opt.getAttribute('data-value') === markerPresetType));
+        if (markerTypeCurrent) {
+            markerTypeCurrent.querySelectorAll('.marker-type-icon').forEach((el) => el.className = 'marker-type-icon marker-type-icon-' + (markerPresetType || (svgMarkerDataUrl ? 'custom' : 'circle')));
+        }
+    }
+    if (markerTypeSelect) {
+        markerTypeSelect.addEventListener('pointerdown', (event) => event.stopPropagation());
+        markerTypeSelect.addEventListener('click', (event) => event.stopPropagation());
+        markerTypeSelect.addEventListener('change', (event) => {
+            event.stopPropagation();
+            const selected = markerTypeSelect.value;
+            const record = getLayerRecord(name);
+            if (!record || !record.isPointLayer) return;
+
+            // Selecting a preset or custom icon updates the marker mode independently of uploaded SVG state.
+            if (selected === 'custom') {
+                record.markerPresetType = null;
+            } else {
+                record.markerPresetType = selected === 'circle' ? 'circle' : selected;
+            }
+
+            syncMarkerTypeWidgets(record, newItem);
+            renderSvgMarkerGallery(record, newItem);
+            updateSvgMarkerPreview(newItem, record.svgMarkerDataUrl);
+            updateManagedLayerStyle(name);
+        });
+    }
+
+    // Wire up custom dropdown UI to set the native select value (keeps logic untouched)
+    if (markerTypeOptions && markerTypeOptions.length > 0) {
+        markerTypeOptions.forEach((opt) => {
+            opt.addEventListener('pointerdown', (ev) => ev.stopPropagation());
+            opt.addEventListener('click', (ev) => {
+                ev.stopPropagation();
+                const val = opt.getAttribute('data-value');
+                if (markerTypeSelect) {
+                    markerTypeSelect.value = val;
+                    markerTypeSelect.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+
+                // close the dropdown after selection
+                const dd = opt.closest('.marker-type-dropdown');
+                if (dd) {
+                    dd.setAttribute('data-open', 'false');
+                    const cur = dd.querySelector('.marker-type-current');
+                    if (cur) cur.setAttribute('aria-expanded', 'false');
+                }
+            });
+        });
+
+        if (markerTypeCurrent) {
+            markerTypeCurrent.addEventListener('pointerdown', (ev) => ev.stopPropagation());
+            markerTypeCurrent.addEventListener('click', (ev) => {
+                ev.stopPropagation();
+                const expanded = markerTypeDropdown.getAttribute('data-open') === 'true';
+                markerTypeDropdown.setAttribute('data-open', expanded ? 'false' : 'true');
+                markerTypeCurrent.setAttribute('aria-expanded', String(!expanded));
+            });
+        }
+    
+        // Close dropdown when clicking elsewhere (single global listener)
+        if (!document._markerTypeDropdownCloseListenerAdded) {
+            document.addEventListener('click', (ev) => {
+                // Close any open dropdowns
+                document.querySelectorAll('.marker-type-dropdown[data-open="true"]').forEach((dd) => {
+                    if (!dd.contains(ev.target)) {
+                        dd.setAttribute('data-open', 'false');
+                        const cur = dd.querySelector('.marker-type-current');
+                        if (cur) cur.setAttribute('aria-expanded', 'false');
+                    }
+                });
+            });
+            document._markerTypeDropdownCloseListenerAdded = true;
+        }
+    }
+    // Note: per-thumbnail delete handles removal; global remove button removed to avoid duplicates
+
+    renderSvgMarkerGallery(record, newItem);
+
     if (lineWidthSlider) {
         lineWidthSlider.addEventListener('pointerdown', (event) => event.stopPropagation());
         lineWidthSlider.addEventListener('click', (event) => event.stopPropagation());
@@ -341,6 +702,40 @@ export function addLayerItem(name, color, featureCount, options = {}) {
         polygonWidthSlider.addEventListener('click', (event) => event.stopPropagation());
         polygonWidthSlider.addEventListener('input', () => updatePolygonStrokeWidth(polygonWidthSlider));
         polygonWidthSlider.addEventListener('change', () => updatePolygonStrokeWidth(polygonWidthSlider));
+    }
+
+    // Marker preset buttons
+    if (markerPresetButtons.length > 0) {
+        markerPresetButtons.forEach((btn) => {
+            btn.addEventListener('pointerdown', (event) => event.stopPropagation());
+            btn.addEventListener('click', (event) => {
+                event.stopPropagation();
+                const presetType = btn.getAttribute('data-preset');
+                updateMarkerPreset(presetType, name, newItem);
+            });
+        });
+    }
+
+    // Marker stroke enabled toggle
+    if (markerStrokeEnabledCheckbox) {
+        markerStrokeEnabledCheckbox.addEventListener('pointerdown', (event) => event.stopPropagation());
+        markerStrokeEnabledCheckbox.addEventListener('click', (event) => event.stopPropagation());
+        markerStrokeEnabledCheckbox.addEventListener('change', () => updateMarkerStrokeEnabled(markerStrokeEnabledCheckbox, name, newItem));
+    }
+
+    // Marker stroke color picker
+    if (markerStrokeColorPicker) {
+        markerStrokeColorPicker.addEventListener('pointerdown', (event) => event.stopPropagation());
+        markerStrokeColorPicker.addEventListener('click', (event) => event.stopPropagation());
+        markerStrokeColorPicker.addEventListener('input', () => updateMarkerStrokeColor(markerStrokeColorPicker, name));
+    }
+
+    // Marker stroke width slider
+    if (markerStrokeWidthSlider) {
+        markerStrokeWidthSlider.addEventListener('pointerdown', (event) => event.stopPropagation());
+        markerStrokeWidthSlider.addEventListener('click', (event) => event.stopPropagation());
+        markerStrokeWidthSlider.addEventListener('input', () => updateMarkerStrokeWidth(markerStrokeWidthSlider));
+        markerStrokeWidthSlider.addEventListener('change', () => updateMarkerStrokeWidth(markerStrokeWidthSlider));
     }
 }
 
@@ -359,6 +754,11 @@ export function updateLayerColor(colorPicker) {
     const record = getLayerRecord(layerName);
 
     if (!record) {
+        return;
+    }
+
+    // Only allow color updates for vector point or line layers (not WMS or polygons)
+    if (record.isWMS || record.isPolygonLayer || !(record.isPointLayer || record.isLineLayer)) {
         return;
     }
 
@@ -450,6 +850,306 @@ export function updatePolygonStrokeWidth(slider) {
 
     record.polygonStrokeWidth = strokeWidth;
     updateManagedLayerStyle(layerName);
+}
+
+function updateMarkerPreset(presetType, layerName, layerItem) {
+    const record = getLayerRecord(layerName);
+
+    if (!record || !record.isPointLayer) {
+        return;
+    }
+
+    // Reset to default if "none" is selected
+    if (presetType === 'none') {
+        record.markerPresetType = null;
+    } else {
+        record.markerPresetType = presetType;
+    }
+
+    syncMarkerTypeWidgets(record, layerItem);
+    renderSvgMarkerGallery(record, layerItem);
+
+    // Update button states
+    layerItem.querySelectorAll('.marker-preset-btn').forEach((btn) => {
+        btn.classList.remove('active');
+        const btnPreset = btn.getAttribute('data-preset');
+        if ((presetType === 'none' && btnPreset === 'none') || (presetType === btnPreset)) {
+            btn.classList.add('active');
+        }
+    });
+
+    updateManagedLayerStyle(layerName);
+}
+
+function syncMarkerTypeWidgets(record, layerItem) {
+    if (!record || !layerItem) {
+        return;
+    }
+
+    const markerTypeSelect = layerItem.querySelector('.marker-type-select');
+    const markerTypeDropdown = layerItem.querySelector('.marker-type-dropdown');
+    const markerTypeCurrent = layerItem.querySelector('.marker-type-current');
+    const markerTypeOptions = layerItem.querySelectorAll('.marker-type-option');
+    const svgSection = layerItem.querySelector('.marker-svg-section');
+    const removeBtn = layerItem.querySelector('.svg-marker-remove-button');
+
+    const selected = record.markerPresetType || (record.svgMarkerDataUrl ? 'custom' : 'circle');
+
+    if (markerTypeSelect) {
+        markerTypeSelect.value = selected;
+    }
+
+    if (markerTypeDropdown) {
+        markerTypeDropdown.setAttribute('data-selected', selected);
+    }
+
+    if (markerTypeOptions && markerTypeOptions.length > 0) {
+        markerTypeOptions.forEach((opt) => {
+            opt.classList.toggle('active', opt.getAttribute('data-value') === record.markerPresetType);
+        });
+    }
+
+    if (markerTypeCurrent) {
+        markerTypeCurrent.querySelectorAll('.marker-type-icon').forEach((el) => {
+            el.className = 'marker-type-icon marker-type-icon-' + selected;
+        });
+    }
+
+    if (svgSection) {
+        // Always keep SVG upload UI visible for point layers
+        svgSection.style.display = record.isPointLayer ? 'flex' : 'none';
+    }
+
+    if (removeBtn) {
+        removeBtn.style.display = record.svgMarkerDataUrl ? 'inline-flex' : 'none';
+    }
+
+    // Hide or disable stroke UI when custom SVG marker mode is active.
+    // Stroke remains available for preset marker types (circle, square, star, triangle, diamond).
+    const strokeSection = layerItem.querySelector('.marker-stroke-section');
+    const strokeControls = layerItem.querySelector('.marker-stroke-controls');
+    const markerStrokeToggle = layerItem.querySelector('.marker-stroke-enabled');
+    const isSvgMode = selected === 'custom';
+    if (strokeSection) {
+        if (isSvgMode) {
+            strokeSection.style.display = 'none';
+            // disable inputs inside stroke section to prevent accidental changes
+            strokeSection.querySelectorAll('input,button,select').forEach((el) => el.disabled = true);
+        } else {
+            // restore stroke section visibility but keep inner controls' visibility in sync with enabled flag
+            strokeSection.style.display = '';
+            strokeSection.querySelectorAll('input,button,select').forEach((el) => el.disabled = false);
+            if (strokeControls) {
+                strokeControls.style.display = record.markerStrokeEnabled ? 'block' : 'none';
+            }
+            if (markerStrokeToggle) {
+                markerStrokeToggle.checked = Boolean(record.markerStrokeEnabled);
+            }
+        }
+    }
+}
+
+function updateMarkerStrokeEnabled(checkbox, layerName, layerItem) {
+    const record = getLayerRecord(layerName);
+
+    if (!record || !record.isPointLayer) {
+        return;
+    }
+
+    record.markerStrokeEnabled = checkbox.checked;
+
+    // Show/hide stroke controls
+    const strokeControls = layerItem.querySelector('.marker-stroke-controls');
+    if (strokeControls) {
+        if (record.markerStrokeEnabled) {
+            // Create and insert the controls if they don't exist
+            if (!strokeControls.style.display || strokeControls.style.display === 'none') {
+                strokeControls.style.display = 'block';
+            }
+        } else {
+            strokeControls.style.display = 'none';
+        }
+    } else if (record.markerStrokeEnabled) {
+        // If controls don't exist and we need to show them, rebuild the UI
+        const strokeSection = layerItem.querySelector('.marker-stroke-section');
+        if (strokeSection) {
+            strokeSection.innerHTML = `
+                <div class="marker-stroke-toggle">
+                    <label class="checkbox-label">
+                        <input type="checkbox" class="marker-stroke-enabled" checked>
+                        <span>Add stroke</span>
+                    </label>
+                </div>
+                <div class="marker-stroke-controls">
+                    <div class="marker-stroke-color-row">
+                        <label>
+                            <span class="marker-stroke-color-label">Stroke color:</span>
+                            <input type="color" class="marker-stroke-color-picker" value="${record.markerStrokeColor}">
+                        </label>
+                    </div>
+                    <div class="marker-stroke-width-row">
+                        <div class="transparency-header">
+                            <span class="control-label">Stroke width</span>
+                            <span class="marker-stroke-width-value">${record.markerStrokeWidth}px</span>
+                        </div>
+                        <div class="transparency-control">
+                            <input
+                                type="range"
+                                class="marker-stroke-width-slider"
+                                min="0"
+                                max="4"
+                                step="1"
+                                value="${record.markerStrokeWidth}"
+                                title="Adjust marker stroke width"
+                                aria-label="Adjust marker stroke width"
+                            >
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // Re-attach event listeners for the new elements
+            const newCheckbox = strokeSection.querySelector('.marker-stroke-enabled');
+            const newColorPicker = strokeSection.querySelector('.marker-stroke-color-picker');
+            const newWidthSlider = strokeSection.querySelector('.marker-stroke-width-slider');
+
+            if (newCheckbox) {
+                newCheckbox.addEventListener('pointerdown', (event) => event.stopPropagation());
+                newCheckbox.addEventListener('click', (event) => event.stopPropagation());
+                newCheckbox.addEventListener('change', () => updateMarkerStrokeEnabled(newCheckbox, layerName, layerItem));
+            }
+
+            if (newColorPicker) {
+                newColorPicker.addEventListener('pointerdown', (event) => event.stopPropagation());
+                newColorPicker.addEventListener('click', (event) => event.stopPropagation());
+                newColorPicker.addEventListener('input', () => updateMarkerStrokeColor(newColorPicker, layerName));
+            }
+
+            if (newWidthSlider) {
+                newWidthSlider.addEventListener('pointerdown', (event) => event.stopPropagation());
+                newWidthSlider.addEventListener('click', (event) => event.stopPropagation());
+                newWidthSlider.addEventListener('input', () => updateMarkerStrokeWidth(newWidthSlider));
+                newWidthSlider.addEventListener('change', () => updateMarkerStrokeWidth(newWidthSlider));
+            }
+        }
+    }
+
+    updateManagedLayerStyle(layerName);
+}
+
+function updateMarkerStrokeColor(colorPicker, layerName) {
+    const newColor = colorPicker.value;
+    const record = getLayerRecord(layerName);
+
+    if (!record || !record.isPointLayer) {
+        return;
+    }
+
+    record.markerStrokeColor = newColor;
+    updateManagedLayerStyle(layerName);
+}
+
+function updateMarkerStrokeWidth(slider) {
+    const strokeWidth = Number(slider.value);
+    const layerItem = slider.closest('.layer-item');
+    const layerName = layerItem.querySelector('.layer-name').textContent;
+    const record = getLayerRecord(layerName);
+
+    const valueEl = layerItem?.querySelector('.marker-stroke-width-value');
+    if (valueEl) {
+        valueEl.textContent = `${strokeWidth}px`;
+    }
+
+    if (!record || !record.isPointLayer || !Number.isFinite(strokeWidth)) {
+        return;
+    }
+
+    record.markerStrokeWidth = strokeWidth;
+    updateManagedLayerStyle(layerName);
+}
+
+function updateSvgMarkerPreview(layerItem, dataUrl) {
+    if (!layerItem) {
+        return;
+    }
+    const statusEl = layerItem.querySelector('.svg-marker-upload-status');
+    if (statusEl) {
+        statusEl.textContent = dataUrl ? 'Uploaded' : 'None';
+    }
+}
+
+function handleSvgMarkerUpload(event, layerName) {
+    const files = Array.from(event.target.files || []);
+    const layerItem = event.target.closest('.layer-item');
+    const record = getLayerRecord(layerName);
+
+    if (!record || files.length === 0) {
+        return;
+    }
+
+    const validFiles = files.filter((file) => file.type === 'image/svg+xml' || file.name.toLowerCase().endsWith('.svg'));
+    if (validFiles.length === 0) {
+        showToast('Error', 'Only SVG marker files are accepted.', 'error');
+        event.target.value = '';
+        return;
+    }
+
+    const loadFilePromises = validFiles.map((file, index) => new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+            const result = reader.result;
+            if (typeof result !== 'string' || !result.startsWith('data:image/svg+xml')) {
+                reject(new Error(`Invalid SVG file: ${file.name}`));
+                return;
+            }
+            resolve({
+                id: createSvgMarkerId(file.name),
+                name: file.name,
+                dataUrl: result
+            });
+        };
+        reader.onerror = () => reject(new Error(`Unable to read SVG file: ${file.name}`));
+        reader.readAsDataURL(file);
+    }));
+
+    Promise.allSettled(loadFilePromises).then((results) => {
+        const galleryItems = results
+            .filter((item) => item.status === 'fulfilled')
+            .map((item) => item.value);
+
+        if (galleryItems.length === 0) {
+            showToast('Error', 'No valid SVG files were uploaded.', 'error');
+            event.target.value = '';
+            return;
+        }
+
+        // Combine existing gallery with new uploads but dedupe by dataUrl to avoid duplicates
+        const existing = Array.isArray(record.svgMarkerGallery) ? record.svgMarkerGallery : [];
+        const combined = [...existing, ...galleryItems];
+        const seen = new Set();
+        const unique = [];
+        for (const it of combined) {
+            if (!it || !it.dataUrl) continue;
+            if (seen.has(it.dataUrl)) continue;
+            seen.add(it.dataUrl);
+            unique.push(it);
+        }
+        record.svgMarkerGallery = unique;
+        record.activeSvgMarkerIndex = Math.max(0, record.svgMarkerGallery.length - 1);
+        syncSvgMarkerState(record);
+        record.markerPresetType = null;
+
+        const markerTypeSelect = layerItem.querySelector('.marker-type-select');
+        if (markerTypeSelect) {
+            markerTypeSelect.value = 'custom';
+        }
+
+        syncMarkerTypeWidgets(record, layerItem);
+        updateManagedLayerStyle(layerName);
+        updateSvgMarkerPreview(layerItem, record.svgMarkerDataUrl);
+        renderSvgMarkerGallery(record, layerItem);
+        event.target.value = '';
+    });
 }
 
 export function updateLayerOpacity(slider) {

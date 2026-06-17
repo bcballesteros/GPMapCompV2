@@ -6,3 +6,5 @@ export const DEFAULT_VECTOR_OPACITY = 1;
 export const DEFAULT_STYLE_OPACITY = 0.7;
 export const DEFAULT_POINT_SIZE = 5;
 export const DEFAULT_LINE_STROKE_WIDTH = 2;
+export const DEFAULT_SVG_BASE_SIZE = 24;
+export const DEFAULT_SVG_BASE_SCALE = 1;
