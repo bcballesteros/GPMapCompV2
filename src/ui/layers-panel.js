@@ -19,6 +19,135 @@ function getEmptyStateMarkup() {
     `;
 }
 
+const LAYER_GROUP_ORDER = ['vector', 'wms', 'annotation', 'other'];
+const LAYER_GROUP_LABELS = {
+    vector: 'Vector Layers',
+    wms: 'WMS Layers',
+    annotation: 'Annotations',
+    other: 'Other Layers'
+};
+
+function getLayerGroupKey(record, options = {}) {
+    if (record?.isWMS || options.isWMS) {
+        return 'wms';
+    }
+    if (record?.isPointLayer || record?.isLineLayer || record?.isPolygonLayer) {
+        return 'vector';
+    }
+    if (record?.isAnnotation) {
+        return 'annotation';
+    }
+    return 'other';
+}
+
+function getLayerGroupContainer(groupKey) {
+    return document.querySelector(`#layerList .layer-group[data-group="${groupKey}"]`);
+}
+
+function getLayerGroupBody(/* groupKey */) {
+    // Group bodies no longer exist; layers are rendered as flat siblings.
+    // Keep API but return the root list as the logical container when needed.
+    return getLayerList();
+}
+
+function getLayerList() {
+    return document.getElementById('layerList');
+}
+
+function createLayerGroup(groupKey) {
+    const layerList = getLayerList();
+    const groupLabel = LAYER_GROUP_LABELS[groupKey] || LAYER_GROUP_LABELS.other;
+    const groupHTML = `
+        <div class="layer-group" data-group="${groupKey}">
+            <div class="layer-group-header">
+                <button type="button" class="layer-group-toggle" data-group="${groupKey}" aria-expanded="true">
+                    <span class="layer-group-title">${groupLabel}</span>
+                    <span class="layer-group-count">0</span>
+                    <i class="fas fa-chevron-down layer-group-chevron" aria-hidden="true"></i>
+                </button>
+            </div>
+        </div>
+    `;
+    const template = document.createElement('div');
+    template.innerHTML = groupHTML;
+    const groupElement = template.firstElementChild;
+
+    const insertBefore = LAYER_GROUP_ORDER
+        .slice(LAYER_GROUP_ORDER.indexOf(groupKey) + 1)
+        .map((nextKey) => getLayerGroupContainer(nextKey))
+        .find(Boolean);
+
+    if (insertBefore) {
+        layerList.insertBefore(groupElement, insertBefore);
+    } else {
+        layerList.appendChild(groupElement);
+    }
+
+    return groupElement;
+}
+
+function ensureLayerGroup(groupKey) {
+    // Ensure a visual group header exists and return its header element.
+    const container = getLayerGroupContainer(groupKey) || createLayerGroup(groupKey);
+    return container.querySelector('.layer-group-header');
+}
+
+function updateLayerGroupCount(groupKey) {
+    const group = getLayerGroupContainer(groupKey);
+    if (!group) return;
+    const layerList = getLayerList();
+    const count = layerList.querySelectorAll(`.layer-item[data-group="${groupKey}"]`).length;
+    const countEl = group.querySelector('.layer-group-count');
+    if (countEl) countEl.textContent = String(count);
+}
+
+function collapseLayerItem(layerItem) {
+    if (!layerItem) return;
+    layerItem.classList.add('collapsed');
+    const btn = layerItem.querySelector('.layer-expand-btn');
+    if (btn) {
+        btn.setAttribute('aria-expanded', 'false');
+        btn.classList.remove('expanded');
+    }
+}
+
+function collapseAllLayerItems(exceptItem = null) {
+    document.querySelectorAll('.layer-item').forEach((item) => {
+        if (item !== exceptItem) {
+            collapseLayerItem(item);
+        }
+    });
+}
+
+function setupLayerGroupToggleListeners(layerList) {
+    if (!layerList) {
+        return;
+    }
+
+    layerList.addEventListener('click', (event) => {
+        const toggle = event.target.closest('.layer-group-toggle');
+        if (!toggle) {
+            return;
+        }
+
+        event.stopPropagation();
+        const group = toggle.closest('.layer-group');
+        if (!group) return;
+
+        const expanded = toggle.getAttribute('aria-expanded') === 'true';
+        toggle.setAttribute('aria-expanded', String(!expanded));
+        group.classList.toggle('collapsed', expanded);
+
+        const groupKey = group.getAttribute('data-group');
+        if (groupKey) {
+            document.querySelectorAll(`#layerList .layer-item[data-group="${groupKey}"]`).forEach((item) => {
+                item.classList.toggle('hidden', expanded);
+                collapseLayerItem(item);
+            });
+        }
+    });
+}
+
 function escapeHtml(value) {
     return String(value)
         .replace(/&/g, '&amp;')
@@ -272,12 +401,18 @@ export function addLayerItem(name, color, featureCount, options = {}) {
         layerList.innerHTML = '';
     }
 
+    if (!document._layerGroupToggleListenerAdded) {
+        setupLayerGroupToggleListeners(layerList);
+        document._layerGroupToggleListenerAdded = true;
+    }
+
     const record = getLayerRecord(name);
     const isWms = Boolean(record?.isWMS) || Boolean(options.isWMS);
     const isGp = Boolean(options.isGP || record?.isGP);
     const isPointLayer = Boolean(record?.isPointLayer);
     const isLineLayer = Boolean(record?.isLineLayer);
     const isPolygonLayer = Boolean(record?.isPolygonLayer);
+    const groupKey = getLayerGroupKey(record, options);
     const opacityValue = Math.round((record?.opacity ?? 1) * 100);
     const pointSizeValue = Math.round(record?.pointSize ?? DEFAULT_POINT_SIZE);
     const svgMarkerDataUrl = record?.svgMarkerDataUrl || '';
@@ -485,13 +620,18 @@ export function addLayerItem(name, color, featureCount, options = {}) {
     const isVisible = options.visible !== false;
     const safeName = escapeHtml(name);
     const layerHTML = `
-        <div class="layer-item" onclick="selectLayer(this)">
-            <input type="checkbox" class="layer-toggle" ${isVisible ? 'checked' : ''} title="Toggle layer visibility">
-            <div class="layer-info">
-                <div class="layer-name-wrap" data-tooltip="${safeName}">
-                    <div class="layer-name" tabindex="0" aria-label="Layer name: ${safeName}">${safeName}</div>
+        <div class="layer-item collapsed" data-layer-name="${safeName}">
+            <div class="layer-item-header" role="button" tabindex="0">
+                <input type="checkbox" class="layer-toggle" ${isVisible ? 'checked' : ''} title="Toggle layer visibility">
+                <div class="layer-info-short">
+                    <div class="layer-name-wrap" data-tooltip="${safeName}">
+                        <div class="layer-name" tabindex="0" aria-label="Layer name: ${safeName}">${safeName}</div>
+                    </div>
+                    <div class="layer-stats">${statsText}</div>
                 </div>
-                <div class="layer-stats">${statsText}</div>
+                <button type="button" class="layer-expand-btn" aria-expanded="false" title="Expand layer"><i class="fas fa-chevron-down" aria-hidden="true"></i></button>
+            </div>
+            <div class="layer-controls-wrapper">
                 <div class="layer-controls">
                     ${colorControl}
                     ${polygonStyleControls}
@@ -522,11 +662,67 @@ export function addLayerItem(name, color, featureCount, options = {}) {
         </div>
     `;
 
-    layerList.insertAdjacentHTML('beforeend', layerHTML);
+    const headerEl = ensureLayerGroup(groupKey);
+    const layerListEl = getLayerList();
 
-    const newItem = layerList.lastElementChild;
-    selectLayer(newItem);
+    // Create element from HTML so we can set data attributes and insert at correct position
+    const tmp = document.createElement('div');
+    tmp.innerHTML = layerHTML.trim();
+    const newItem = tmp.firstElementChild;
+    if (newItem) {
+        newItem.setAttribute('data-group', groupKey);
+
+        const insertBefore = LAYER_GROUP_ORDER
+            .slice(LAYER_GROUP_ORDER.indexOf(groupKey) + 1)
+            .map((nextKey) => getLayerGroupContainer(nextKey))
+            .find(Boolean);
+
+        if (insertBefore) {
+            layerListEl.insertBefore(newItem, insertBefore);
+        } else {
+            layerListEl.appendChild(newItem);
+        }
+    }
+    updateLayerGroupCount(groupKey);
     attachLayerNameTooltip(newItem);
+
+    // Initialize collapsed state and header/expand behavior (compact by default)
+    const header = newItem.querySelector('.layer-item-header');
+    const expandBtn = newItem.querySelector('.layer-expand-btn');
+    if (newItem && header && expandBtn) {
+        // Ensure collapsed by default
+        newItem.classList.add('collapsed');
+        expandBtn.setAttribute('aria-expanded', 'false');
+
+        const toggleExpansion = (ev) => {
+            ev && ev.stopPropagation();
+            const isExpanded = !newItem.classList.contains('collapsed');
+            if (isExpanded) {
+                collapseLayerItem(newItem);
+            } else {
+                newItem.classList.remove('collapsed');
+                expandBtn.setAttribute('aria-expanded', 'true');
+                expandBtn.classList.add('expanded');
+            }
+        };
+
+        header.addEventListener('click', (ev) => {
+            ev.stopPropagation();
+            selectLayer(newItem);
+        });
+
+        header.addEventListener('keydown', (ev) => {
+            if (ev.key === 'Enter' || ev.key === ' ') {
+                ev.preventDefault();
+                selectLayer(newItem);
+            }
+        });
+
+        expandBtn.addEventListener('click', (ev) => {
+            ev.stopPropagation();
+            toggleExpansion(ev);
+        });
+    }
     const checkbox = newItem.querySelector('.layer-toggle');
     const colorPicker = newItem.querySelector('.color-picker:not(.polygon-fill-picker):not(.polygon-stroke-picker)');
     const polygonFillPicker = newItem.querySelector('.polygon-fill-picker');
@@ -542,6 +738,8 @@ export function addLayerItem(name, color, featureCount, options = {}) {
     const markerStrokeColorPicker = newItem.querySelector('.marker-stroke-color-picker');
     const markerStrokeWidthSlider = newItem.querySelector('.marker-stroke-width-slider');
 
+    checkbox.addEventListener('pointerdown', (event) => event.stopPropagation());
+    checkbox.addEventListener('click', (event) => event.stopPropagation());
     checkbox.addEventListener('change', (event) => {
         event.stopPropagation();
         const record = getLayerRecord(name);
@@ -740,8 +938,10 @@ export function addLayerItem(name, color, featureCount, options = {}) {
 }
 
 export function selectLayer(element) {
-    document.querySelectorAll('.layer-item').forEach((item) => item.classList.remove('active'));
-    element.classList.add('active');
+    // Only one layer should be active at a time, but expansion is independent.
+    document.querySelectorAll('.layer-item').forEach((item) => {
+        item.classList.toggle('active', item === element);
+    });
 
     const layerName = element.querySelector('.layer-name').textContent;
     setCurrentLayerName(layerName);
@@ -1182,18 +1382,26 @@ export function removeLayerItem(layerName) {
     removeManagedLayer(layerName);
     hideLayerNameTooltip();
 
+    const groupKey = layerItem.getAttribute('data-group');
     layerItem.remove();
 
-    if (layerList.children.length === 0) {
-        layerList.innerHTML = getEmptyStateMarkup();
-        setCurrentLayerName(null);
-    } else if (wasActive) {
-        const nextItem = layerList.querySelector('.layer-item');
-        if (nextItem) {
-            selectLayer(nextItem);
-        } else {
-            setCurrentLayerName(null);
+    if (groupKey) {
+        const group = getLayerGroupContainer(groupKey);
+        const remaining = document.getElementById('layerList')?.querySelectorAll(`.layer-item[data-group="${groupKey}"]`).length || 0;
+        if (group && remaining === 0) {
+            group.remove();
+        } else if (group) {
+            updateLayerGroupCount(groupKey);
         }
+    }
+
+    if (layerList.querySelectorAll('.layer-item').length === 0) {
+        layerList.innerHTML = getEmptyStateMarkup();
+    }
+
+    if (wasActive) {
+        document.querySelectorAll('.layer-item').forEach((item) => item.classList.remove('active'));
+        setCurrentLayerName(null);
     }
 
     syncLabelsToggle();

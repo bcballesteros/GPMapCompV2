@@ -554,6 +554,8 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
     display: flex;
     flex-direction: column;
     overflow-y: auto;
+    /* Ensure sidebar spans the viewport height minus navbar so scrolling is contained */
+    height: calc(100vh - var(--navbar-height));
     box-shadow: 2px 0 8px rgba(0, 0, 0, 0.08);
 }
 
@@ -617,26 +619,136 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
 
 .sidebar-content {
     flex: 1;
+    /* Allow the sidebar content area to scroll when needed and participate in flex layout */
+    display: flex;
+    flex-direction: column;
     overflow-y: auto;
     padding: 14px;
+    min-height: 0;
 }
 
 .layer-list {
     display: flex;
     flex-direction: column;
-    gap: var(--spacing-3);
+    gap: 6px;
+    min-height: 0;
+    /* Let the parent `.sidebar-content` provide the scrolling container.
+       Use flex to fill available space so expanded layer items push within the scrollable area. */
+    flex: 1 1 auto;
+    overflow-y: auto;
+    padding-right: 2px;
+}
+
+.layer-group {
+    /* Group is now a lightweight wrapper for a visual header only */
+    display: block;
+    margin: 0 0 16px 0;
+    padding: 0;
+    border: none;
+    background: transparent;
+}
+
+.layer-group:last-of-type {
+    margin-bottom: 0;
+}
+
+.layer-group-header {
+    padding: 12px 12px;
+    background: linear-gradient(135deg, rgba(15, 23, 42, 0.02) 0%, rgba(37, 99, 235, 0.02) 100%);
+    border-bottom: 2px solid var(--gray-200);
+    border-radius: 8px 8px 0 0;
+    transition: all 0.2s ease;
+}
+
+.layer-group.collapsed .layer-group-header {
+    border-radius: 8px;
+    border-bottom: 1px solid var(--gray-200);
+}
+
+.layer-group-toggle {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    color: var(--gray-700);
+    text-align: left;
+    font-size: 11px;
+    font-weight: 650;
+    line-height: 1.4;
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    transition: color 0.2s ease;
+}
+
+.layer-group-toggle:hover {
+    color: var(--primary-dark);
+}
+
+.layer-group-title {
+    flex: 1;
+    min-width: 0;
+    color: inherit;
+}
+
+.layer-group-count {
+    color: var(--gray-500);
+    font-size: 11px;
+    font-weight: 650;
+    white-space: nowrap;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    background: rgba(37, 99, 235, 0.08);
+    padding: 3px 8px;
+    border-radius: 6px;
+    min-width: 32px;
+    text-align: center;
+}
+
+.layer-group-chevron {
+    transition: transform 0.2s ease, color 0.2s ease;
+    color: var(--gray-500);
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+}
+
+
+.layer-group.collapsed .layer-group-chevron {
+    transform: rotate(-90deg);
+    color: var(--gray-400);
+}
+
+.layer-item.hidden {
+    display: none !important;
+}
+
+.layer-group + .layer-item {
+    /* ensure layer items following a header are visually grouped */
+    margin-top: 8px;
 }
 
 .layer-item {
-    padding: var(--spacing-4);
-    background: var(--gray-50);
+    padding: 12px;
+    background: white;
     border: 1px solid var(--gray-200);
-    border-radius: 10px;
+    border-radius: 8px;
     cursor: pointer;
     transition: all 0.2s ease;
     display: flex;
-    align-items: flex-start;
-    gap: var(--spacing-3);
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--spacing-2);
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
 }
 
 .layer-item:hover {
@@ -650,6 +762,75 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
     border-color: var(--accent);
     background: var(--blue-50);
     box-shadow: 0 4px 12px rgba(37, 99, 235, 0.15);
+}
+
+/* Compact collapsed state for layer cards */
+.layer-item.collapsed {
+    padding: 6px 8px;
+    align-items: stretch;
+    gap: 8px;
+}
+
+.layer-item.collapsed .layer-controls-wrapper {
+    display: none;
+}
+
+.layer-item-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+}
+
+.layer-controls-wrapper {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    /* Allow expanded controls to be visible and let the sidebar scroll container handle overflow */
+    overflow: visible;
+}
+
+.layer-info-short {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    flex: 1;
+}
+
+.layer-expand-btn {
+    background: transparent;
+    border: none;
+    color: var(--gray-500);
+    width: 28px;
+    height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease;
+    flex-shrink: 0;
+}
+
+.layer-expand-btn:hover {
+    background: rgba(37, 99, 235, 0.08);
+    color: var(--accent);
+}
+
+.layer-expand-btn.expanded i {
+    transform: rotate(180deg);
+    transition: transform 160ms ease;
+}
+
+.layer-expand-btn i {
+    transition: transform 160ms ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .layer-toggle {
@@ -732,6 +913,12 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
     gap: var(--spacing-3);
     width: 100%;
     min-width: 0;
+    box-sizing: border-box;
+    flex-shrink: 1;
+    max-height: min(60vh, 520px);
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 4px;
 }
 
 .control-row {
