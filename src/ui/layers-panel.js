@@ -45,8 +45,13 @@ function getLayerGroupContainer(groupKey) {
 }
 
 function getLayerGroupBody(/* groupKey */) {
-    // Group bodies no longer exist; layers are rendered as flat siblings.
-    // Keep API but return the root list as the logical container when needed.
+    // Return the logical body container for a group when present.
+    // Keep backwards compatibility by returning the root list if no group body exists.
+    const container = getLayerGroupContainer(arguments[0]);
+    if (container) {
+        const body = container.querySelector('.layer-group-body');
+        if (body) return body;
+    }
     return getLayerList();
 }
 
@@ -66,6 +71,7 @@ function createLayerGroup(groupKey) {
                     <i class="fas fa-chevron-down layer-group-chevron" aria-hidden="true"></i>
                 </button>
             </div>
+            <div class="layer-group-body" role="group" aria-label="${groupLabel}"></div>
         </div>
     `;
     const template = document.createElement('div');
@@ -95,8 +101,8 @@ function ensureLayerGroup(groupKey) {
 function updateLayerGroupCount(groupKey) {
     const group = getLayerGroupContainer(groupKey);
     if (!group) return;
-    const layerList = getLayerList();
-    const count = layerList.querySelectorAll(`.layer-item[data-group="${groupKey}"]`).length;
+    const body = group.querySelector('.layer-group-body') || getLayerList();
+    const count = body.querySelectorAll(`.layer-item[data-group="${groupKey}"]`).length;
     const countEl = group.querySelector('.layer-group-count');
     if (countEl) countEl.textContent = String(count);
 }
@@ -672,16 +678,13 @@ export function addLayerItem(name, color, featureCount, options = {}) {
     if (newItem) {
         newItem.setAttribute('data-group', groupKey);
 
-        const insertBefore = LAYER_GROUP_ORDER
-            .slice(LAYER_GROUP_ORDER.indexOf(groupKey) + 1)
-            .map((nextKey) => getLayerGroupContainer(nextKey))
-            .find(Boolean);
+        // Insert the layer item into the group's body container to make the
+        // header a true structural anchor for its layers.
+        const groupContainer = getLayerGroupContainer(groupKey) || createLayerGroup(groupKey);
+        const groupBody = groupContainer.querySelector('.layer-group-body') || layerListEl;
 
-        if (insertBefore) {
-            layerListEl.insertBefore(newItem, insertBefore);
-        } else {
-            layerListEl.appendChild(newItem);
-        }
+        // Append to the group's body. Keep relative ordering within a group.
+        groupBody.appendChild(newItem);
     }
     updateLayerGroupCount(groupKey);
     attachLayerNameTooltip(newItem);
@@ -1387,7 +1390,7 @@ export function removeLayerItem(layerName) {
 
     if (groupKey) {
         const group = getLayerGroupContainer(groupKey);
-        const remaining = document.getElementById('layerList')?.querySelectorAll(`.layer-item[data-group="${groupKey}"]`).length || 0;
+        const remaining = group?.querySelectorAll('.layer-item').length || 0;
         if (group && remaining === 0) {
             group.remove();
         } else if (group) {
