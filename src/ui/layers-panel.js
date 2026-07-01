@@ -13,8 +13,8 @@ function getEmptyStateMarkup() {
         <div class="empty-state">
             <div class="empty-state-icon" aria-hidden="true"><i class="fas fa-layer-group"></i></div>
             <div class="empty-state-title">No layers in this workspace</div>
-            <div class="empty-state-text">Add a dataset to start styling, inspecting, and exporting your map composition.</div>
-            <div class="empty-state-formats">Supported uploads: Shapefile (.zip), KML (.kml), GeoJSON (.geojson/.json), CSV (.csv)</div>
+            <div class="empty-state-text">Add a file or connect a remote service to start styling, inspecting, and exporting your map composition.</div>
+            <div class="empty-state-formats">Supported: Shapefile (.zip), KML (.kml), GeoJSON (.geojson/.json), CSV (.csv), WMS, and GP layers.</div>
         </div>
     `;
 }

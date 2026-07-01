@@ -3885,6 +3885,31 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
     opacity: 0;
 }
 
+.export-format-group {
+    display: grid;
+    grid-template-columns: minmax(116px, max-content) minmax(160px, 1fr);
+    align-items: center;
+    column-gap: var(--spacing-3);
+    row-gap: var(--spacing-2);
+    margin-bottom: var(--spacing-4);
+    padding: var(--spacing-3);
+    border: 1px solid var(--gray-200);
+    border-radius: 8px;
+    background: #ffffff;
+}
+
+.export-format-label {
+    margin-bottom: 0;
+    color: var(--gray-700);
+    letter-spacing: 0.35px;
+}
+
+.export-format-group .form-input {
+    min-height: 40px;
+    border-radius: 8px;
+    background-color: var(--gray-50);
+}
+
 /* File Preview */
 .file-preview {
     background: linear-gradient(135deg, var(--gray-50), var(--gray-100));
@@ -4216,6 +4241,20 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
 @media (max-width: 520px) {
     .app-title {
         display: none;
+    }
+
+    .export-format-group {
+        grid-template-columns: 1fr;
+    }
+
+    .export-format-label {
+        margin-bottom: var(--spacing-1);
+    }
+
+    .export-format-group {
+        padding: 0;
+        border: 0;
+        background: transparent;
     }
 }
 

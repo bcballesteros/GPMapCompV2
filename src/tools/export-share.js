@@ -14,10 +14,13 @@ import ol from '../lib/ol.js';
 
 const SHARE_TOKEN_KEY = 's';
 const SHARE_TOKEN_VERSION = 1;
+const EXPORT_LONG_EDGE_PX = 2560;
+const EXPORT_MAX_PIXEL_AREA = 12000000;
 
 let previewMap = null;
 let previewSyncScheduled = false;
 let previewListenersBound = false;
+let previewRenderToken = 0;
 let sharedStateRestoreAttempted = false;
 
 function setExportBusyState(isBusy) {
@@ -144,7 +147,22 @@ function cloneWmsSource(source) {
     });
 }
 
-function clonePreviewLayer(layer, index) {
+function cloneXyzSource(source) {
+    return new ol.source.XYZ({
+        url: source.getUrls?.()?.[0] || source.getUrl?.(),
+        urls: source.getUrls?.(),
+        attributions: source.getAttributions?.(),
+        crossOrigin: 'anonymous',
+        minZoom: source.getMinZoom?.(),
+        maxZoom: source.getMaxZoom?.(),
+        projection: source.getProjection?.(),
+        tileGrid: source.getTileGrid?.(),
+        wrapX: source.getWrapX?.(),
+        transition: 0
+    });
+}
+
+function cloneMapLayer(layer, index) {
     const source = layer.getSource?.();
     if (!source) {
         return null;
@@ -176,8 +194,15 @@ function clonePreviewLayer(layer, index) {
     }
 
     if (layer instanceof ol.layer.Tile) {
+        let tileSource = source;
+        if (source instanceof ol.source.TileWMS) {
+            tileSource = cloneWmsSource(source);
+        } else if (source instanceof ol.source.XYZ) {
+            tileSource = cloneXyzSource(source);
+        }
+
         const previewLayer = new ol.layer.Tile({
-            source: source instanceof ol.source.TileWMS ? cloneWmsSource(source) : source,
+            source: tileSource,
             opacity: commonOptions.opacity,
             visible: commonOptions.visible
         });
@@ -186,6 +211,10 @@ function clonePreviewLayer(layer, index) {
     }
 
     return null;
+}
+
+function clonePreviewLayer(layer, index) {
+    return cloneMapLayer(layer, index);
 }
 
 function ensurePreviewMap() {
@@ -292,6 +321,127 @@ function bindPreviewSyncListeners() {
     mainMap.getLayers().on('remove', scheduleSync);
     mainMap.getLayers().forEach((layer) => layer.on('change', scheduleSync));
     previewListenersBound = true;
+}
+
+function rebuildMapLayers(targetMap, sourceMap) {
+    const targetLayers = targetMap.getLayers();
+    targetLayers.clear();
+
+    sourceMap.getLayers().forEach((layer, index) => {
+        const clonedLayer = cloneMapLayer(layer, index);
+        if (clonedLayer) {
+            targetLayers.push(clonedLayer);
+        }
+    });
+}
+
+function waitForAnimationFrame() {
+    return new Promise((resolve) => {
+        requestAnimationFrame(resolve);
+    });
+}
+
+function getVisibleLayerSources(map) {
+    const sources = [];
+
+    map?.getLayers?.().forEach((layer) => {
+        if (layer.getVisible?.() === false) {
+            return;
+        }
+
+        const source = layer.getSource?.();
+        if (source) {
+            sources.push(source);
+        }
+    });
+
+    return sources;
+}
+
+function waitForViewIdle(map) {
+    const view = map?.getView?.();
+    if (!view || (!view.getAnimating?.() && !view.getInteracting?.())) {
+        return Promise.resolve();
+    }
+
+    return new Promise((resolve) => {
+        const key = view.on('change', () => {
+            if (view.getAnimating?.() || view.getInteracting?.()) {
+                return;
+            }
+
+            ol.Observable.unByKey(key);
+            resolve();
+        });
+    });
+}
+
+function waitForMapRenderComplete(map, { sync = false } = {}) {
+    if (!map) {
+        return Promise.resolve();
+    }
+
+    return new Promise((resolve) => {
+        const sourceEvents = [];
+        let pendingLoads = 0;
+        let renderComplete = false;
+        let resolved = false;
+
+        const cleanup = () => {
+            sourceEvents.forEach((key) => ol.Observable.unByKey(key));
+        };
+
+        const finishIfReady = () => {
+            if (resolved || !renderComplete || pendingLoads > 0) {
+                return;
+            }
+
+            resolved = true;
+            cleanup();
+            resolve();
+        };
+
+        const handleLoadStart = () => {
+            pendingLoads += 1;
+            renderComplete = false;
+        };
+
+        const handleLoadEnd = () => {
+            pendingLoads = Math.max(0, pendingLoads - 1);
+            finishIfReady();
+        };
+
+        getVisibleLayerSources(map).forEach((source) => {
+            [
+                'tileloadstart',
+                'tileloadend',
+                'tileloaderror',
+                'imageloadstart',
+                'imageloadend',
+                'imageloaderror'
+            ].forEach((eventName) => {
+                const listener = eventName.endsWith('start') ? handleLoadStart : handleLoadEnd;
+                sourceEvents.push(source.on(eventName, listener));
+            });
+        });
+
+        map.once('rendercomplete', () => {
+            renderComplete = true;
+            finishIfReady();
+        });
+
+        if (sync) {
+            map.renderSync();
+            return;
+        }
+
+        map.render();
+    });
+}
+
+async function waitForMapSettledRender(map, options) {
+    await waitForViewIdle(map);
+    await waitForMapRenderComplete(map, options);
 }
 
 function serializeViewState(map) {
@@ -704,7 +854,7 @@ function drawExportFooter(context, canvasWidth, canvasHeight, footerHeight) {
 
     const exportDate = getLocalExportDate();
     const crsLabel = getExportCrsLabel();
-    const disclaimerText = `Generated from NAMRIA GP Map Composer · ${crsLabel} · ${exportDate}`;
+    const disclaimerText = `Generated from NAMRIA GP Map Composer | ${crsLabel} | ${exportDate}`;
 
     context.save();
 
@@ -774,112 +924,96 @@ function getExportCrsLabel() {
     return getMapProjectionLabel();
 }
 
-function waitForRenderComplete(map) {
-    return new Promise((resolve) => {
-        let resolved = false;
-        const finish = () => {
-            if (resolved) {
-                return;
-            }
+function getExportCanvasSize(map) {
+    const [mapWidth = 0, mapHeight = 0] = map?.getSize?.() || [];
 
-            resolved = true;
-            clearTimeout(timeoutId);
-            resolve();
+    if (mapWidth <= 0 || mapHeight <= 0) {
+        return {
+            width: EXPORT_LONG_EDGE_PX,
+            mapHeight: Math.round(EXPORT_LONG_EDGE_PX * 9 / 16)
         };
+    }
 
-        const timeoutId = window.setTimeout(finish, 3500);
-        map.once('rendercomplete', finish);
-        map.renderSync();
-    });
+    const longEdgeScale = EXPORT_LONG_EDGE_PX / Math.max(mapWidth, mapHeight);
+    const areaScale = Math.sqrt(EXPORT_MAX_PIXEL_AREA / (mapWidth * mapHeight));
+    const scale = Math.min(longEdgeScale, areaScale);
+
+    return {
+        width: Math.max(1, Math.round(mapWidth * scale)),
+        mapHeight: Math.max(1, Math.round(mapHeight * scale))
+    };
 }
 
-async function renderMapToCanvas(width, height) {
-    const mainMap = getMap();
-    if (!mainMap) {
-        throw new Error('Map is not ready');
+function createExportMapTarget(width, height) {
+    const target = document.createElement('div');
+    target.style.position = 'fixed';
+    target.style.left = '-100000px';
+    target.style.top = '0';
+    target.style.width = `${width}px`;
+    target.style.height = `${height}px`;
+    target.style.overflow = 'hidden';
+    target.style.pointerEvents = 'none';
+    target.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(target);
+    return target;
+}
+
+function syncExportView(exportMap, mainMap, exportSize) {
+    const mainView = mainMap.getView();
+    const mainSize = mainMap.getSize();
+    const exportView = exportMap.getView();
+
+    if (mainSize) {
+        exportView.fit(mainView.calculateExtent(mainSize), {
+            size: exportSize,
+            duration: 0,
+            nearest: false
+        });
+    } else {
+        exportView.setCenter(mainView.getCenter());
+        exportView.setResolution(mainView.getResolution());
     }
 
-    // CRITICAL: Get map container and save original dimensions
-    const mapContainer = document.getElementById('mapContainer');
-    if (!mapContainer) {
-        throw new Error('Map container not found');
-    }
+    exportView.setRotation(mainView.getRotation() || 0);
+}
 
-    const originalWidth = mapContainer.offsetWidth;
-    const originalHeight = mapContainer.offsetHeight;
-    const originalDisplay = mapContainer.style.display;
-    const originalPosition = mapContainer.style.position;
-    const originalTop = mapContainer.style.top;
-    const originalLeft = mapContainer.style.left;
+async function renderExportMapToCanvas(mainMap, width, height) {
+    const target = createExportMapTarget(width, height);
+    const mainView = mainMap.getView();
+    const exportMap = new ol.Map({
+        target,
+        controls: [],
+        interactions: [],
+        layers: [],
+        pixelRatio: 1,
+        view: new ol.View({
+            center: mainView.getCenter(),
+            resolution: mainView.getResolution(),
+            rotation: mainView.getRotation() || 0,
+            projection: mainView.getProjection()
+        })
+    });
 
     try {
-        const footerHeight = Math.max(24, Math.round(height * 0.025));
-        const mapExportHeight = height - footerHeight;
+        rebuildMapLayers(exportMap, mainMap);
+        exportMap.updateSize();
+        syncExportView(exportMap, mainMap, [width, height]);
+        await waitForMapSettledRender(exportMap, { sync: true });
 
-        // CRITICAL: Capture current view state BEFORE any resize
-        const view = mainMap.getView?.();
-        const savedCenter = view?.getCenter ? (view.getCenter() ? Array.from(view.getCenter()) : null) : null;
-        const savedResolution = typeof view?.getResolution === 'function' ? view.getResolution() : (typeof view?.getZoom === 'function' ? view.getZoom() : null);
-        const savedRotation = typeof view?.getRotation === 'function' ? view.getRotation() : 0;
-
-        // CRITICAL FIX: Use EXACT export resolution, NO aspect ratio constraint
-        // This ensures user-selected resolution is respected (e.g., 1920x1080, 2560x1440, 4K)
-        const exportMapWidth = width;
-        const exportMapHeight = mapExportHeight;
-
-        // CRITICAL: Resize map container to EXACT export dimensions
-        mapContainer.style.display = 'block';
-        mapContainer.style.position = 'fixed';
-        mapContainer.style.top = '-9999px';
-        mapContainer.style.left = '-9999px';
-        mapContainer.style.width = `${exportMapWidth}px`;
-        mapContainer.style.height = `${exportMapHeight}px`;
-        mapContainer.style.overflow = 'hidden';
-        mapContainer.style.pointerEvents = 'none';
-
-        // CRITICAL: Update map size so OL recognizes new container dimensions
-        mainMap.updateSize();
-
-        // CRITICAL: Re-apply saved view state to new container size
-        const postView = mainMap.getView();
-        if (postView) {
-            if (Array.isArray(savedCenter) && savedCenter.length === 2) {
-                postView.setCenter(savedCenter);
-            }
-            if (Number.isFinite(savedResolution)) {
-                // setResolution preserves exact map extent/scale
-                if (typeof postView.setResolution === 'function') {
-                    postView.setResolution(savedResolution);
-                } else if (typeof postView.setZoom === 'function') {
-                    postView.setZoom(savedResolution);
-                }
-            }
-            if (Number.isFinite(savedRotation)) {
-                postView.setRotation(savedRotation);
-            }
-        }
-
-        // Force synchronous render and then wait for rendercomplete
-        mainMap.renderSync();
-        await waitForRenderComplete(mainMap);
-
-        // CRITICAL: Create canvas at EXACT export dimensions (no scaling fallback)
-        const mapCanvas = createExportCanvas(exportMapWidth, exportMapHeight);
+        const mapCanvas = createExportCanvas(width, height);
         const mapContext = mapCanvas.getContext('2d');
 
         if (!mapContext) {
             throw new Error('Failed to get map canvas context');
         }
 
-        mapContext.imageSmoothingEnabled = true;
-        mapContext.imageSmoothingQuality = 'high';
+        mapContext.imageSmoothingEnabled = false;
 
-        // Draw map directly at full resolution (no offset needed - already at target size)
         const rendered = drawMapViewportToContext(
-            mainMap,
+            exportMap,
             mapContext,
-            exportMapWidth,
-            exportMapHeight,
+            width,
+            height,
             0,
             0
         );
@@ -888,57 +1022,55 @@ async function renderMapToCanvas(width, height) {
             throw new Error('Map renderer did not produce an exportable frame');
         }
 
-        // Create final export canvas with map + footer at requested resolution
-        const exportCanvas = createExportCanvas(width, height);
-        const context = exportCanvas.getContext('2d');
-
-        if (!context) {
-            throw new Error('Failed to get canvas context');
-        }
-
-        context.imageSmoothingEnabled = true;
-        context.imageSmoothingQuality = 'high';
-
-        // Fill background
-        context.fillStyle = '#ffffff';
-        context.fillRect(0, 0, width, height);
-
-        // CRITICAL FIX: Draw map directly at top of canvas (no aspect ratio margins)
-        // Map is already at correct size, so draw at 1:1 without centering offsets
-        context.drawImage(
-            mapCanvas,
-            0,
-            0,
-            exportMapWidth,
-            exportMapHeight,
-            0,
-            0,
-            exportMapWidth,
-            exportMapHeight
-        );
-
-        // Draw footer in dedicated space below map
-        drawExportFooter(context, width, height, footerHeight);
-
-        return exportCanvas;
+        return mapCanvas;
     } finally {
-        // CRITICAL: Always restore original map container dimensions
-        // This ensures the UI returns to normal state
-        mapContainer.style.width = `${originalWidth}px`;
-        mapContainer.style.height = `${originalHeight}px`;
-        mapContainer.style.display = originalDisplay;
-        mapContainer.style.position = originalPosition;
-        mapContainer.style.top = originalTop;
-        mapContainer.style.left = originalLeft;
-        mapContainer.style.overflow = '';
-        mapContainer.style.pointerEvents = '';
-
-        // Update map size back to normal
-        mainMap.updateSize();
+        exportMap.setTarget(null);
+        target.remove();
     }
 }
 
-export function renderMapPreview() {
+async function renderMapToCanvas() {
+    const mainMap = getMap();
+    if (!mainMap) {
+        throw new Error('Map is not ready');
+    }
+
+    const { width, mapHeight } = getExportCanvasSize(mainMap);
+    const footerHeight = Math.max(24, Math.round(mapHeight * 0.025));
+    const height = mapHeight + footerHeight;
+
+    await waitForMapSettledRender(mainMap, { sync: true });
+
+    const mapCanvas = await renderExportMapToCanvas(mainMap, width, mapHeight);
+
+    const exportCanvas = createExportCanvas(width, height);
+    const context = exportCanvas.getContext('2d');
+
+    if (!context) {
+        throw new Error('Failed to get canvas context');
+    }
+
+    context.imageSmoothingEnabled = false;
+    context.fillStyle = '#ffffff';
+    context.fillRect(0, 0, width, height);
+    context.drawImage(
+        mapCanvas,
+        0,
+        0,
+        width,
+        mapHeight,
+        0,
+        0,
+        width,
+        mapHeight
+    );
+
+    drawExportFooter(context, width, height, footerHeight);
+
+    return exportCanvas;
+}
+
+export async function renderMapPreview() {
     const { container, placeholder } = getExportPreviewElements();
     const mainMap = getMap();
 
@@ -947,30 +1079,42 @@ export function renderMapPreview() {
     }
 
     bindPreviewSyncListeners();
+    const renderToken = ++previewRenderToken;
 
-    requestAnimationFrame(() => {
-        const previewInstance = ensurePreviewMap();
-        if (!previewInstance) {
-            return;
-        }
+    await waitForAnimationFrame();
 
-        rebuildPreviewLayers(mainMap);
-        syncPreviewView(mainMap);
-        previewInstance.renderSync();
-        container.classList.add('ready');
-        placeholder.setAttribute('aria-hidden', 'true');
-    });
+    const previewInstance = ensurePreviewMap();
+    if (!previewInstance || renderToken !== previewRenderToken) {
+        return;
+    }
+
+    container.classList.remove('ready');
+    placeholder.setAttribute('aria-hidden', 'false');
+
+    await waitForMapSettledRender(mainMap);
+    if (renderToken !== previewRenderToken) {
+        return;
+    }
+
+    rebuildPreviewLayers(mainMap);
+    syncPreviewView(mainMap);
+    await waitForMapSettledRender(previewInstance);
+
+    if (renderToken !== previewRenderToken) {
+        return;
+    }
+
+    container.classList.add('ready');
+    placeholder.setAttribute('aria-hidden', 'true');
 }
 
 export async function downloadMap() {
     const format = document.getElementById('exportFormat')?.value || 'png';
-    const resolution = document.getElementById('exportResolution')?.value || '1920x1080';
-    const [width, height] = resolution.split('x').map(Number);
 
     setExportBusyState(true);
 
     try {
-        const canvas = await renderMapToCanvas(width, height);
+        const canvas = await renderMapToCanvas();
 
         if (format === 'png') {
             downloadCanvas(canvas, 'image/png', createExportFileName('png'), undefined, (blob) => {
@@ -986,7 +1130,7 @@ export async function downloadMap() {
         }
 
         if (format === 'jpeg') {
-            downloadCanvas(canvas, 'image/jpeg', createExportFileName('jpg'), 0.92, (blob) => {
+            downloadCanvas(canvas, 'image/jpeg', createExportFileName('jpg'), 0.98, (blob) => {
                 if (!blob) {
                     showToast('Error', 'Failed to create JPEG export', 'error');
                     return;

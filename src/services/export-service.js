@@ -7,7 +7,7 @@ export function createExportCanvas(width, height) {
 
 export function downloadCanvas(canvas, mimeType, fileName, quality, onComplete) {
     canvas.toBlob((blob) => {
-        onComplete(blob);
+        onComplete?.(blob);
         if (!blob) {
             return;
         }

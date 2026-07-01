@@ -1,3 +1,4 @@
+import { ANNOTATION_LAYER_ID, DRAWING_LAYER_ID } from '../config/constants.js';
 import { getLayerRecord, getMap, getState } from '../state/store.js';
 
 function getStatusElement(id) {
@@ -5,7 +6,7 @@ function getStatusElement(id) {
 }
 
 function getOperationalLayerNames() {
-    return Object.keys(getState().uploadedLayers).filter((layerName) => layerName !== 'annotations');
+    return Object.keys(getState().uploadedLayers).filter((layerName) => layerName !== ANNOTATION_LAYER_ID && layerName !== DRAWING_LAYER_ID);
 }
 
 function getActiveLayerLabel() {
@@ -48,6 +49,108 @@ function getProjectionLabel(view) {
     return mapProjection;
 }
 
+function isRemoteLayer(record) {
+    return Boolean(record?.isWMS || record?.isGP);
+}
+
+function getSelectedFeatureKind(feature) {
+    if (!feature?.get) {
+        return null;
+    }
+
+    if (feature.get('isAnnotation')) {
+        return 'annotation';
+    }
+
+    if (feature.get('measurementType')) {
+        return 'measurement';
+    }
+
+    if (feature.get('drawingType')) {
+        return 'drawing';
+    }
+
+    return null;
+}
+
+function buildSelectedFeatureHelp(feature) {
+    const kind = getSelectedFeatureKind(feature);
+
+    if (kind === 'annotation') {
+        return {
+            primary: 'Annotation selected.',
+            secondary: 'Use Edit, Move, Hide/Show, or Delete to update the note. Clear All removes every annotation.'
+        };
+    }
+
+    if (kind === 'drawing') {
+        const drawingType = feature.get?.('drawingType') || 'drawing';
+        const label = String(drawingType).charAt(0).toUpperCase() + String(drawingType).slice(1);
+        return {
+            primary: `${label} drawing selected.`,
+            secondary: 'Delete Selected removes only this shape. Clear All removes every point, line, polygon, and freehand drawing.'
+        };
+    }
+
+    if (kind === 'measurement') {
+        const measurementType = feature.get?.('measurementType') === 'area' ? 'Area' : 'Distance';
+        return {
+            primary: `${measurementType} measurement selected.`,
+            secondary: 'Delete Selected removes only this result. Press Esc to clear the selection or cancel an active measurement.'
+        };
+    }
+
+    return null;
+}
+
+function buildLayerHelp(layerName, record) {
+    if (!layerName || !record) {
+        return null;
+    }
+
+    if (isRemoteLayer(record)) {
+        return {
+            primary: `${layerName} is selected.`,
+            secondary: 'Remote WMS and GP layers can be shown or hidden, reordered, and faded with opacity.'
+        };
+    }
+
+    const styleTips = [];
+
+    if (record.isPointLayer) {
+        styleTips.push('point size');
+        styleTips.push('marker style');
+    } else if (record.isLineLayer) {
+        styleTips.push('line width');
+    } else if (record.isPolygonLayer) {
+        styleTips.push('fill and border colors');
+    }
+
+    styleTips.push('opacity');
+    const styleSummary = styleTips.length === 1
+        ? styleTips[0]
+        : `${styleTips.slice(0, -1).join(', ')}, and ${styleTips[styleTips.length - 1]}`;
+
+    return {
+        primary: `${layerName} is selected.`,
+        secondary: `Use the layer card to change ${styleSummary}, toggle visibility, and open the attribute table for details.`
+    };
+}
+
+function buildDefaultHelp(hasLayers) {
+    if (!hasLayers) {
+        return {
+            primary: 'Import data or connect a layer to begin.',
+            secondary: 'Use Add Layer for Shapefile, KML, GeoJSON, CSV, WMS, or GP sources. Press Esc to clear a location search.'
+        };
+    }
+
+    return {
+        primary: 'Select a layer or tool to continue.',
+        secondary: 'Build your map by styling layers, drawing sketches, measuring features, adding annotations, then export or share the finished map.'
+    };
+}
+
 function buildHelpContent() {
     const state = getState();
     const activeLayerName = state.currentLayerName;
@@ -55,60 +158,47 @@ function buildHelpContent() {
     const hasLayers = getOperationalLayerNames().length > 0;
 
     if (!hasLayers) {
-        return {
-            primary: 'Upload a layer to begin.',
-            secondary: 'Add a dataset from the Layers panel to start styling, layer information review, and export.'
-        };
+        return buildDefaultHelp(false);
     }
 
     if (state.annotationMode === 'text') {
         return {
-            primary: 'Click map to place annotation.',
-            secondary: 'After clicking, enter the label text, font size, and color in the popup.'
+            primary: 'Click the map to place a note.',
+            secondary: 'Type the text in the popup, then choose font size and color before adding it. Right-click cancels placement.'
         };
     }
 
     if (state.selectedTool === 'annotation:labels') {
         return {
-            primary: 'Feature labels updated.',
-            secondary: 'Use Feature Labels to toggle attribute labels for the selected vector layer.'
+            primary: 'Feature labels are ready.',
+            secondary: 'Turn labels on for the selected vector layer to show key attributes on the map.'
         };
     }
 
     if (state.selectedTool === 'measurement:distance') {
         return {
             primary: 'Distance measurement active.',
-            secondary: 'Click map to start measuring, add vertices for path distance, and double-click to finish.'
+            secondary: 'Click to start, add vertices along the path, and double-click to finish. Press Esc or right-click to cancel.'
         };
     }
 
     if (state.selectedTool === 'measurement:area') {
         return {
             primary: 'Area measurement active.',
-            secondary: 'Click map to add polygon vertices, then double-click to calculate area and perimeter.'
+            secondary: 'Click to add polygon vertices, then double-click to finish. The result shows area and perimeter, and Esc cancels the sketch.'
         };
     }
 
-    if (state.selectedFeature?.get?.('isAnnotation')) {
-        return {
-            primary: 'Annotation selected.',
-            secondary: 'Use Edit, Move, Hide/Show, or Delete in the annotation panel to update the selected note.'
-        };
+    const selectedFeatureHelp = buildSelectedFeatureHelp(state.selectedFeature);
+    if (selectedFeatureHelp) {
+        return selectedFeatureHelp;
     }
 
     if (activeLayerName && activeLayerRecord) {
-        return {
-            primary: `${activeLayerName} is selected.`,
-            secondary: activeLayerRecord.isWMS
-                ? 'Use Map Settings and layer visibility controls to manage this remote service layer.'
-                : 'Use Layer Information to inspect attributes, then adjust styling and opacity from the Layers panel.'
-        };
+        return buildLayerHelp(activeLayerName, activeLayerRecord);
     }
 
-    return {
-        primary: 'Select a layer to continue.',
-        secondary: 'Choose a layer from the Layers panel to inspect attributes or adjust styling.'
-    };
+    return buildDefaultHelp(hasLayers);
 }
 
 export function updateSmartHelpPanel() {

@@ -13,7 +13,12 @@ import { bindAnnotationPopupDismissal } from '../ui/toolbar.js';
 
 function runOptionalStartupStep(label, callback) {
     try {
-        callback();
+        const result = callback();
+        if (result && typeof result.catch === 'function') {
+            result.catch((error) => {
+                console.warn(`[startup] ${label} failed`, error);
+            });
+        }
     } catch (error) {
         console.warn(`[startup] ${label} failed`, error);
     }
