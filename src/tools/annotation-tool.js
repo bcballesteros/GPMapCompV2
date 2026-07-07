@@ -1134,6 +1134,7 @@ function bindInteractiveEscapeKey() {
             || cancelActiveAnnotationMove()) {
             event.preventDefault();
             event.stopPropagation();
+            event.stopImmediatePropagation();
             return;
         }
 
@@ -1742,11 +1743,10 @@ export function updateDrawingControls() {
 export function deleteSelectedDrawing() {
     const drawingLayer = getLayerRecord(DRAWING_LAYER_ID);
     if (!drawingLayer?.source || !selectedDrawing) {
-        showToast('No Drawing Selected', 'Select a drawing on the map before using Delete Selected Drawing.', 'info', 1700);
+        showToast('No Drawing Selected', 'Select a drawing on the map before using Delete Selected.', 'info', 1700);
         return;
     }
 
-    const deletedLabel = getDrawingLabel(selectedDrawing);
     const deletedDrawing = selectedDrawing;
     drawingLayer.source.removeFeature(selectedDrawing);
     selectedDrawing = null;
@@ -1758,7 +1758,6 @@ export function deleteSelectedDrawing() {
     drawingLayer.layer.changed();
     updateDrawingControls();
     syncMapCursor();
-    showToast('Drawing Deleted', `${deletedLabel} drawing was removed. Other drawings were kept.`, 'success', 1700);
 }
 
 export function clearDrawings() {
@@ -1910,12 +1909,11 @@ export function clearMeasurements() {
 
 export function deleteSelectedMeasurement() {
     if (!measureLayer?.getSource() || !selectedMeasurement) {
-        showToast('No Measurement Selected', 'Select a distance or area measurement before using Delete Selected Measurement.', 'info', 1700);
+        showToast('No Measurement Selected', 'Select a distance or area measurement before using Delete Selected.', 'info', 1700);
         return;
     }
 
     const deletedMeasurement = selectedMeasurement;
-    const measurementType = deletedMeasurement.get?.('measurementType') === MEASUREMENT_TYPE_AREA ? 'Area' : 'Distance';
     measureLayer.getSource().removeFeature(deletedMeasurement);
     setSelectedMeasurement(null);
     hoveredMeasurement = null;
@@ -1924,7 +1922,6 @@ export function deleteSelectedMeasurement() {
     }
     updateMeasurementCursor();
     updateMeasurementResultPanel(Number.NaN);
-    showToast('Measurement Deleted', `${measurementType} measurement was removed. Other measurements were kept.`, 'success', 1700);
 }
 
 export function isMeasurementActive() {
@@ -1989,53 +1986,35 @@ export function editAnnotation(feature) {
     const fontColor = feature.get('fontColor') || '#000000';
     const editPopup = document.createElement('div');
 
-    editPopup.style.cssText = `
-        position: fixed;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        background: white;
-        padding: 20px;
-        border-radius: 12px;
-        box-shadow: 0 10px 40px rgba(0,0,0,0.2);
-        z-index: 10001;
-        min-width: 300px;
-    `;
+    editPopup.className = 'annotation-edit-popover';
 
     editPopup.innerHTML = `
-        <div style="font-weight: 700; margin-bottom: 15px; font-size: 14px;">Edit Annotation</div>
-        <div style="margin-bottom: 10px;">
-            <label style="display: block; font-size: 12px; font-weight: 600; margin-bottom: 5px;">Text</label>
-            <textarea id="editAnnotationText" style="width: 100%; padding: 8px; border: 1px solid var(--gray-300); border-radius: 6px; font-family: Arial; font-size: 13px; min-height: 60px; resize: vertical;">${text}</textarea>
+        <div class="annotation-edit-title">Edit Annotation</div>
+        <div class="annotation-edit-field">
+            <label class="annotation-edit-label" for="editAnnotationText">Text</label>
+            <textarea id="editAnnotationText" class="annotation-edit-textarea"></textarea>
         </div>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
-            <div>
-                <label style="display: block; font-size: 12px; font-weight: 600; margin-bottom: 5px;">Font Size</label>
-                <input type="number" id="editAnnotationFontSize" min="8" max="48" value="${fontSize}" style="width: 100%; padding: 8px; border: 1px solid var(--gray-300); border-radius: 6px; font-size: 13px;">
+        <div class="annotation-edit-grid">
+            <div class="annotation-edit-field">
+                <label class="annotation-edit-label" for="editAnnotationFontSize">Font Size</label>
+                <input type="number" id="editAnnotationFontSize" class="annotation-edit-input" min="8" max="48" value="${fontSize}">
             </div>
-            <div>
-                <label style="display: block; font-size: 12px; font-weight: 600; margin-bottom: 5px;">Color</label>
-                <input type="color" id="editAnnotationFontColor" value="${fontColor}" style="width: 100%; height: 36px; padding: 4px; border: 1px solid var(--gray-300); border-radius: 6px; cursor: pointer;">
+            <div class="annotation-edit-field">
+                <label class="annotation-edit-label" for="editAnnotationFontColor">Color</label>
+                <input type="color" id="editAnnotationFontColor" class="annotation-edit-color" value="${fontColor}">
             </div>
         </div>
-        <div style="display: flex; gap: 10px; justify-content: flex-end;">
-            <button id="editCancelBtn" style="padding: 8px 16px; background: var(--gray-200); border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 12px;">Cancel</button>
-            <button id="editSaveBtn" style="padding: 8px 16px; background: var(--accent); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 12px;">Save</button>
+        <div class="annotation-edit-actions">
+            <button id="editCancelBtn" class="btn btn-secondary" type="button">Cancel</button>
+            <button id="editSaveBtn" class="btn btn-primary" type="button">Save</button>
         </div>
     `;
 
     document.body.appendChild(editPopup);
+    document.getElementById('editAnnotationText').value = text;
 
     const backdrop = document.createElement('div');
-    backdrop.style.cssText = `
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0,0,0,0.3);
-        z-index: 10000;
-    `;
+    backdrop.className = 'annotation-edit-backdrop';
     document.body.insertBefore(backdrop, editPopup);
 
     document.getElementById('editSaveBtn').onclick = () => {
@@ -2153,8 +2132,8 @@ export function updateAnnotationControls() {
                 ? '<i class="fas fa-eye-slash"></i> Hide'
                 : '<i class="fas fa-eye"></i> Show';
             visibilityBtn.title = annotationVisible
-                ? 'Hide the selected annotation text'
-                : 'Show the selected annotation text';
+                ? 'Hide annotation text'
+                : 'Show annotation text';
         }
         if (hint) {
             if (annotationMoveMode) {
@@ -2179,7 +2158,7 @@ export function updateAnnotationControls() {
             visibilityBtn.dataset.state = 'visible';
             visibilityBtn.setAttribute('aria-pressed', 'false');
             visibilityBtn.innerHTML = '<i class="fas fa-eye-slash"></i> Hide';
-            visibilityBtn.title = 'Hide or show the selected annotation text';
+            visibilityBtn.title = 'Toggle annotation visibility';
         }
         if (hint) {
             hint.textContent = 'Select an annotation on the map to edit its text, move its position, or remove it.';

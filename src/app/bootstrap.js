@@ -4,7 +4,7 @@ import { initializeMap } from '../map/map-init.js';
 import { changeBasemapLayer } from '../map/layer-manager.js';
 import { addGPLayerFromForm, addWMSLayerFromForm, clearCsvSelection, clearFileSelection, clearGeoJSONSelection, clearKmlSelection, fetchGpLayersFromForm, fetchWmsCapabilitiesFromForm, handleCsvSelect, handleFileSelect, handleGeoJSONSelect, handleKmlSelect, initializeGpLayerForm, initializeUploadForm, initializeWmsLayerForm, resetGpLayerFormSession, resetWmsLayerFormSession, submitUpload, updateDataSection } from '../tools/upload-tool.js';
 import { commitLayerOpacity, removeLayer, selectLayer, updateLayerColor, updateLayerOpacity, updateLineStrokeWidth } from '../ui/layers-panel.js';
-import { bindModalOverlayDismissal, closeModal, openModal, toggleSection } from '../ui/modal.js';
+import { bindModalEscapeDismissal, bindModalOverlayDismissal, closeModal, openModal, toggleSection } from '../ui/modal.js';
 import { initializeLocationSearch } from '../ui/location-search.js';
 import { openAttributeTable } from '../ui/sidebar.js';
 import { initializeWorkspaceStatus } from '../ui/workspace-status.js';
@@ -111,6 +111,7 @@ export function bootstrapApp() {
 
         runOptionalStartupStep('location search init', () => initializeLocationSearch());
         runOptionalStartupStep('annotation interaction init', () => initializeAnnotationInteractions());
+        runOptionalStartupStep('modal escape dismissal binding', () => bindModalEscapeDismissal());
         runOptionalStartupStep('annotation controls init', () => bindAnnotationControls());
         runOptionalStartupStep('annotation visibility toggle init', () => bindAnnotationVisibilityToggle());
         runOptionalStartupStep('drawing selection controls init', () => initializeDrawingSelectionControls());
@@ -123,7 +124,7 @@ export function bootstrapApp() {
         runOptionalStartupStep('shared state restore', () => restoreSharedStateFromUrl());
     } catch (error) {
         console.error('[startup] critical bootstrap failure', error);
-        showToast('Startup Issue', 'Some tools failed during startup, so a few features may be unavailable.', 'warning', 3500);
+        showToast('Startup Issue', 'Some tools failed to initialize.', 'warning', 3500);
     } finally {
         revealAppShell();
     }

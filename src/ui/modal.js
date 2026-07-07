@@ -46,6 +46,17 @@ export function closeModal(modalId) {
     }, MODAL_CLOSE_DURATION_MS);
 }
 
+export function closeActiveModal() {
+    const activeModals = Array.from(document.querySelectorAll('.modal-overlay.active'));
+    const activeModal = activeModals.at(-1);
+    if (!activeModal?.id) {
+        return false;
+    }
+
+    closeModal(activeModal.id);
+    return true;
+}
+
 export function toggleSection(header) {
     const content = header.nextElementSibling;
     if (!content) {
@@ -96,5 +107,17 @@ export function bindModalOverlayDismissal() {
                 closeModal(overlay.id);
             }
         });
+    });
+}
+
+export function bindModalEscapeDismissal() {
+    window.addEventListener('keydown', (event) => {
+        if (event.key !== 'Escape' || event.defaultPrevented) {
+            return;
+        }
+
+        if (closeActiveModal()) {
+            event.preventDefault();
+        }
     });
 }

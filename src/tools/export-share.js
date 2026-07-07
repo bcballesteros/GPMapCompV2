@@ -1133,7 +1133,7 @@ export async function downloadMap() {
                     return;
                 }
 
-                showToast('Export Complete', 'The map was exported as PNG.', 'success');
+                showToast('Export Complete', 'PNG export completed.', 'success');
                 closeModal('exportModal');
             });
             return;
@@ -1146,7 +1146,7 @@ export async function downloadMap() {
                     return;
                 }
 
-                showToast('Export Complete', 'The map was exported as JPEG.', 'success');
+                showToast('Export Complete', 'JPEG export completed.', 'success');
                 closeModal('exportModal');
             });
             return;
@@ -1154,11 +1154,11 @@ export async function downloadMap() {
 
         const pdfBlob = await createPdfBlobFromCanvas(canvas);
         downloadBlob(pdfBlob, createExportFileName('pdf'));
-        showToast('Export Complete', 'The map was exported as PDF.', 'success');
+        showToast('Export Complete', 'PDF export completed.', 'success');
         closeModal('exportModal');
     } catch (error) {
         console.error('Export error:', error);
-        showToast('Export Failed', 'The export could not be completed. Please try again.', 'error');
+        showToast('Export Failed', 'The export could not be completed.', 'error');
     } finally {
         setExportBusyState(false);
     }
@@ -1172,7 +1172,7 @@ export async function copyToClipboard() {
 
     try {
         await navigator.clipboard.writeText(input.value);
-        setShareFeedback('Share link copied to the clipboard.', 'success');
+        setShareFeedback('Share link copied.', 'success');
     } catch (error) {
         try {
             input.focus();
@@ -1182,9 +1182,9 @@ export async function copyToClipboard() {
                 throw new Error('Copy command rejected');
             }
 
-            setShareFeedback('Share link copied to the clipboard.', 'success');
+            setShareFeedback('Share link copied.', 'success');
         } catch (copyError) {
-            setShareFeedback('Could not copy the share link automatically. Select the link and copy it manually.', 'warning');
+            setShareFeedback('Could not copy the share link.', 'warning');
             return;
         }
     }
@@ -1195,8 +1195,8 @@ export function generateLink({ silent = false } = {}) {
     updateShareLinkInput(link);
     setShareFeedback(
         silent
-            ? 'The share link will update here when you copy or regenerate the map state.'
-            : 'A new share link was generated for the current map state.',
+            ? 'Share link ready.'
+            : 'Share link generated.',
         silent ? 'info' : 'success'
     );
 
@@ -1256,12 +1256,12 @@ export function restoreSharedStateFromUrl() {
         }
 
         updateShareLinkInput(generateLink({ silent: true }));
-        showToast('Share Restored', 'The map state was restored from the shared link.', 'success', 2200);
+        showToast('Share Restored', 'Shared map state restored.', 'success', 2200);
         return true;
     } catch (error) {
         console.error('Shared state restore failed:', error);
         updateShareLinkInput(generateLink({ silent: true }));
-        showToast('Share Restore Failed', 'The shared map state could not be restored.', 'warning', 2400);
+        showToast('Share Restore Failed', 'Shared map state could not be restored.', 'warning', 2400);
         return false;
     }
 }

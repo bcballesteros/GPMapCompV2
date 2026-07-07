@@ -152,7 +152,7 @@ export function openAttributeTable() {
             const displayValue = value === null || value === undefined ? '' : String(value);
             const escapedValue = escapeHtml(displayValue);
 
-            return `<td style="padding: 10px; color: var(--gray-700);" class="attr-cell" title="${escapedValue}">${escapedValue}</td>`;
+            return `<td style="padding: 10px; color: var(--gray-700);" class="attr-cell">${escapedValue}</td>`;
         }).join('');
 
         return `<tr class="attribute-row" data-row-index="${index}" style="border-bottom: 1px solid var(--gray-200); background: ${rowBackground}; transition: background 0.2s;" onmouseover="this.style.background='var(--blue-50)'" onmouseout="this.style.background='${rowBackground}'">${cells}</tr>`;

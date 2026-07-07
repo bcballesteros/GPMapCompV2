@@ -14,6 +14,59 @@ function getActiveModalId() {
     return activeModal?.id || null;
 }
 
+function isElementInSelector(element, selector) {
+    return Boolean(element?.closest?.(selector));
+}
+
+function getOpenWorkflowContext() {
+    const activeElement = document.activeElement;
+
+    if (isElementInSelector(activeElement, '#locationSearchForm')) {
+        return 'search';
+    }
+
+    if (isElementInSelector(activeElement, '.basemap-selector') || isElementInSelector(activeElement, '#basemapSelect')) {
+        return 'basemap';
+    }
+
+    if (isElementInSelector(activeElement, '.map-settings-section')) {
+        return 'mapSettings';
+    }
+
+    if (isElementInSelector(activeElement, '.measurement-section')) {
+        return 'measurementTools';
+    }
+
+    if (isElementInSelector(activeElement, '.drawing-tools-section')) {
+        return 'drawingTools';
+    }
+
+    if (isElementInSelector(activeElement, '.annotation-tools-section')) {
+        return 'annotationTools';
+    }
+
+    const openSection = Array.from(document.querySelectorAll('.tool-section-group'))
+        .find((section) => !section.querySelector('.tool-section-content')?.classList.contains('collapsed'));
+
+    if (openSection?.classList.contains('map-settings-section')) {
+        return 'mapSettings';
+    }
+
+    if (openSection?.classList.contains('measurement-section')) {
+        return 'measurementTools';
+    }
+
+    if (openSection?.classList.contains('drawing-tools-section')) {
+        return 'drawingTools';
+    }
+
+    if (openSection?.classList.contains('annotation-tools-section')) {
+        return 'annotationTools';
+    }
+
+    return null;
+}
+
 function getActiveLayerLabel() {
     const state = getState();
     const activeLayerName = state.currentLayerName;
@@ -84,7 +137,7 @@ function buildSelectedFeatureHelp(feature) {
     if (kind === 'annotation') {
         return {
             primary: 'Annotation selected.',
-            secondary: 'Use Edit, Move, Hide/Show, or Delete to update the note. Clear All removes every annotation.'
+            secondary: 'Edit text, Move the note, Hide/Show its label, or Delete it. Clear All removes every annotation.'
         };
     }
 
@@ -93,7 +146,7 @@ function buildSelectedFeatureHelp(feature) {
         const label = String(drawingType).charAt(0).toUpperCase() + String(drawingType).slice(1);
         return {
             primary: `${label} drawing selected.`,
-            secondary: 'Delete Selected removes only this shape. Clear All removes every point, line, polygon, and freehand drawing.'
+            secondary: 'Delete Selected removes this shape. Clear All removes every drawing.'
         };
     }
 
@@ -101,7 +154,7 @@ function buildSelectedFeatureHelp(feature) {
         const measurementType = feature.get?.('measurementType') === 'area' ? 'Area' : 'Distance';
         return {
             primary: `${measurementType} measurement selected.`,
-            secondary: 'Delete Selected removes only this result. Press Esc to clear the selection or cancel an active measurement.'
+            secondary: 'Review the result panel, delete this measurement, or clear all measurements.'
         };
     }
 
@@ -116,34 +169,37 @@ function buildLayerHelp(layerName, record) {
     if (isRemoteLayer(record)) {
         return {
             primary: `${layerName} is selected.`,
-            secondary: 'Remote WMS and GP layers can be shown or hidden and faded with opacity.'
+            secondary: 'Toggle visibility or adjust opacity. Attribute tables, labels, and vector styling are not available for remote layers.'
         };
     }
 
     if (record.isPointLayer) {
+        const markerHelp = record.svgMarkerDataUrl
+            ? 'Select an uploaded SVG thumbnail or switch back to a preset marker.'
+            : 'Choose a marker shape, upload SVG markers, then adjust color, size, stroke, and opacity.';
         return {
-            primary: `${layerName} is selected.`,
-            secondary: 'Use the layer card to change point color, size, marker style, optional stroke, and opacity, then open the attribute table for details.'
+            primary: `Style point layer: ${layerName}.`,
+            secondary: `${markerHelp} Open the attribute table to inspect records.`
         };
     }
 
     if (record.isLineLayer) {
         return {
-            primary: `${layerName} is selected.`,
-            secondary: 'Use the layer card to change stroke color, width, and opacity, then open the attribute table for details.'
+            primary: `Style line layer: ${layerName}.`,
+            secondary: 'Adjust stroke color, stroke width, and opacity. Open the attribute table to inspect records.'
         };
     }
 
     if (record.isPolygonLayer) {
         return {
-            primary: `${layerName} is selected.`,
-            secondary: 'Use the layer card to change fill color, border color, border width, and opacity, then open the attribute table for details.'
+            primary: `Style polygon layer: ${layerName}.`,
+            secondary: 'Adjust fill, border color, border width, and opacity. Open the attribute table to inspect records.'
         };
     }
 
     return {
         primary: `${layerName} is selected.`,
-        secondary: 'Use the layer card to change opacity, toggle visibility, and open the attribute table for details.'
+        secondary: 'Toggle visibility, adjust opacity, and open the attribute table when records are available.'
     };
 }
 
@@ -171,43 +227,43 @@ function buildDrawingHelp(drawingType) {
 function buildModalHelp(modalId) {
     if (modalId === 'uploadModal') {
         return {
-            primary: 'Add geospatial data.',
-            secondary: 'Upload a file, or switch to WMS or GP to connect a service. Give the layer a name, choose a color, then upload.'
+            primary: 'Upload Dataset.',
+            secondary: 'Choose Shapefile ZIP, GeoJSON, KML, or CSV. Confirm the layer name and color, then upload.'
         };
     }
 
     if (modalId === 'wmsModal') {
         return {
             primary: 'Connect a WMS service.',
-            secondary: 'Enter the service URL, fetch capabilities, then check the layers you want to add.'
+            secondary: 'Enter a WMS URL, fetch capabilities, then check layers to preview them on the map. Use Done when finished.'
         };
     }
 
     if (modalId === 'gpModal') {
         return {
             primary: 'Connect Geoportal layers.',
-            secondary: 'Enter a portal or map service URL, fetch layers, then select the ones you want to add.'
+            secondary: 'Fetch the catalog, then check Geoportal layers to preview them. Demo layers appear when no live service is available.'
         };
     }
 
     if (modalId === 'exportModal') {
         return {
             primary: 'Export the current map view.',
-            secondary: 'Choose PNG, JPEG, or PDF. The preview mirrors the current map before you download.'
+            secondary: 'Choose PNG, JPEG, or PDF. Check the preview, then download the visible map view.'
         };
     }
 
     if (modalId === 'shareModal') {
         return {
             primary: 'Share the current map state.',
-            secondary: 'Copy the link or generate a new one to preserve layers, view, and settings.'
+            secondary: 'Generate or copy a link for the current view, remote layers, styling, annotations, search result, and settings.'
         };
     }
 
     if (modalId === 'attributesModal') {
         return {
             primary: 'Browse layer attributes.',
-            secondary: 'Use search to filter records and inspect feature details for the selected layer.'
+            secondary: 'Search to filter rows. Attribute tables are available for uploaded vector layers only.'
         };
     }
 
@@ -217,15 +273,77 @@ function buildModalHelp(modalId) {
 function buildDefaultHelp(hasLayers) {
     if (!hasLayers) {
         return {
-            primary: 'Add a layer or connect a service to begin.',
-            secondary: 'Use Add Layer for files, WMS, or GP sources. Drag the map to pan, use zoom controls, and search for a place to jump there quickly.'
+            primary: 'Start with a dataset or service.',
+            secondary: 'Use Add Geospatial Data for uploaded datasets, WMS layers, or Geoportal layers. Search can jump the map to a place first.'
         };
     }
 
     return {
-        primary: 'Pan, zoom, or pick a tool to continue.',
-        secondary: 'Select a layer to style it, or use the drawing, measurement, and annotation tools to build your map. You can also search for a place, change the basemap, adjust Map Settings, or export when you are ready.'
+        primary: 'Select a layer or choose a tool.',
+        secondary: 'Layer cards control styling and visibility. Drawing, measurement, annotation, search, basemap, export, and share tools use the current map view.'
     };
+}
+
+function buildWorkflowHelp(context, activeLayerRecord) {
+    if (context === 'search') {
+        return {
+            primary: 'Search for a location.',
+            secondary: 'Type a place name and submit to move the map. Press Esc in the search box to clear the search.'
+        };
+    }
+
+    if (context === 'basemap') {
+        return {
+            primary: 'Switch the basemap.',
+            secondary: 'Choose a basemap that supports the layer contrast you need. Operational layers stay in place.'
+        };
+    }
+
+    if (context === 'mapSettings') {
+        return {
+            primary: 'Adjust Map Settings.',
+            secondary: 'Toggle vector labels, annotation text, the scale bar, and the north arrow for the workspace and exports.'
+        };
+    }
+
+    if (context === 'measurementTools') {
+        return {
+            primary: 'Measurement Tools.',
+            secondary: 'Choose Distance or Area, click to add vertices, and double-click to finish. Use Clear All to remove saved results.'
+        };
+    }
+
+    if (context === 'drawingTools') {
+        return {
+            primary: 'Drawing Tools.',
+            secondary: 'Choose Point, Line, Polygon, or Freehand. Finished drawings can be selected, deleted individually, or cleared all at once.'
+        };
+    }
+
+    if (context === 'annotationTools') {
+        return {
+            primary: 'Annotation Tools.',
+            secondary: 'Add text on the map, then select an annotation to edit, move, hide/show, or delete it.'
+        };
+    }
+
+    if (context === 'labels') {
+        if (!activeLayerRecord || activeLayerRecord.isWMS) {
+            return {
+                primary: 'Labels need a vector layer.',
+                secondary: 'Select an uploaded vector layer with attribute fields before turning labels on.'
+            };
+        }
+
+        return {
+            primary: 'Label the selected layer.',
+            secondary: activeLayerRecord.labelField
+                ? 'Toggle labels to show the layer attribute chosen for map labels.'
+                : 'This layer has no usable label field.'
+        };
+    }
+
+    return null;
 }
 
 function buildHelpContent() {
@@ -252,10 +370,7 @@ function buildHelpContent() {
     }
 
     if (state.selectedTool === 'annotation:labels') {
-        return {
-            primary: 'Feature labels are ready.',
-            secondary: 'Turn labels on for the selected vector layer to show key attributes on the map.'
-        };
+        return buildWorkflowHelp('labels', activeLayerRecord);
     }
 
     if (state.selectedTool?.startsWith?.('drawing:')) {
@@ -282,15 +397,20 @@ function buildHelpContent() {
         return selectedFeatureHelp;
     }
 
-    if (activeLayerName && activeLayerRecord) {
-        return buildLayerHelp(activeLayerName, activeLayerRecord);
+    const workflowHelp = buildWorkflowHelp(getOpenWorkflowContext(), activeLayerRecord);
+    if (workflowHelp) {
+        return workflowHelp;
     }
 
     if (state.currentSearchResult) {
         return {
             primary: 'Location found.',
-            secondary: 'Drag the map to pan, use the zoom controls to refine the view, or press Esc in the search box to clear the result.'
+            secondary: 'Pan or zoom from here. Press Esc in the search box or use clear to remove the marker.'
         };
+    }
+
+    if (activeLayerName && activeLayerRecord) {
+        return buildLayerHelp(activeLayerName, activeLayerRecord);
     }
 
     return buildDefaultHelp(hasLayers);
@@ -354,6 +474,11 @@ export function initializeWorkspaceStatus() {
     window.addEventListener('gpmap:modalchange', () => {
         updateSmartHelpPanel();
     });
+
+    document.addEventListener('focusin', () => updateSmartHelpPanel());
+    document.addEventListener('click', () => window.setTimeout(updateSmartHelpPanel, 0));
+    document.addEventListener('change', () => updateSmartHelpPanel());
+    document.addEventListener('input', () => updateSmartHelpPanel());
 
     mapContainer?.setAttribute('title', 'Scroll to zoom, drag to pan, and use the status bar for live map reference.');
 }

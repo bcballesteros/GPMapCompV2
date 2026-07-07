@@ -207,10 +207,10 @@ export async function submitUpload() {
         clearKmlSelection();
         clearCsvSelection();
 
-        showToast('Layer Added', `Added "${layerName}" with ${features.length} feature${features.length === 1 ? '' : 's'}.`, 'success');
+        showToast('Layer Added', `"${layerName}" was added with ${features.length} feature${features.length === 1 ? '' : 's'}.`, 'success');
     } catch (error) {
         console.error('Error processing upload:', error);
-        showToast('Upload Failed', 'The file could not be loaded. It may be unsupported or corrupted.', 'error');
+        showToast('Upload Failed', 'The file could not be loaded.', 'error');
     } finally {
         setUploadBusyState(false);
     }
@@ -420,7 +420,7 @@ function addWmsLayerToMap(wmsUrl, layerInfo) {
         addLayerItem(displayName, DEFAULT_LAYER_COLOR, 0, { isWMS: true });
     } catch (error) {
         console.error('Error previewing WMS layer:', error);
-        showToast('WMS Preview Failed', `Could not preview the WMS layer: ${error.message}`, 'error');
+        showToast('WMS Preview Failed', 'Could not preview the WMS layer.', 'error');
     }
 }
 
@@ -543,7 +543,7 @@ export async function fetchWmsCapabilitiesFromForm() {
         availableWmsLayers = [];
         renderWmsLayerChecklist([]);
         setWmsFetchFeedback('Could not fetch WMS capabilities. Check the URL, network access, or CORS settings.', 'warning');
-        showToast('WMS Fetch Failed', 'Could not fetch WMS layers. Check the URL or network access.', 'error');
+        showToast('WMS Fetch Failed', 'Could not fetch WMS layers.', 'error');
     } finally {
         if (requestId === wmsFetchRequestId) {
             setWmsFetchBusyState(false);
@@ -747,7 +747,7 @@ function updateGpLayerPickerSummary() {
 
     const selectedCount = document.querySelectorAll('#gpLayerChecklist input[type="checkbox"]:checked').length;
     summary.textContent = selectedCount > 0
-        ? `${selectedCount} GP layer${selectedCount === 1 ? '' : 's'} selected`
+        ? `${selectedCount} Geoportal layer${selectedCount === 1 ? '' : 's'} selected`
         : `${availableGpLayers.length} layers available`;
 }
 
@@ -796,8 +796,8 @@ function addGpLayerToMap(gpUrl, layerInfo) {
         });
         addLayerItem(displayName, DEFAULT_LAYER_COLOR, 0, { isWMS: true, isGP: true });
     } catch (error) {
-        console.error('Error previewing GP layer:', error);
-        showToast('GP Preview Failed', `Could not preview the GP layer: ${error.message}`, 'error');
+        console.error('Error previewing Geoportal layer:', error);
+        showToast('Geoportal Preview Failed', 'Could not preview the Geoportal layer.', 'error');
     }
 }
 

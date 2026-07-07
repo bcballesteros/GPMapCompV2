@@ -13,8 +13,8 @@ function getEmptyStateMarkup() {
         <div class="empty-state">
             <div class="empty-state-icon" aria-hidden="true"><i class="fas fa-layer-group"></i></div>
             <div class="empty-state-title">No layers in this workspace</div>
-            <div class="empty-state-text">Add a file or connect a remote service to start styling, inspecting, and exporting your map composition.</div>
-            <div class="empty-state-formats">Supported: Shapefile (.zip), KML (.kml), GeoJSON (.geojson/.json), CSV (.csv), WMS, and GP layers.</div>
+            <div class="empty-state-text">Use Add Geospatial Data to add an uploaded dataset, WMS layer, or Geoportal layer, then start styling, inspecting, and exporting your map composition.</div>
+            <div class="empty-state-formats">Supported: Shapefile (.zip), KML (.kml), GeoJSON (.geojson/.json), CSV (.csv), WMS, and Geoportal layers.</div>
         </div>
     `;
 }
@@ -238,9 +238,9 @@ function renderSvgMarkerGallery(record, layerItem) {
         const label = escapeHtml(item.name);
         const activeClass = isSvgActive && index === activeIndex ? ' active' : '';
         return `
-            <button type="button" class="svg-marker-thumbnail${activeClass}" data-svg-index="${index}" title="Select ${label}" aria-label="Select ${label}">
+            <button type="button" class="svg-marker-thumbnail${activeClass}" data-svg-index="${index}" title="Select SVG" aria-label="Select ${label}">
                 <img src="${item.dataUrl}" alt="${label}" />
-                <span class="svg-marker-delete" role="button" aria-label="Delete ${label}" title="Delete ${label}">×</span>
+                <span class="svg-marker-delete" role="button" aria-label="Delete ${label}" title="Delete SVG">×</span>
             </button>
         `;
     }).join('');
@@ -431,7 +431,7 @@ export function addLayerItem(name, color, featureCount, options = {}) {
     const polygonStrokeColor = record?.polygonStrokeColor || color;
     const polygonStrokeWidthValue = Math.round(record?.polygonStrokeWidth ?? DEFAULT_LINE_STROKE_WIDTH);
     const statsText = isWms
-        ? `${isGp ? 'GP Layer' : 'WMS Layer'} • Remote`
+        ? `${isGp ? 'Geoportal Layer' : 'WMS Layer'} • Remote`
         : `${featureCount} features • ${getState().uploadedLayers[name]?.geometryType || 'Mixed'}`;
 
     // Build controls strictly by geometry type. WMS only gets opacity.
@@ -466,8 +466,8 @@ export function addLayerItem(name, color, featureCount, options = {}) {
                         max="18"
                         step="1"
                         value="${pointSizeValue}"
-                        title="Adjust point size"
-                        aria-label="Adjust point size"
+                        title="Point size"
+                        aria-label="Point size"
                     >
                 </div>
             </div>
@@ -489,7 +489,7 @@ export function addLayerItem(name, color, featureCount, options = {}) {
                         </select>
 
                         <div class="marker-type-dropdown" data-selected="${markerPresetType || (svgMarkerDataUrl ? 'custom' : 'circle')}">
-                            <button type="button" class="marker-type-current" aria-haspopup="listbox" aria-expanded="false" title="Choose marker type" aria-label="Choose marker type">
+                            <button type="button" class="marker-type-current" aria-haspopup="listbox" aria-expanded="false" title="Marker type" aria-label="Marker type">
                                 <!-- current icon preview inserted by JS on init; fallback: simple circle -->
                                 <span class="marker-type-icon marker-type-icon-circle" aria-hidden="true"></span>
                                 <i class="fas fa-caret-down" style="margin-left:8px;color:var(--gray-400);"></i>
@@ -544,8 +544,8 @@ export function addLayerItem(name, color, featureCount, options = {}) {
                                     max="4"
                                     step="1"
                                     value="${markerStrokeWidth}"
-                                    title="Adjust marker stroke width"
-                                    aria-label="Adjust marker stroke width"
+                                    title="Stroke width"
+                                    aria-label="Stroke width"
                                 >
                             </div>
                         </div>
@@ -577,8 +577,8 @@ export function addLayerItem(name, color, featureCount, options = {}) {
                         max="12"
                         step="1"
                         value="${lineStrokeWidthValue}"
-                        title="Adjust line stroke width"
-                        aria-label="Adjust line stroke width"
+                        title="Line width"
+                        aria-label="Line width"
                     >
                 </div>
             </div>
@@ -611,8 +611,8 @@ export function addLayerItem(name, color, featureCount, options = {}) {
                         max="12"
                         step="1"
                         value="${polygonStrokeWidthValue}"
-                        title="Adjust polygon border width"
-                        aria-label="Adjust polygon border width"
+                        title="Border width"
+                        aria-label="Border width"
                     >
                 </div>
             </div>
@@ -628,14 +628,14 @@ export function addLayerItem(name, color, featureCount, options = {}) {
     const layerHTML = `
         <div class="layer-item collapsed" data-layer-name="${safeName}">
             <div class="layer-item-header" role="button" tabindex="0">
-                        <input type="checkbox" class="layer-toggle" ${isVisible ? 'checked' : ''} title="Show or hide layer">
+                        <input type="checkbox" class="layer-toggle" ${isVisible ? 'checked' : ''} title="Toggle layer visibility">
                 <div class="layer-info-short">
                     <div class="layer-name-wrap" data-tooltip="${safeName}">
                         <div class="layer-name" tabindex="0" aria-label="Layer name: ${safeName}">${safeName}</div>
                     </div>
                     <div class="layer-stats">${statsText}</div>
                 </div>
-                <button type="button" class="layer-expand-btn" aria-expanded="false" title="Show layer controls"><i class="fas fa-chevron-down" aria-hidden="true"></i></button>
+                <button type="button" class="layer-expand-btn" aria-expanded="false" title="Layer controls"><i class="fas fa-chevron-down" aria-hidden="true"></i></button>
             </div>
             <div class="layer-controls-wrapper">
                 <div class="layer-controls">
@@ -655,8 +655,8 @@ export function addLayerItem(name, color, featureCount, options = {}) {
                                 min="0"
                                 max="100"
                                 value="${opacityValue}"
-                                title="Adjust ${opacityLabel.toLowerCase()}"
-                                aria-label="Adjust ${opacityLabel.toLowerCase()}"
+                                title="${opacityLabel}"
+                                aria-label="${opacityLabel}"
                             >
                         </div>
                     </div>
@@ -1203,8 +1203,8 @@ function updateMarkerStrokeEnabled(checkbox, layerName, layerItem) {
                                 max="4"
                                 step="1"
                                 value="${record.markerStrokeWidth}"
-                                title="Adjust marker stroke width"
-                                aria-label="Adjust marker stroke width"
+                                title="Stroke width"
+                                aria-label="Stroke width"
                             >
                         </div>
                     </div>
@@ -1292,7 +1292,7 @@ function handleSvgMarkerUpload(event, layerName) {
 
     const validFiles = files.filter((file) => file.type === 'image/svg+xml' || file.name.toLowerCase().endsWith('.svg'));
     if (validFiles.length === 0) {
-        showToast('SVG Upload Failed', 'Only SVG marker files are accepted.', 'error');
+        showToast('SVG Upload Failed', 'Only SVG files are supported.', 'error');
         event.target.value = '';
         return;
     }
