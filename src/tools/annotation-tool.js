@@ -37,7 +37,7 @@ let measureSelectionClickHandler = null;
 let measureSketchFeature = null;
 let measureSketchListenerKey = null;
 let measureContextMenuHandler = null;
-let measurementEscapeKeyHandler = null;
+let interactiveEscapeKeyHandler = null;
 let selectedMeasurement = null;
 let hoveredMeasurement = null;
 let hasLatestMeasurementResult = false;
@@ -239,13 +239,10 @@ function detachDrawingContextMenuCancel() {
     drawingContextMenuHandler = null;
 }
 
-function cancelActiveDrawingByContextMenu(event) {
+function cancelActiveDrawingOperation() {
     if (!drawingInteraction || !selectedDrawingMode) {
-        return;
+        return false;
     }
-
-    event.preventDefault();
-    event.stopPropagation();
 
     if (typeof drawingInteraction.abortDrawing === 'function') {
         drawingInteraction.abortDrawing();
@@ -254,7 +251,18 @@ function cancelActiveDrawingByContextMenu(event) {
     deactivateDrawingMode();
     setSelectedTool(null);
     setAnnotationMode(null);
-    showToast('Drawing Canceled', 'Drawing canceled. Select a drawing tool to start again.', 'info', 1700);
+    showToast('Drawing Canceled', 'The drawing was canceled. Select a drawing tool to start again.', 'info', 1700);
+    return true;
+}
+
+function cancelActiveDrawingByContextMenu(event) {
+    if (!drawingInteraction || !selectedDrawingMode) {
+        return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    cancelActiveDrawingOperation();
 }
 
 function attachDrawingContextMenuCancel() {
@@ -795,10 +803,10 @@ function getMeasurementValues(featureOrGeometry) {
 function formatMeasurementSummary(featureOrGeometry) {
     const values = getMeasurementValues(featureOrGeometry);
     if (values.type === MEASUREMENT_TYPE_AREA) {
-        return `Area ${formatMeasuredArea(values.areaSquareMeters)} | Perimeter ${formatMeasuredDistance(values.perimeterMeters)}`;
+        return `Area: ${formatMeasuredArea(values.areaSquareMeters)}, Perimeter: ${formatMeasuredDistance(values.perimeterMeters)}`;
     }
 
-    return `Distance ${formatMeasuredDistance(values.lengthMeters)}`;
+    return `Distance: ${formatMeasuredDistance(values.lengthMeters)}`;
 }
 
 function formatCoordinateForDisplay(value) {
@@ -813,7 +821,7 @@ function formatPointSummary(pointGeometry) {
     }
 
     const [longitude, latitude] = ol.proj.toLonLat(coordinates, projection);
-    return `Point | Lat ${formatCoordinateForDisplay(latitude)} | Lon ${formatCoordinateForDisplay(longitude)}`;
+    return `Point: lat ${formatCoordinateForDisplay(latitude)}, lon ${formatCoordinateForDisplay(longitude)}`;
 }
 
 function formatDrawingSummary(feature) {
@@ -827,11 +835,11 @@ function formatDrawingSummary(feature) {
     if (geometry instanceof ol.geom.Polygon) {
         const areaSquareMeters = getGeodesicAreaSquareMeters(geometry);
         const perimeterMeters = getPolygonPerimeterMeters(geometry);
-        return `${label} | Area ${formatMeasuredArea(areaSquareMeters)} | Perimeter ${formatMeasuredDistance(perimeterMeters)}`;
+        return `${label}: Area ${formatMeasuredArea(areaSquareMeters)}, Perimeter ${formatMeasuredDistance(perimeterMeters)}`;
     }
 
     if (geometry instanceof ol.geom.LineString) {
-        return `${label} | Length ${formatMeasuredDistance(getGeodesicLengthMeters(geometry))}`;
+        return `${label}: Length ${formatMeasuredDistance(getGeodesicLengthMeters(geometry))}`;
     }
 
     return label;
@@ -1085,7 +1093,6 @@ function bindDrawingSelection() {
 
             if (hitDrawing) {
                 setSelectedFeature(hitDrawing);
-                showToast('Drawing Selected', 'Use Delete Selected Drawing to remove only this drawing.', 'info', 1500);
             } else if (getState().selectedFeature === previousDrawing) {
                 setSelectedFeature(null);
             }
@@ -1111,26 +1118,22 @@ function bindDrawingSelection() {
     }
 }
 
-function bindMeasurementEscapeKey() {
-    if (measurementEscapeKeyHandler) {
+function bindInteractiveEscapeKey() {
+    if (interactiveEscapeKeyHandler) {
         return;
     }
 
-    measurementEscapeKeyHandler = (event) => {
+    interactiveEscapeKeyHandler = (event) => {
         if (event.key !== 'Escape') {
             return;
         }
 
-        if (measureInteraction) {
-            if (typeof measureInteraction.abortDrawing === 'function') {
-                measureInteraction.abortDrawing();
-            }
-            clearMeasureSketchWatcher();
-            measureSketchFeature = null;
-            deactivateMeasurementMode();
-            setSelectedTool(null);
-            setAnnotationMode(null);
-            showToast('Measurement Canceled', 'Measurement canceled. Select a measurement tool to start again.', 'info', 1700);
+        if (cancelActiveDrawingOperation()
+            || cancelActiveMeasurementOperation()
+            || cancelActiveAnnotationOperation()
+            || cancelActiveAnnotationMove()) {
+            event.preventDefault();
+            event.stopPropagation();
             return;
         }
 
@@ -1141,7 +1144,7 @@ function bindMeasurementEscapeKey() {
         }
     };
 
-    window.addEventListener('keydown', measurementEscapeKeyHandler);
+    window.addEventListener('keydown', interactiveEscapeKeyHandler);
 }
 
 function setMeasureButtonsActive(activeType = null) {
@@ -1231,13 +1234,10 @@ function detachMeasurementContextMenuCancel() {
     measureContextMenuHandler = null;
 }
 
-function cancelActiveMeasurementByContextMenu(event) {
+function cancelActiveMeasurementOperation() {
     if (!measureInteraction || !getState().selectedTool?.startsWith?.('measurement:')) {
-        return;
+        return false;
     }
-
-    event.preventDefault();
-    event.stopPropagation();
 
     if (typeof measureInteraction.abortDrawing === 'function') {
         measureInteraction.abortDrawing();
@@ -1248,7 +1248,18 @@ function cancelActiveMeasurementByContextMenu(event) {
     deactivateMeasurementMode();
     setSelectedTool(null);
     setAnnotationMode(null);
-    showToast('Measurement Canceled', 'Measurement canceled. Select a measurement tool to start again.', 'info', 1700);
+    showToast('Measurement Canceled', 'The measurement was canceled. Select a measurement tool to start again.', 'info', 1700);
+    return true;
+}
+
+function cancelActiveMeasurementByContextMenu(event) {
+    if (!measureInteraction || !getState().selectedTool?.startsWith?.('measurement:')) {
+        return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    cancelActiveMeasurementOperation();
 }
 
 function attachMeasurementContextMenuCancel() {
@@ -1406,6 +1417,12 @@ function setMoveMode(enabled) {
 
     updateAnnotationCursor();
     updateAnnotationControls();
+
+    if (annotationMoveMode) {
+        attachAnnotationContextMenuCancel();
+    } else if (!isTextAnnotationPlacementActive()) {
+        detachAnnotationContextMenuCancel();
+    }
 }
 
 export function initializeAnnotationInteractions() {
@@ -1469,14 +1486,7 @@ function detachAnnotationContextMenuCancel() {
     annotationContextMenuHandler = null;
 }
 
-function cancelActiveAnnotationPlacementByContextMenu(event) {
-    if (!annotationMode || selectedAnnotationMode !== 'text') {
-        return;
-    }
-
-    event.preventDefault();
-    event.stopPropagation();
-
+function clearAnnotationPlacementPopup() {
     const popup = document.getElementById('annotationPopup');
     if (popup) {
         popup.classList.remove('active');
@@ -1488,10 +1498,38 @@ function cancelActiveAnnotationPlacementByContextMenu(event) {
         delete input.dataset.x;
         delete input.dataset.y;
     }
+}
 
+function cancelActiveAnnotationOperation() {
+    if (!annotationMode || selectedAnnotationMode !== 'text') {
+        return false;
+    }
+
+    clearAnnotationPlacementPopup();
     resetAnnotationPlacement();
     updateAnnotationControls();
-    showToast('Annotation Canceled', 'Text annotation placement canceled. Click Add Text Annotation to start again.', 'info', 1700);
+    showToast('Annotation Canceled', 'Text annotation placement was canceled. Click Add Text Annotation to start again.', 'info', 1700);
+    return true;
+}
+
+function cancelActiveAnnotationMove() {
+    if (!annotationMoveMode) {
+        return false;
+    }
+
+    setMoveMode(false);
+    showToast('Annotation Move Canceled', 'Annotation move mode was turned off.', 'info', 1500);
+    return true;
+}
+
+function cancelActiveAnnotationByContextMenu(event) {
+    if (!annotationMode && !annotationMoveMode) {
+        return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    cancelActiveAnnotationOperation() || cancelActiveAnnotationMove();
 }
 
 function attachAnnotationContextMenuCancel() {
@@ -1501,7 +1539,7 @@ function attachAnnotationContextMenuCancel() {
     }
 
     annotationContextMenuHandler = (event) => {
-        cancelActiveAnnotationPlacementByContextMenu(event);
+        cancelActiveAnnotationByContextMenu(event);
     };
     viewport.addEventListener('contextmenu', annotationContextMenuHandler);
 }
@@ -1523,8 +1561,6 @@ export function activateAnnotation(type) {
         setTextAnnotationButtonActive(true);
         updateAnnotationCursor();
         attachAnnotationContextMenuCancel();
-        showToast('Text Annotation', 'Click on the map to place a text annotation', 'info');
-
         const placementClickListener = (event) => {
             if (annotationClickListener !== placementClickListener || !isTextAnnotationPlacementActive()) {
                 return;
@@ -1584,7 +1620,7 @@ export function activateDrawing(type) {
         deactivateDrawingMode();
         setSelectedTool(null);
         setAnnotationMode(null);
-        showToast('Drawing Disabled', `${config.label} drawing mode turned off.`, 'info', 1500);
+        showToast('Drawing Disabled', `${config.label} drawing mode was turned off.`, 'info', 1500);
         return;
     }
 
@@ -1595,7 +1631,7 @@ export function activateDrawing(type) {
 
     const drawingLayer = ensureDrawingLayer();
     if (!drawingLayer?.source) {
-        showToast('Drawing Unavailable', 'Unable to start drawing because the drawing layer is not ready.', 'error', 2200);
+        showToast('Drawing Unavailable', 'The drawing layer is not ready yet.', 'error', 2200);
         return;
     }
     drawingInteraction = new ol.interaction.Draw({
@@ -1634,11 +1670,11 @@ export function activateDrawing(type) {
     });
 
     const drawMessage = config.freehand
-        ? 'Drag to sketch a freehand line. Release pointer to finish each stroke.'
+        ? 'Drag on the map to sketch a freehand line. Release the pointer to finish each stroke.'
         : config.drawType === 'Point'
             ? 'Click on the map to place a point.'
             : 'Click to place vertices, then double-click to finish.';
-    showToast(`${config.label} Drawing`, drawMessage, 'info', 2200);
+    showToast(`${config.label} Drawing Ready`, drawMessage, 'info', 2200);
 }
 
 function getDrawingLabel(feature) {
@@ -1706,7 +1742,7 @@ export function updateDrawingControls() {
 export function deleteSelectedDrawing() {
     const drawingLayer = getLayerRecord(DRAWING_LAYER_ID);
     if (!drawingLayer?.source || !selectedDrawing) {
-        showToast('No Drawing Selected', 'Click one drawing on the map before using Delete Selected Drawing.', 'info', 1700);
+        showToast('No Drawing Selected', 'Select a drawing on the map before using Delete Selected Drawing.', 'info', 1700);
         return;
     }
 
@@ -1722,13 +1758,13 @@ export function deleteSelectedDrawing() {
     drawingLayer.layer.changed();
     updateDrawingControls();
     syncMapCursor();
-    showToast('Drawing Deleted', `${deletedLabel} drawing removed. Other drawings were kept.`, 'success', 1700);
+    showToast('Drawing Deleted', `${deletedLabel} drawing was removed. Other drawings were kept.`, 'success', 1700);
 }
 
 export function clearDrawings() {
     const drawingLayer = getLayerRecord(DRAWING_LAYER_ID);
     if (!drawingLayer?.source) {
-        showToast('No Drawings', 'There are no drawing features to clear.', 'info', 1500);
+        showToast('No Drawings', 'There are no drawings to clear.', 'info', 1500);
         return;
     }
 
@@ -1743,7 +1779,7 @@ export function clearDrawings() {
     drawingLayer.layer.changed();
     updateDrawingControls();
     syncMapCursor();
-    showToast('Drawings Cleared', 'All point, line, polygon, and freehand drawings were removed.', 'success', 1700);
+    showToast('Drawings Cleared', 'All drawings were removed.', 'success', 1700);
 }
 
 function activateMeasurementTool(type) {
@@ -1758,7 +1794,7 @@ function activateMeasurementTool(type) {
         setSelectedTool(null);
         const wasSameTool = activeTool === `measurement:${type}`;
         if (wasSameTool) {
-            showToast('Measurement Disabled', `${type === MEASUREMENT_TYPE_AREA ? 'Area' : 'Distance'} measurement mode turned off.`, 'info', 1500);
+            showToast('Measurement Disabled', `${type === MEASUREMENT_TYPE_AREA ? 'Area' : 'Distance'} measurement mode was turned off.`, 'info', 1500);
             return;
         }
     }
@@ -1773,7 +1809,7 @@ function activateMeasurementTool(type) {
 
     const layer = ensureMeasureLayer();
     if (!layer?.getSource()) {
-        showToast('Measurement Unavailable', 'Unable to start measurement because the measure layer is not ready.', 'error', 2200);
+        showToast('Measurement Unavailable', 'The measurement layer is not ready yet.', 'error', 2200);
         return;
     }
 
@@ -1823,8 +1859,8 @@ function activateMeasurementTool(type) {
         showToast(
             'Measurement Complete',
             type === MEASUREMENT_TYPE_AREA
-                ? 'Area captured. Click Measure Area again to start a new polygon.'
-                : 'Distance captured. Click Measure Distance again to start a new line.',
+                ? 'Area recorded. Click Measure Area again to start a new polygon.'
+                : 'Distance recorded. Click Measure Distance again to start a new line.',
             'success',
             1800
         );
@@ -1837,10 +1873,10 @@ function activateMeasurementTool(type) {
     setMeasureButtonsActive(type);
 
     showToast(
-        type === MEASUREMENT_TYPE_AREA ? 'Measure Area' : 'Measure Distance',
+        type === MEASUREMENT_TYPE_AREA ? 'Area Measurement Ready' : 'Distance Measurement Ready',
         type === MEASUREMENT_TYPE_AREA
-            ? 'Click to start, add polygon vertices, and double-click to finish an area.'
-            : 'Click to start, click to add vertices, and double-click to finish a line.',
+            ? 'Click on the map to start an area measurement. Add vertices, then double-click to finish.'
+            : 'Click on the map to start a distance measurement. Click to add vertices, then double-click to finish.',
         'info',
         2300
     );
@@ -1869,12 +1905,12 @@ export function clearMeasurements() {
     }
     updateMeasurementCursor();
     updateMeasurementResultPanel(Number.NaN);
-    showToast('Measurements Cleared', 'All distance and area measurements were removed.', 'success', 1600);
+    showToast('Measurements Cleared', 'All measurements were removed.', 'success', 1600);
 }
 
 export function deleteSelectedMeasurement() {
     if (!measureLayer?.getSource() || !selectedMeasurement) {
-        showToast('No Measurement Selected', 'Click a distance or area measurement before using Delete Selected Measurement.', 'info', 1700);
+        showToast('No Measurement Selected', 'Select a distance or area measurement before using Delete Selected Measurement.', 'info', 1700);
         return;
     }
 
@@ -1888,7 +1924,7 @@ export function deleteSelectedMeasurement() {
     }
     updateMeasurementCursor();
     updateMeasurementResultPanel(Number.NaN);
-    showToast('Measurement Deleted', `${measurementType} measurement removed. Other measurements were kept.`, 'success', 1700);
+    showToast('Measurement Deleted', `${measurementType} measurement was removed. Other measurements were kept.`, 'success', 1700);
 }
 
 export function isMeasurementActive() {
@@ -1909,7 +1945,7 @@ export function submitAnnotation() {
     const annotationsVisible = document.getElementById('annotationsToggle')?.checked !== false;
 
     if (!text) {
-        showToast('Annotation Required', 'Please enter some text', 'warning');
+        showToast('Annotation Required', 'Enter some text for the annotation.', 'warning');
         return;
     }
 
@@ -1935,12 +1971,7 @@ export function submitAnnotation() {
 }
 
 export function cancelAnnotation() {
-    document.getElementById('annotationPopup').classList.remove('active');
-
-    const input = document.getElementById('annotationInput');
-    input.value = '';
-    delete input.dataset.x;
-    delete input.dataset.y;
+    clearAnnotationPlacementPopup();
 
     resetAnnotationPlacement();
     updateAnnotationControls();
@@ -2013,7 +2044,7 @@ export function editAnnotation(feature) {
         const newFontColor = document.getElementById('editAnnotationFontColor').value;
 
         if (!newText) {
-            showToast('Error', 'Text cannot be empty', 'error');
+            showToast('Annotation Required', 'Enter some text for the annotation.', 'warning');
             return;
         }
 
@@ -2280,7 +2311,7 @@ export function initializeMeasurementControls() {
     createMeasureHoverTooltip();
     bindMeasurementHover();
     bindMeasurementSelection();
-    bindMeasurementEscapeKey();
+    bindInteractiveEscapeKey();
 
     const deleteBtn = document.getElementById('deleteSelectedMeasurementBtn');
     if (deleteBtn) {

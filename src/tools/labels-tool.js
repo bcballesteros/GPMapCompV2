@@ -18,18 +18,18 @@ function getLabelTargetLayerName() {
 export function toggleSelectedLayerLabels() {
     const layerName = getLabelTargetLayerName();
     if (!layerName) {
-        showToast('No Layer', 'Select a vector layer first to show labels', 'warning', 2000);
+        showToast('No Layer Selected', 'Select a vector layer first.', 'warning', 2000);
         return;
     }
 
     const record = getLayerRecord(layerName);
     if (!record || record.isWMS) {
-        showToast('Labels Unavailable', 'Labels are only available for uploaded vector layers', 'warning', 2200);
+        showToast('Labels Unavailable', 'Labels are only available for uploaded vector layers.', 'warning', 2200);
         return;
     }
 
     if (!record.labelField) {
-        showToast('No Label Field', 'This layer has no usable attribute field for labels', 'warning', 2200);
+        showToast('No Label Field', 'This layer does not have a usable label field.', 'warning', 2200);
         return;
     }
 

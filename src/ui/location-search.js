@@ -183,7 +183,7 @@ async function handleLocationSearch(event) {
 
         if (!bestResult) {
             clearSearchMarker();
-            showToast('No Results', `No location found for "${query}"`, 'warning', 2200);
+            showToast('No Locations Found', `No location was found for "${query}".`, 'warning', 2200);
             return;
         }
 
@@ -201,7 +201,7 @@ async function handleLocationSearch(event) {
         }
 
         clearSearchMarker();
-        showToast('Search Error', 'Unable to reach the location search service', 'error', 2600);
+        showToast('Search Unavailable', 'The location search service could not be reached.', 'error', 2600);
     } finally {
         if (activeSearchController === controller) {
             activeSearchController = null;

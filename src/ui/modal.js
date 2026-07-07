@@ -15,6 +15,9 @@ export function openModal(modalId, { onOpen } = {}) {
     }
 
     modal.classList.add('active');
+    window.dispatchEvent(new CustomEvent('gpmap:modalchange', {
+        detail: { modalId, isOpen: true }
+    }));
 
     requestAnimationFrame(() => {
         modal.classList.add('visible');
@@ -36,6 +39,9 @@ export function closeModal(modalId) {
     window.setTimeout(() => {
         if (!modal.classList.contains('visible')) {
             modal.classList.remove('active');
+            window.dispatchEvent(new CustomEvent('gpmap:modalchange', {
+                detail: { modalId, isOpen: false }
+            }));
         }
     }, MODAL_CLOSE_DURATION_MS);
 }

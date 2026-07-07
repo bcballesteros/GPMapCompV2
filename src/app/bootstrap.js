@@ -123,7 +123,7 @@ export function bootstrapApp() {
         runOptionalStartupStep('shared state restore', () => restoreSharedStateFromUrl());
     } catch (error) {
         console.error('[startup] critical bootstrap failure', error);
-        showToast('Startup Warning', 'Some tools failed during startup. The app loaded with reduced functionality.', 'warning', 3500);
+        showToast('Startup Issue', 'Some tools failed during startup, so a few features may be unavailable.', 'warning', 3500);
     } finally {
         revealAppShell();
     }

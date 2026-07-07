@@ -176,7 +176,7 @@ export function updateDataSection() {
 export async function submitUpload() {
     const currentLayerData = getCurrentLayerData();
     if (!currentLayerData) {
-        showToast('Error', 'Please select a file', 'error');
+        showToast('No File Selected', 'Select a file before uploading.', 'warning');
         return;
     }
 
@@ -188,7 +188,7 @@ export async function submitUpload() {
     try {
         const { geojson, features, sourceCrs, sourceCrsDetected } = await parseUploadFile(currentLayerData);
         if (features.length === 0) {
-            showToast('Error', 'No valid features found in file', 'error');
+            showToast('No Features Found', 'The selected file did not contain any usable features.', 'warning');
             return;
         }
 
@@ -207,10 +207,10 @@ export async function submitUpload() {
         clearKmlSelection();
         clearCsvSelection();
 
-        showToast('Success', `Layer "${layerName}" added with ${features.length} features`, 'success');
+        showToast('Layer Added', `Added "${layerName}" with ${features.length} feature${features.length === 1 ? '' : 's'}.`, 'success');
     } catch (error) {
         console.error('Error processing upload:', error);
-        showToast('Error', 'Failed to load file. Unsupported or corrupted format.', 'error');
+        showToast('Upload Failed', 'The file could not be loaded. It may be unsupported or corrupted.', 'error');
     } finally {
         setUploadBusyState(false);
     }
@@ -420,7 +420,7 @@ function addWmsLayerToMap(wmsUrl, layerInfo) {
         addLayerItem(displayName, DEFAULT_LAYER_COLOR, 0, { isWMS: true });
     } catch (error) {
         console.error('Error previewing WMS layer:', error);
-        showToast('Error', `Failed to preview WMS layer: ${error.message}`, 'error');
+        showToast('WMS Preview Failed', `Could not preview the WMS layer: ${error.message}`, 'error');
     }
 }
 
@@ -529,7 +529,7 @@ export async function fetchWmsCapabilitiesFromForm() {
         setWmsLayerChecklistOpen(true);
 
         if (layers.length === 0) {
-            setWmsFetchFeedback('No named WMS layers found in the capabilities response.', 'warning');
+            setWmsFetchFeedback('No named WMS layers were found in the capabilities response.', 'warning');
             return;
         }
 
@@ -543,7 +543,7 @@ export async function fetchWmsCapabilitiesFromForm() {
         availableWmsLayers = [];
         renderWmsLayerChecklist([]);
         setWmsFetchFeedback('Could not fetch WMS capabilities. Check the URL, network access, or CORS settings.', 'warning');
-        showToast('Error', 'Failed to fetch WMS layers. Check URL or network.', 'error');
+        showToast('WMS Fetch Failed', 'Could not fetch WMS layers. Check the URL or network access.', 'error');
     } finally {
         if (requestId === wmsFetchRequestId) {
             setWmsFetchBusyState(false);
@@ -797,7 +797,7 @@ function addGpLayerToMap(gpUrl, layerInfo) {
         addLayerItem(displayName, DEFAULT_LAYER_COLOR, 0, { isWMS: true, isGP: true });
     } catch (error) {
         console.error('Error previewing GP layer:', error);
-        showToast('Error', `Failed to preview GP layer: ${error.message}`, 'error');
+        showToast('GP Preview Failed', `Could not preview the GP layer: ${error.message}`, 'error');
     }
 }
 
@@ -892,9 +892,6 @@ export async function fetchGpLayersFromForm() {
         }
 
         setGpFetchFeedback(result.message, result.isDemo ? 'warning' : 'success');
-        if (result.isDemo) {
-            showToast('Error', 'Failed to fetch Geoportal layers.', 'error');
-        }
     } finally {
         if (requestId === gpFetchRequestId) {
             setGpFetchBusyState(false);

@@ -185,10 +185,10 @@
                         autocomplete="off"
                         spellcheck="false"
                     >
-                    <button type="button" id="locationSearchClear" class="location-search-clear" aria-label="Clear location search" hidden>
+                    <button type="button" id="locationSearchClear" class="location-search-clear" aria-label="Clear location search" title="Clear search" hidden>
                         <i class="fas fa-times"></i>
                     </button>
-                    <button type="submit" class="location-search-submit" aria-label="Search location">
+                    <button type="submit" class="location-search-submit" aria-label="Search location" title="Search">
                         <i class="fas fa-search"></i>
                     </button>
                 </div>
@@ -209,8 +209,8 @@
                 </select>
             </div>
             <div class="nav-actions">
-                <button class="btn btn-share" onclick="openModal('shareModal')" aria-label="Share current map" title="Share current map"><i class="fas fa-share-alt"></i> <span>Share</span></button>
-                <button class="btn btn-export btn-primary" onclick="openModal('exportModal')" aria-label="Export current map" title="Export current map"><i class="fas fa-download"></i> <span>Export</span></button>
+                <button class="btn btn-share" onclick="openModal('shareModal')" aria-label="Share current map" title="Open share dialog"><i class="fas fa-share-alt"></i> <span>Share</span></button>
+                <button class="btn btn-export btn-primary" onclick="openModal('exportModal')" aria-label="Export current map" title="Open export dialog"><i class="fas fa-download"></i> <span>Export</span></button>
             </div>
         </div>
     </nav>
@@ -221,7 +221,7 @@
         <aside class="sidebar-left">
             <div class="sidebar-header">
                 <div class="sidebar-title"><i class="fas fa-layer-group"></i> Layers</div>
-                <button class="btn-upload" onclick="openModal('uploadModal')"><i class="fas fa-plus"></i> Add Layer</button>
+                <button class="btn-upload" onclick="openModal('uploadModal')" title="Add a new layer"><i class="fas fa-plus"></i> Add Layer</button>
             </div>
             <div class="sidebar-content">
                 <div id="layerList" class="layer-list">
@@ -242,16 +242,16 @@
             <!-- Zoom Controls -->
             <div class="map-control-stack" aria-label="Map controls">
                 <div class="map-control-cluster">
-                    <div class="north-arrow" title="Compass - North orientation" aria-label="North orientation indicator">
+                    <div class="north-arrow" title="North orientation" aria-label="North orientation indicator">
                         <svg width="32" height="32" viewBox="0 0 24 24" aria-hidden="true">
                             <path d="M12 2 L16 10 L12 8 L8 10 Z" fill="#2563eb"/>
                             <text x="12" y="22" text-anchor="middle" font-size="9" fill="#2563eb" font-weight="700">N</text>
                         </svg>
                     </div>
                     <div class="zoom-controls">
-                        <button class="zoom-btn" id="zoomIn" title="Zoom In" aria-label="Zoom in to map"><i class="fas fa-plus" aria-hidden="true"></i></button>
-                        <button class="zoom-btn" id="zoomOut" title="Zoom Out" aria-label="Zoom out from map"><i class="fas fa-minus" aria-hidden="true"></i></button>
-                        <button class="zoom-btn zoom-btn-reset" id="resetView" title="Reset View" aria-label="Reset map to default Philippines view"><i class="fas fa-location-crosshairs" aria-hidden="true"></i></button>
+                        <button class="zoom-btn" id="zoomIn" title="Zoom in" aria-label="Zoom in to map"><i class="fas fa-plus" aria-hidden="true"></i></button>
+                        <button class="zoom-btn" id="zoomOut" title="Zoom out" aria-label="Zoom out from map"><i class="fas fa-minus" aria-hidden="true"></i></button>
+                        <button class="zoom-btn zoom-btn-reset" id="resetView" title="Reset map view" aria-label="Reset map to default Philippines view"><i class="fas fa-location-crosshairs" aria-hidden="true"></i></button>
                     </div>
                 </div>
             </div>
@@ -292,11 +292,11 @@
                         <strong data-badge-type="text">Text</strong>
                     </div>
                     <div class="annotation-controls-actions">
-                    <button id="editAnnotationBtn" class="tool-btn tool-btn-solid tool-btn-accent" disabled title="Edit the selected annotation text and style"><i class="fas fa-edit"></i> Edit</button>
-                    <button id="deleteAnnotationBtn" class="tool-btn tool-btn-solid tool-btn-danger" disabled title="Delete the selected annotation from the map"><i class="fas fa-trash"></i> Delete</button>
-                    <button id="moveAnnotationBtn" class="tool-btn tool-btn-solid tool-btn-muted" disabled title="Drag the selected annotation to a new location"><i class="fas fa-arrows-alt"></i> Move</button>
+                    <button id="editAnnotationBtn" class="tool-btn tool-btn-solid tool-btn-accent" disabled title="Edit the selected annotation"><i class="fas fa-edit"></i> Edit</button>
+                    <button id="deleteAnnotationBtn" class="tool-btn tool-btn-solid tool-btn-danger" disabled title="Delete the selected annotation"><i class="fas fa-trash"></i> Delete</button>
+                    <button id="moveAnnotationBtn" class="tool-btn tool-btn-solid tool-btn-muted" disabled title="Move the selected annotation"><i class="fas fa-arrows-alt"></i> Move</button>
                     <button id="toggleAnnotationVisibilityBtn" class="tool-btn tool-btn-solid tool-btn-muted" disabled title="Hide or show the selected annotation text" aria-pressed="false" data-state="visible"><i class="fas fa-eye-slash"></i> Hide</button>
-                    <button id="clearAnnotationsBtn" class="tool-btn context-clear-btn clear-annotations-btn" disabled title="Remove all text annotations from the map"><i class="fas fa-eraser"></i> Clear All Annotations</button>
+                    <button id="clearAnnotationsBtn" class="tool-btn context-clear-btn clear-annotations-btn" disabled title="Clear all annotations"><i class="fas fa-eraser"></i> Clear All Annotations</button>
                     </div>
                     <div class="annotation-controls-hint">Select an annotation on the map to edit its text, move its position, or remove it.</div>
                 </div>
@@ -311,10 +311,10 @@
                     </div>
                     <div class="drawing-selection-hint context-controls-hint">Click a drawing on the map to select it for individual deletion.</div>
                     <div class="context-controls-actions">
-                        <button id="deleteSelectedDrawingBtn" class="tool-btn delete-selected-drawing-btn" disabled title="Delete only the selected drawing">
+                        <button id="deleteSelectedDrawingBtn" class="tool-btn delete-selected-drawing-btn" disabled title="Delete the selected drawing">
                             <span><i class="fas fa-trash"></i> Delete Selected</span>
                         </button>
-                        <button class="tool-btn clear-drawings-btn context-clear-btn" onclick="clearDrawings()" title="Remove all drawing geometries">
+                        <button class="tool-btn clear-drawings-btn context-clear-btn" onclick="clearDrawings()" title="Clear all drawings">
                             <span><i class="fas fa-eraser"></i> Clear All Drawings</span>
                         </button>
                     </div>
@@ -361,10 +361,10 @@
                         </div>
                         <div class="measurement-selection-hint context-controls-hint">Click a measurement on the map to select it for individual deletion.</div>
                         <div class="context-controls-actions">
-                            <button id="deleteSelectedMeasurementBtn" class="tool-btn delete-selected-measurement-btn" disabled title="Delete only the selected measurement">
+                            <button id="deleteSelectedMeasurementBtn" class="tool-btn delete-selected-measurement-btn" disabled title="Delete the selected measurement">
                                 <span><i class="fas fa-trash"></i> Delete Selected</span>
                             </button>
-                            <button class="tool-btn clear-measurements-btn context-clear-btn" onclick="clearMeasurements()" title="Clear all measurement lines">
+                            <button class="tool-btn clear-measurements-btn context-clear-btn" onclick="clearMeasurements()" title="Clear all measurements">
                                 <span><i class="fas fa-broom"></i> Clear All Measurements</span>
                             </button>
                         </div>
@@ -385,11 +385,11 @@
                     </div>
                     <div class="tool-section-content collapsed">
                         <div class="tool-buttons">
-                            <button id="addTextAnnotationBtn" class="tool-btn" onclick="activateAnnotation('text')">
+                            <button id="addTextAnnotationBtn" class="tool-btn" onclick="activateAnnotation('text')" title="Place a text annotation">
                                 <span><i class="fas fa-font"></i> Add Text Annotation</span>
                                 <span class="tool-btn-arrow">&rsaquo;</span>
                             </button>
-                            <button class="tool-btn" onclick="activateAnnotation('labels')" title="Toggle attribute labels for the selected vector layer">
+                            <button class="tool-btn" onclick="activateAnnotation('labels')" title="Toggle labels for the selected vector layer">
                                 <span><i class="fas fa-tags"></i> Feature Labels</span>
                                 <span class="tool-btn-arrow">&rsaquo;</span>
                             </button>
@@ -409,19 +409,19 @@
                     </div>
                     <div class="tool-section-content collapsed">
                         <div class="tool-buttons">
-                            <button class="tool-btn" data-draw-mode="point" onclick="activateDrawing('point')" title="Activate point drawing">
+                            <button class="tool-btn" data-draw-mode="point" onclick="activateDrawing('point')" title="Draw a point">
                                 <span><i class="fas fa-location-dot"></i> Draw Point</span>
                                 <span class="tool-btn-arrow">&rsaquo;</span>
                             </button>
-                            <button class="tool-btn" data-draw-mode="line" onclick="activateDrawing('line')" title="Activate line drawing">
+                            <button class="tool-btn" data-draw-mode="line" onclick="activateDrawing('line')" title="Draw a line">
                                 <span><i class="fas fa-slash"></i> Draw Line</span>
                                 <span class="tool-btn-arrow">&rsaquo;</span>
                             </button>
-                            <button class="tool-btn" data-draw-mode="polygon" onclick="activateDrawing('polygon')" title="Activate polygon drawing">
+                            <button class="tool-btn" data-draw-mode="polygon" onclick="activateDrawing('polygon')" title="Draw a polygon">
                                 <span><i class="fas fa-draw-polygon"></i> Draw Polygon</span>
                                 <span class="tool-btn-arrow">&rsaquo;</span>
                             </button>
-                            <button class="tool-btn" data-draw-mode="freehand" onclick="activateDrawing('freehand')" title="Activate freehand line drawing">
+                            <button class="tool-btn" data-draw-mode="freehand" onclick="activateDrawing('freehand')" title="Draw a freehand line">
                                 <span><i class="fas fa-signature"></i> Freehand</span>
                                 <span class="tool-btn-arrow">&rsaquo;</span>
                             </button>
@@ -441,11 +441,11 @@
                     </div>
                     <div class="tool-section-content collapsed">
                         <div class="tool-buttons">
-                            <button id="measureDistanceBtn" class="tool-btn" onclick="activateMeasureDistance()" title="Measure geodesic distance on the map">
+                            <button id="measureDistanceBtn" class="tool-btn" onclick="activateMeasureDistance()" title="Measure distance on the map">
                                 <span><i class="fas fa-ruler-horizontal"></i> Measure Distance</span>
                                 <span class="tool-btn-arrow">&rsaquo;</span>
                             </button>
-                            <button id="measureAreaBtn" class="tool-btn" onclick="activateMeasureArea()" title="Measure geodesic polygon area and perimeter on the map">
+                            <button id="measureAreaBtn" class="tool-btn" onclick="activateMeasureArea()" title="Measure area and perimeter on the map">
                                 <span><i class="fas fa-draw-polygon"></i> Measure Area</span>
                                 <span class="tool-btn-arrow">&rsaquo;</span>
                             </button>
@@ -465,7 +465,7 @@
                     </div>
                     <div class="tool-section-content collapsed">
                         <div class="tool-buttons">
-                            <button class="tool-btn" onclick="openAttributeTable()" title="Open the attribute table for the currently selected layer">
+                            <button class="tool-btn" onclick="openAttributeTable()" title="Open the selected layer's attribute table">
                                 <span><i class="fas fa-table"></i> View Attribute Table</span>
                                 <span class="tool-btn-arrow">&rsaquo;</span>
                             </button>
@@ -485,15 +485,15 @@
                     </div>
                     <div class="tool-section-content collapsed">
                         <div class="tool-buttons">
-                            <button class="tool-btn" onclick="openModal('wmsModal')" title="Connect a remote WMS service as a map layer">
+                            <button class="tool-btn" onclick="openModal('wmsModal')" title="Connect a WMS service">
                                 <span><i class="fas fa-globe"></i> Add WMS Layer</span>
                                 <span class="tool-btn-arrow">&rsaquo;</span>
                             </button>
-                            <button class="tool-btn" onclick="openModal('gpModal')" title="Connect a Geoportal Philippines or internal map service layer">
+                            <button class="tool-btn" onclick="openModal('gpModal')" title="Connect a Geoportal or map service layer">
                                 <span><i class="fas fa-map-location-dot"></i> Add GP Layer</span>
                                 <span class="tool-btn-arrow">&rsaquo;</span>
                             </button>
-                            <button class="tool-btn" onclick="showToast('Coming Soon', 'GeoTIFF support will be available soon', 'info')" title="Raster import is planned but not available yet">
+                            <button class="tool-btn" onclick="showToast('Coming Soon', 'GeoTIFF import is not available yet.', 'info')" title="GeoTIFF import is not available yet">
                                 <span><i class="fas fa-image"></i> Add GeoTIFF</span>
                                 <span class="tool-btn-arrow">&rsaquo;</span>
                             </button>
@@ -573,7 +573,7 @@
         <div class="modal">
             <div class="modal-header">
                 <div class="modal-title"><i class="fas fa-cloud-arrow-up"></i> Add Geospatial Data</div>
-                <button class="modal-close" onclick="closeModal('uploadModal')">&times;</button>
+                <button class="modal-close" onclick="closeModal('uploadModal')" title="Close dialog" aria-label="Close dialog">&times;</button>
             </div>
             <div class="modal-body">
                 <div class="layer-source-actions" aria-label="Layer source options">
@@ -581,11 +581,11 @@
                         <i class="fas fa-file-arrow-up"></i>
                         <span>Upload Dataset</span>
                     </button>
-                    <button type="button" class="layer-source-btn" onclick="closeModal('uploadModal'); openModal('wmsModal')" title="Connect a remote WMS service">
+                    <button type="button" class="layer-source-btn" onclick="closeModal('uploadModal'); openModal('wmsModal')" title="Connect a WMS service">
                         <i class="fas fa-globe"></i>
                         <span>WMS Layer</span>
                     </button>
-                    <button type="button" class="layer-source-btn" onclick="closeModal('uploadModal'); openModal('gpModal')" title="Connect a Geoportal Philippines or internal map service layer">
+                    <button type="button" class="layer-source-btn" onclick="closeModal('uploadModal'); openModal('gpModal')" title="Connect a Geoportal or map service layer">
                         <i class="fas fa-map-location-dot"></i>
                         <span>GP Layer</span>
                     </button>
@@ -613,7 +613,7 @@
                             <div class="file-preview-name" id="fileName"></div>
                             <div class="file-preview-size" id="fileSize"></div>
                         </div>
-                        <button class="file-preview-clear" onclick="clearFileSelection()" title="Clear file">&times;</button>
+                        <button class="file-preview-clear" onclick="clearFileSelection()" title="Remove selected file">&times;</button>
                     </div>
                     <input type="file" id="fileInput" style="display: none;" accept=".zip" onchange="handleFileSelect(event)">
                 </div>
@@ -630,7 +630,7 @@
                             <div class="file-preview-name" id="geojsonFileName"></div>
                             <div class="file-preview-size" id="geojsonFileSize"></div>
                         </div>
-                        <button class="file-preview-clear" onclick="clearGeoJSONSelection()" title="Clear file">&times;</button>
+                        <button class="file-preview-clear" onclick="clearGeoJSONSelection()" title="Remove selected file">&times;</button>
                     </div>
                     <input type="file" id="geojsonInput" style="display: none;" accept=".json,.geojson" onchange="handleGeoJSONSelect(event)">
                 </div>
@@ -647,7 +647,7 @@
                             <div class="file-preview-name" id="kmlFileName"></div>
                             <div class="file-preview-size" id="kmlFileSize"></div>
                         </div>
-                        <button class="file-preview-clear" onclick="clearKmlSelection()" title="Clear file">&times;</button>
+                        <button class="file-preview-clear" onclick="clearKmlSelection()" title="Remove selected file">&times;</button>
                     </div>
                     <input type="file" id="kmlInput" style="display: none;" accept=".kml" onchange="handleKmlSelect(event)">
                 </div>
@@ -664,7 +664,7 @@
                             <div class="file-preview-name" id="csvFileName"></div>
                             <div class="file-preview-size" id="csvFileSize"></div>
                         </div>
-                        <button class="file-preview-clear" onclick="clearCsvSelection()" title="Clear file">&times;</button>
+                        <button class="file-preview-clear" onclick="clearCsvSelection()" title="Remove selected file">&times;</button>
                     </div>
                     <input type="file" id="csvInput" style="display: none;" accept=".csv" onchange="handleCsvSelect(event)">
                 </div>
@@ -692,7 +692,7 @@
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="closeModal('uploadModal')">Cancel</button>
-                <button class="btn btn-primary" id="submitBtn" onclick="submitUpload()"><i class="fas fa-upload"></i> Upload</button>
+                <button class="btn btn-primary" id="submitBtn" onclick="submitUpload()" title="Upload the selected file"><i class="fas fa-upload"></i> Upload</button>
             </div>
         </div>
     </div>
@@ -702,7 +702,7 @@
         <div class="modal">
             <div class="modal-header">
                 <div class="modal-title"><i class="fas fa-download"></i> Export Map</div>
-                <button class="modal-close" onclick="closeModal('exportModal')">&times;</button>
+                <button class="modal-close" onclick="closeModal('exportModal')" title="Close dialog" aria-label="Close dialog">&times;</button>
             </div>
             <div class="modal-body">
                 <div id="mapPreviewContainer" class="export-preview-shell">
@@ -728,7 +728,7 @@
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="closeModal('exportModal')">Cancel</button>
-                <button class="btn btn-primary" id="downloadBtn" onclick="downloadMap()"><i class="fas fa-download"></i> Download</button>
+                <button class="btn btn-primary" id="downloadBtn" onclick="downloadMap()" title="Download the exported map"><i class="fas fa-download"></i> Download</button>
             </div>
         </div>
     </div>
@@ -738,14 +738,14 @@
         <div class="modal">
             <div class="modal-header">
                 <div class="modal-title"><i class="fas fa-share-nodes"></i> Share Map</div>
-                <button class="modal-close" onclick="closeModal('shareModal')">&times;</button>
+                <button class="modal-close" onclick="closeModal('shareModal')" title="Close dialog" aria-label="Close dialog">&times;</button>
             </div>
             <div class="modal-body">
                 <div class="form-group">
                     <div class="form-label">Share Link</div>
                     <div style="display: flex; gap: var(--spacing-2);">
                         <input type="text" class="form-input" id="shareLinkInput" value="" readonly>
-                        <button class="btn btn-primary" onclick="copyToClipboard()" style="white-space: nowrap;"><i class="fas fa-copy"></i> Copy</button>
+                        <button class="btn btn-primary" onclick="copyToClipboard()" style="white-space: nowrap;" title="Copy share link"><i class="fas fa-copy"></i> Copy</button>
                     </div>
                     <div id="shareFeedback" class="inline-feedback" data-state="neutral" aria-live="polite">
                         Share link updates here when you copy or regenerate the current map state.
@@ -757,7 +757,7 @@
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="closeModal('shareModal')">Close</button>
-                <button class="btn btn-primary" onclick="generateLink()"><i class="fas fa-refresh"></i> New Link</button>
+                <button class="btn btn-primary" onclick="generateLink()" title="Generate a new share link"><i class="fas fa-refresh"></i> New Link</button>
             </div>
         </div>
     </div>
@@ -767,7 +767,7 @@
         <div class="modal" style="max-width: 680px;">
             <div class="modal-header">
                 <div class="modal-title"><i class="fas fa-table"></i> View Attribute Table</div>
-                <button class="modal-close" onclick="closeModal('attributesModal')">&times;</button>
+                <button class="modal-close" onclick="closeModal('attributesModal')" title="Close dialog" aria-label="Close dialog">&times;</button>
             </div>
             <div class="modal-body">
                 <div class="form-group">
@@ -790,14 +790,14 @@
         <div class="modal">
             <div class="modal-header">
                 <div class="modal-title"><i class="fas fa-map-location-dot"></i> Add GP Layer</div>
-                <button class="modal-close" onclick="closeModal('gpModal')">&times;</button>
+                <button class="modal-close" onclick="closeModal('gpModal')" title="Close dialog" aria-label="Close dialog">&times;</button>
             </div>
             <div class="modal-body">
                 <div class="form-group">
                     <div class="form-label">GP URL</div>
                     <div class="form-input-action-row">
                         <input type="text" class="form-input" id="gpUrl" value="https://geoportal.gov.ph/" placeholder="e.g., https://geoportal.gov.ph/ or an internal WMS/map service endpoint">
-                        <button type="button" class="btn btn-secondary form-input-action" id="gpFetchButton"><i class="fas fa-cloud-arrow-down"></i> Fetch</button>
+                        <button type="button" class="btn btn-secondary form-input-action" id="gpFetchButton" title="Fetch available Geoportal layers"><i class="fas fa-cloud-arrow-down"></i> Fetch</button>
                     </div>
                     <div id="gpFetchFeedback" class="inline-feedback" aria-live="polite"></div>
                 </div>
@@ -831,14 +831,14 @@
         <div class="modal">
             <div class="modal-header">
                 <div class="modal-title"><i class="fas fa-globe"></i> Add WMS Layer</div>
-                <button class="modal-close" onclick="closeModal('wmsModal')">&times;</button>
+                <button class="modal-close" onclick="closeModal('wmsModal')" title="Close dialog" aria-label="Close dialog">&times;</button>
             </div>
             <div class="modal-body">
                 <div class="form-group">
                     <div class="form-label">WMS URL</div>
                     <div class="form-input-action-row">
                         <input type="text" class="form-input" id="wmsUrl" value="http://192.168.8.87:8080/geoserver/wms" placeholder="e.g., http://wms.example.com/service?service=WMS&version=1.1.1&request=GetCapabilities">
-                        <button type="button" class="btn btn-secondary form-input-action" id="wmsFetchButton"><i class="fas fa-cloud-arrow-down"></i> Fetch</button>
+                        <button type="button" class="btn btn-secondary form-input-action" id="wmsFetchButton" title="Fetch available WMS layers"><i class="fas fa-cloud-arrow-down"></i> Fetch</button>
                     </div>
                     <div id="wmsFetchFeedback" class="inline-feedback" aria-live="polite"></div>
                 </div>

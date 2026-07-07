@@ -238,7 +238,7 @@ function renderSvgMarkerGallery(record, layerItem) {
         const label = escapeHtml(item.name);
         const activeClass = isSvgActive && index === activeIndex ? ' active' : '';
         return `
-            <button type="button" class="svg-marker-thumbnail${activeClass}" data-svg-index="${index}" title="${label}" aria-label="Select ${label}">
+            <button type="button" class="svg-marker-thumbnail${activeClass}" data-svg-index="${index}" title="Select ${label}" aria-label="Select ${label}">
                 <img src="${item.dataUrl}" alt="${label}" />
                 <span class="svg-marker-delete" role="button" aria-label="Delete ${label}" title="Delete ${label}">×</span>
             </button>
@@ -489,7 +489,7 @@ export function addLayerItem(name, color, featureCount, options = {}) {
                         </select>
 
                         <div class="marker-type-dropdown" data-selected="${markerPresetType || (svgMarkerDataUrl ? 'custom' : 'circle')}">
-                            <button type="button" class="marker-type-current" aria-haspopup="listbox" aria-expanded="false" title="Select marker type" aria-label="Select marker type">
+                            <button type="button" class="marker-type-current" aria-haspopup="listbox" aria-expanded="false" title="Choose marker type" aria-label="Choose marker type">
                                 <!-- current icon preview inserted by JS on init; fallback: simple circle -->
                                 <span class="marker-type-icon marker-type-icon-circle" aria-hidden="true"></span>
                                 <i class="fas fa-caret-down" style="margin-left:8px;color:var(--gray-400);"></i>
@@ -628,14 +628,14 @@ export function addLayerItem(name, color, featureCount, options = {}) {
     const layerHTML = `
         <div class="layer-item collapsed" data-layer-name="${safeName}">
             <div class="layer-item-header" role="button" tabindex="0">
-                <input type="checkbox" class="layer-toggle" ${isVisible ? 'checked' : ''} title="Toggle layer visibility">
+                        <input type="checkbox" class="layer-toggle" ${isVisible ? 'checked' : ''} title="Show or hide layer">
                 <div class="layer-info-short">
                     <div class="layer-name-wrap" data-tooltip="${safeName}">
                         <div class="layer-name" tabindex="0" aria-label="Layer name: ${safeName}">${safeName}</div>
                     </div>
                     <div class="layer-stats">${statsText}</div>
                 </div>
-                <button type="button" class="layer-expand-btn" aria-expanded="false" title="Expand layer"><i class="fas fa-chevron-down" aria-hidden="true"></i></button>
+                <button type="button" class="layer-expand-btn" aria-expanded="false" title="Show layer controls"><i class="fas fa-chevron-down" aria-hidden="true"></i></button>
             </div>
             <div class="layer-controls-wrapper">
                 <div class="layer-controls">
@@ -661,7 +661,7 @@ export function addLayerItem(name, color, featureCount, options = {}) {
                         </div>
                     </div>
                     <div class="control-row control-row-action">
-                        <button class="layer-action-btn danger layer-action-btn-full" onclick="removeLayer(event)" title="Remove Layer"><i class="fas fa-trash"></i> Remove</button>
+                        <button class="layer-action-btn danger layer-action-btn-full" onclick="removeLayer(event)" title="Remove layer"><i class="fas fa-trash"></i> Remove</button>
                     </div>
                 </div>
             </div>
@@ -1292,7 +1292,7 @@ function handleSvgMarkerUpload(event, layerName) {
 
     const validFiles = files.filter((file) => file.type === 'image/svg+xml' || file.name.toLowerCase().endsWith('.svg'));
     if (validFiles.length === 0) {
-        showToast('Error', 'Only SVG marker files are accepted.', 'error');
+        showToast('SVG Upload Failed', 'Only SVG marker files are accepted.', 'error');
         event.target.value = '';
         return;
     }
@@ -1321,7 +1321,7 @@ function handleSvgMarkerUpload(event, layerName) {
             .map((item) => item.value);
 
         if (galleryItems.length === 0) {
-            showToast('Error', 'No valid SVG files were uploaded.', 'error');
+            showToast('SVG Upload Failed', 'No valid SVG files were uploaded.', 'error');
             event.target.value = '';
             return;
         }

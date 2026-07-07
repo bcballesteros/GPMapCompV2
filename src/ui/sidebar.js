@@ -118,30 +118,30 @@ function bindAttributeSearch(totalRows) {
 export function openAttributeTable() {
     const layerName = getSelectedLayerName();
     if (!layerName) {
-        showToast('No Layer', 'Please select a layer first', 'warning', 2000);
+        showToast('No Layer Selected', 'Select a layer first.', 'warning', 2000);
         return;
     }
 
     const record = getLayerRecord(layerName);
     if (!record) {
-        showToast('Layer Missing', 'The selected layer could not be found', 'error', 2000);
+        showToast('Layer Not Found', 'The selected layer could not be found.', 'error', 2000);
         return;
     }
 
     if (record.isWMS) {
-        showToast('No Attributes', 'Attribute tables are only available for uploaded vector layers', 'warning', 2200);
+        showToast('Attributes Unavailable', 'Attribute tables are only available for uploaded vector layers.', 'warning', 2200);
         return;
     }
 
     const rowsData = getAttributeRows(record);
     if (!rowsData.length) {
-        showToast('No Data', 'This layer has no attribute data to display', 'warning', 2000);
+        showToast('No Attribute Data', 'This layer has no attribute data to display.', 'warning', 2000);
         return;
     }
 
     const keys = getAttributeColumns(rowsData);
     if (!keys.length) {
-        showToast('No Data', 'This layer has no attribute fields to display', 'warning', 2000);
+        showToast('No Attribute Fields', 'This layer has no attribute fields to display.', 'warning', 2000);
         return;
     }
 
