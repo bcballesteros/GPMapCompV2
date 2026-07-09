@@ -556,7 +556,7 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
     overflow-y: auto;
     /* Ensure sidebar spans the viewport height minus navbar so scrolling is contained */
     height: calc(100vh - var(--navbar-height));
-    box-shadow: 2px 0 8px rgba(0, 0, 0, 0.08);
+    box-shadow: 2px 0 7px rgba(15, 23, 42, 0.06);
 }
 
 .sidebar-header {
@@ -629,18 +629,19 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
 .layer-list {
     display: flex;
     flex-direction: column;
-    gap: var(--spacing-5);
+    gap: 18px;
     min-height: 0;
     /* List expands to fill available space; scrolling handled by parent .sidebar-left */
     flex: 1 1 auto;
     scrollbar-gutter: stable;
     padding-right: 2px;
+    padding-top: 2px;
 }
 
 .layer-group {
     display: flex;
     flex-direction: column;
-    gap: var(--spacing-2);
+    gap: 10px;
     margin: 0;
     padding: 0;
     border: none;
@@ -652,7 +653,7 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
 }
 
 .layer-group-header {
-    padding: var(--spacing-4);
+    padding: 11px 12px 10px;
     background: linear-gradient(135deg, rgba(15, 23, 42, 0.02) 0%, rgba(37, 99, 235, 0.02) 100%);
     border-bottom: 2px solid var(--gray-200);
     border-radius: 8px 8px 0 0;
@@ -669,18 +670,18 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: var(--spacing-3);
+    gap: 10px;
     color: var(--gray-700);
     text-align: left;
     font-size: 11px;
-    font-weight: 650;
-    line-height: 1.4;
+    font-weight: 700;
+    line-height: 1.15;
     background: none;
     border: none;
     padding: 0;
     cursor: pointer;
     text-transform: uppercase;
-    letter-spacing: 0.6px;
+    letter-spacing: 0.72px;
     transition: color 0.2s ease;
 }
 
@@ -692,31 +693,38 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
     flex: 1;
     min-width: 0;
     color: inherit;
+    display: inline-flex;
+    align-items: center;
+    min-height: 20px;
 }
 
 .layer-group-count {
     color: var(--gray-500);
-    font-size: 11px;
-    font-weight: 650;
+    font-size: 10px;
+    font-weight: 700;
     white-space: nowrap;
     text-transform: uppercase;
-    letter-spacing: 0.4px;
+    letter-spacing: 0.28px;
     background: rgba(37, 99, 235, 0.08);
-    padding: var(--spacing-1) var(--spacing-2);
-    border-radius: 6px;
-    min-width: 32px;
+    padding: 3px 8px 2px;
+    border-radius: 999px;
+    min-width: 28px;
     text-align: center;
+    align-self: center;
+    line-height: 1.1;
 }
 
 .layer-group-chevron {
     transition: transform 0.2s ease, color 0.2s ease;
     color: var(--gray-500);
-    font-size: 14px;
-    display: flex;
+    font-size: 13px;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 20px;
-    height: 20px;
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+    align-self: center;
 }
 
 
@@ -733,7 +741,7 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
 .layer-group-body {
     display: flex;
     flex-direction: column;
-    gap: var(--spacing-4);
+    gap: 8px;
 }
 
 /* First layer should feel connected to its category header */
@@ -759,19 +767,22 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
     width: 100%;
     min-width: 0;
     box-sizing: border-box;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
 }
 
 .layer-item:hover {
     background: white;
-    border-color: var(--accent);
-    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.12);
+    border-color: rgba(37, 99, 235, 0.5);
+    box-shadow: 0 5px 14px rgba(37, 99, 235, 0.1);
     transform: translateY(-1px);
 }
 
 .layer-item.active {
     border-color: var(--accent);
-    background: var(--blue-50);
-    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.15);
+    background: linear-gradient(180deg, rgba(239, 246, 255, 0.92) 0%, rgba(255, 255, 255, 0.98) 100%);
+    box-shadow:
+        0 0 0 1px rgba(37, 99, 235, 0.18),
+        0 6px 16px rgba(37, 99, 235, 0.12);
 }
 
 /* Compact collapsed state for layer cards */
@@ -788,7 +799,7 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
 .layer-item-header {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 9px;
     width: 100%;
     min-width: 0;
     box-sizing: border-box;
@@ -798,7 +809,7 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     flex: 1;
     min-width: 0;
 }
@@ -809,7 +820,7 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
     box-sizing: border-box;
     display: flex;
     flex-direction: column;
-    padding-top: 2px;
+    padding-top: 4px;
     /* Allow expanded controls to be visible and let the sidebar scroll container handle overflow */
     overflow: visible;
 }
@@ -819,7 +830,7 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
     flex-direction: column;
     min-width: 0;
     flex: 1;
-    gap: 2px;
+    gap: 1px;
     justify-content: center;
 }
 
@@ -828,10 +839,11 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
     flex-direction: row;
     align-items: center;
     justify-content: flex-end;
-    gap: 1px;
+    gap: 0;
     flex-shrink: 0;
     align-self: center;
-    margin-right: -2px;
+    margin-right: -1px;
+    padding-left: 2px;
 }
 
 .layer-actions-menu {
@@ -839,6 +851,7 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
     flex-shrink: 0;
     display: inline-flex;
     align-items: center;
+    margin-left: -1px;
 }
 
 .layer-actions-trigger {
@@ -856,6 +869,7 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
     font-size: 15px;
     font-weight: 700;
     line-height: 1;
+    align-self: center;
 }
 
 .layer-actions-trigger:hover,
@@ -926,8 +940,8 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
     background: transparent;
     border: none;
     color: var(--gray-500);
-    width: 26px;
-    height: 26px;
+    width: 24px;
+    height: 24px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -935,6 +949,7 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
     cursor: pointer;
     transition: background 0.2s ease, color 0.2s ease;
     flex-shrink: 0;
+    align-self: center;
 }
 
 .layer-expand-btn:hover {
@@ -959,6 +974,7 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
     display: flex;
     align-items: center;
     justify-content: center;
+    line-height: 1;
 }
 
 .layer-toggle {
