@@ -776,9 +776,9 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
 
 /* Compact collapsed state for layer cards */
 .layer-item.collapsed {
-    padding: var(--spacing-2) var(--spacing-3);
+    padding: 10px 12px;
     align-items: stretch;
-    gap: var(--spacing-2);
+    gap: 6px;
 }
 
 .layer-item.collapsed .layer-controls-wrapper {
@@ -788,10 +788,19 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
 .layer-item-header {
     display: flex;
     align-items: center;
-    gap: var(--spacing-3);
+    gap: 10px;
     width: 100%;
     min-width: 0;
     box-sizing: border-box;
+}
+
+.layer-header-main {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    min-width: 0;
 }
 
 .layer-controls-wrapper {
@@ -800,7 +809,7 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
     box-sizing: border-box;
     display: flex;
     flex-direction: column;
-    padding-top: 0;
+    padding-top: 2px;
     /* Allow expanded controls to be visible and let the sidebar scroll container handle overflow */
     overflow: visible;
 }
@@ -810,15 +819,115 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
     flex-direction: column;
     min-width: 0;
     flex: 1;
-    gap: 4px;
+    gap: 2px;
+    justify-content: center;
+}
+
+.layer-header-actions {
+    display: inline-flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 1px;
+    flex-shrink: 0;
+    align-self: center;
+    margin-right: -2px;
+}
+
+.layer-actions-menu {
+    position: relative;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+}
+
+.layer-actions-trigger {
+    width: 24px;
+    height: 24px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--gray-400);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+    font-size: 15px;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.layer-actions-trigger:hover,
+.layer-actions-menu[data-open="true"] .layer-actions-trigger {
+    background: rgba(37, 99, 235, 0.08);
+    color: var(--accent);
+}
+
+.layer-actions-trigger:focus-visible {
+    outline: none;
+    background: rgba(37, 99, 235, 0.06);
+    color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.layer-actions-trigger:active {
+    background: rgba(37, 99, 235, 0.12);
+    color: var(--accent);
+}
+
+.layer-actions-dropdown {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: -2px;
+    z-index: 20;
+    min-width: 176px;
+    padding: 8px;
+    border: 1px solid var(--gray-200);
+    border-radius: 10px;
+    background: white;
+    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.14);
+    display: none;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.layer-actions-menu[data-open="true"] .layer-actions-dropdown {
+    display: flex;
+}
+
+.layer-actions-item {
+    width: 100%;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--gray-700);
+    text-align: left;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 10px 12px;
+    cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.layer-actions-item:hover {
+    background: var(--gray-100);
+    color: var(--accent);
+}
+
+.layer-actions-item:focus-visible {
+    outline: none;
+    background: rgba(37, 99, 235, 0.08);
+    color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
 }
 
 .layer-expand-btn {
     background: transparent;
     border: none;
     color: var(--gray-500);
-    width: 28px;
-    height: 28px;
+    width: 26px;
+    height: 26px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -831,6 +940,13 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
 .layer-expand-btn:hover {
     background: rgba(37, 99, 235, 0.08);
     color: var(--accent);
+}
+
+.layer-expand-btn:focus-visible {
+    outline: none;
+    background: rgba(37, 99, 235, 0.06);
+    color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
 }
 
 .layer-expand-btn.expanded i {
@@ -849,9 +965,10 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
     width: 20px;
     height: 20px;
     min-width: 20px;
-    margin-top: 2px;
+    margin-top: 0;
     accent-color: var(--accent);
     cursor: pointer;
+    align-self: center;
 }
 
 .layer-info {
@@ -873,11 +990,12 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
     text-overflow: ellipsis;
     white-space: nowrap;
     font-size: 14px;
-    font-weight: 600;
+    font-weight: 700;
     color: var(--gray-900);
-    margin-bottom: var(--spacing-2);
+    margin-bottom: 0;
     letter-spacing: -0.2px;
     outline: none;
+    line-height: 1.2;
 }
 
 .layer-name:focus-visible {
@@ -916,7 +1034,9 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
     font-size: 12px;
     color: var(--gray-500);
     margin: 0;
-    font-weight: 500;
+    font-weight: 600;
+    white-space: nowrap;
+    line-height: 1.2;
 }
 
 .layer-controls {

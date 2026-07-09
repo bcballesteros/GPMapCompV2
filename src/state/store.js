@@ -91,6 +91,27 @@ export function setLayerRecord(layerName, record) {
     emitStateChange('uploadedLayers', { ...state.uploadedLayers });
 }
 
+export function renameLayerRecord(previousName, nextName) {
+    if (!state.uploadedLayers[previousName] || previousName === nextName) {
+        return false;
+    }
+
+    if (state.uploadedLayers[nextName]) {
+        return false;
+    }
+
+    state.uploadedLayers[nextName] = state.uploadedLayers[previousName];
+    delete state.uploadedLayers[previousName];
+
+    if (state.currentLayerName === previousName) {
+        state.currentLayerName = nextName;
+        emitStateChange('currentLayerName', nextName);
+    }
+
+    emitStateChange('uploadedLayers', { ...state.uploadedLayers });
+    return true;
+}
+
 export function removeLayerRecord(layerName) {
     delete state.uploadedLayers[layerName];
     emitStateChange('uploadedLayers', { ...state.uploadedLayers });

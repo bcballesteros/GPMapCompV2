@@ -1,6 +1,6 @@
 import { DEFAULT_LINE_STROKE_WIDTH, DEFAULT_POINT_SIZE } from '../config/constants.js';
-import { removeManagedLayer, updateManagedLayerStyle } from '../map/layer-manager.js';
-import { getLayerRecord, getState, setCurrentLayerName } from '../state/store.js';
+import { fitLayerToView, removeManagedLayer, updateManagedLayerStyle } from '../map/layer-manager.js';
+import { getLayerRecord, renameLayerRecord, setCurrentLayerName } from '../state/store.js';
 import { syncLabelsToggle } from '../tools/labels-tool.js';
 import { commitLayerOpacity as commitLayerOpacityValue, updateLayerOpacity as updateLayerOpacityValue } from '../tools/transparency-tool.js';
 import { showToast } from './toast.js';
@@ -26,6 +26,10 @@ const LAYER_GROUP_LABELS = {
     annotation: 'Annotations',
     other: 'Other Layers'
 };
+const LAYER_ACTIONS = [
+    { id: 'zoom', label: 'Zoom to Layer' },
+    { id: 'rename', label: 'Rename' }
+];
 
 function getLayerGroupKey(record, options = {}) {
     if (record?.isWMS || options.isWMS) {
@@ -123,6 +127,116 @@ function collapseAllLayerItems(exceptItem = null) {
             collapseLayerItem(item);
         }
     });
+}
+
+function formatLayerSubtitle({ featureCount, isWms, isGp }) {
+    if (isWms) {
+        return isGp ? 'Geoportal Layer' : 'Remote Layer';
+    }
+
+    return `${featureCount} Feature${featureCount === 1 ? '' : 's'}`;
+}
+
+function getLayerItemName(layerItem) {
+    return layerItem?.querySelector('.layer-name')?.textContent?.trim() || '';
+}
+
+function getLayerActionsMenuMarkup(safeName) {
+    const itemsMarkup = LAYER_ACTIONS
+        .map((action) => `<button type="button" class="layer-actions-item" data-action="${action.id}" role="menuitem">${action.label}</button>`)
+        .join('');
+
+    return `
+        <div class="layer-actions-menu" data-open="false">
+            <button
+                type="button"
+                class="layer-actions-trigger"
+                aria-haspopup="menu"
+                aria-expanded="false"
+                title="More actions"
+                aria-label="More actions for ${safeName}"
+            >&#8942;</button>
+            <div class="layer-actions-dropdown" role="menu" aria-label="Layer actions">
+                ${itemsMarkup}
+            </div>
+        </div>
+    `;
+}
+
+function closeLayerActionMenus({ except } = {}) {
+    document.querySelectorAll('.layer-actions-menu[data-open="true"]').forEach((menu) => {
+        if (menu === except) {
+            return;
+        }
+
+        menu.setAttribute('data-open', 'false');
+        const trigger = menu.querySelector('.layer-actions-trigger');
+        if (trigger) {
+            trigger.setAttribute('aria-expanded', 'false');
+        }
+    });
+}
+
+function zoomToLayerFromItem(layerItem) {
+    const layerName = getLayerItemName(layerItem);
+    const record = getLayerRecord(layerName);
+
+    if (!record?.source || typeof record.source.getExtent !== 'function') {
+        showToast('Zoom Unavailable', 'This layer does not have a zoomable extent yet.', 'warning');
+        return;
+    }
+
+    fitLayerToView(record.source);
+}
+
+function renameLayerFromItem(layerItem) {
+    const previousName = getLayerItemName(layerItem);
+    const record = getLayerRecord(previousName);
+    if (!record) {
+        showToast('Rename Failed', 'Could not find that layer.', 'error');
+        return;
+    }
+
+    const requestedName = window.prompt('Rename layer', previousName);
+    if (requestedName === null) {
+        return;
+    }
+
+    const nextName = requestedName.trim();
+    if (!nextName || nextName === previousName) {
+        return;
+    }
+
+    if (getLayerRecord(nextName)) {
+        showToast('Name In Use', `A layer named "${nextName}" already exists.`, 'warning');
+        return;
+    }
+
+    const renamed = renameLayerRecord(previousName, nextName);
+    if (!renamed) {
+        showToast('Rename Failed', 'Could not rename that layer.', 'error');
+        return;
+    }
+
+    if (typeof record.displayName === 'string' || record.isWMS) {
+        record.displayName = nextName;
+    }
+
+    const safeName = escapeHtml(nextName);
+    layerItem.setAttribute('data-layer-name', safeName);
+
+    const nameWrap = layerItem.querySelector('.layer-name-wrap');
+    if (nameWrap) {
+        nameWrap.setAttribute('data-tooltip', nextName);
+    }
+
+    const nameEl = layerItem.querySelector('.layer-name');
+    if (nameEl) {
+        nameEl.textContent = nextName;
+        nameEl.setAttribute('aria-label', `Layer name: ${nextName}`);
+    }
+
+    selectLayer(layerItem);
 }
 
 function setupLayerGroupToggleListeners(layerList) {
@@ -430,9 +544,7 @@ export function addLayerItem(name, color, featureCount, options = {}) {
     const polygonFillColor = record?.polygonFillColor || color;
     const polygonStrokeColor = record?.polygonStrokeColor || color;
     const polygonStrokeWidthValue = Math.round(record?.polygonStrokeWidth ?? DEFAULT_LINE_STROKE_WIDTH);
-    const statsText = isWms
-        ? `${isGp ? 'Geoportal Layer' : 'WMS Layer'} • Remote`
-        : `${featureCount} features • ${getState().uploadedLayers[name]?.geometryType || 'Mixed'}`;
+    const statsText = formatLayerSubtitle({ featureCount, isWms, isGp });
 
     // Build controls strictly by geometry type. WMS only gets opacity.
     let colorControl = '';
@@ -628,14 +740,19 @@ export function addLayerItem(name, color, featureCount, options = {}) {
     const layerHTML = `
         <div class="layer-item collapsed" data-layer-name="${safeName}">
             <div class="layer-item-header" role="button" tabindex="0">
-                        <input type="checkbox" class="layer-toggle" ${isVisible ? 'checked' : ''} title="Toggle layer visibility">
-                <div class="layer-info-short">
-                    <div class="layer-name-wrap" data-tooltip="${safeName}">
-                        <div class="layer-name" tabindex="0" aria-label="Layer name: ${safeName}">${safeName}</div>
+                <input type="checkbox" class="layer-toggle" ${isVisible ? 'checked' : ''} title="Toggle layer visibility">
+                <div class="layer-header-main">
+                    <div class="layer-info-short">
+                        <div class="layer-name-wrap" data-tooltip="${safeName}">
+                            <div class="layer-name" tabindex="0" aria-label="Layer name: ${safeName}">${safeName}</div>
+                        </div>
+                        <div class="layer-stats">${statsText}</div>
                     </div>
-                    <div class="layer-stats">${statsText}</div>
+                    <div class="layer-header-actions">
+                        <button type="button" class="layer-expand-btn" aria-expanded="false" title="Layer controls"><i class="fas fa-chevron-down" aria-hidden="true"></i></button>
+                        ${getLayerActionsMenuMarkup(safeName)}
+                    </div>
                 </div>
-                <button type="button" class="layer-expand-btn" aria-expanded="false" title="Layer controls"><i class="fas fa-chevron-down" aria-hidden="true"></i></button>
             </div>
             <div class="layer-controls-wrapper">
                 <div class="layer-controls">
@@ -740,6 +857,9 @@ export function addLayerItem(name, color, featureCount, options = {}) {
     const markerStrokeEnabledCheckbox = newItem.querySelector('.marker-stroke-enabled');
     const markerStrokeColorPicker = newItem.querySelector('.marker-stroke-color-picker');
     const markerStrokeWidthSlider = newItem.querySelector('.marker-stroke-width-slider');
+    const layerActionsMenu = newItem.querySelector('.layer-actions-menu');
+    const layerActionsTrigger = newItem.querySelector('.layer-actions-trigger');
+    const layerActionsItems = newItem.querySelectorAll('.layer-actions-item');
 
     checkbox.addEventListener('pointerdown', (event) => event.stopPropagation());
     checkbox.addEventListener('click', (event) => event.stopPropagation());
@@ -886,6 +1006,42 @@ export function addLayerItem(name, color, featureCount, options = {}) {
             });
             document._markerTypeDropdownCloseListenerAdded = true;
         }
+    }
+
+    if (layerActionsTrigger && layerActionsMenu) {
+        layerActionsTrigger.addEventListener('pointerdown', (event) => event.stopPropagation());
+        layerActionsTrigger.addEventListener('click', (event) => {
+            event.stopPropagation();
+            const isOpen = layerActionsMenu.getAttribute('data-open') === 'true';
+            closeLayerActionMenus({ except: isOpen ? null : layerActionsMenu });
+            layerActionsMenu.setAttribute('data-open', isOpen ? 'false' : 'true');
+            layerActionsTrigger.setAttribute('aria-expanded', String(!isOpen));
+        });
+    }
+
+    if (layerActionsItems.length > 0) {
+        layerActionsItems.forEach((actionItem) => {
+            actionItem.addEventListener('pointerdown', (event) => event.stopPropagation());
+            actionItem.addEventListener('click', (event) => {
+                event.stopPropagation();
+                const action = actionItem.getAttribute('data-action');
+                if (action === 'zoom') {
+                    zoomToLayerFromItem(newItem);
+                } else if (action === 'rename') {
+                    renameLayerFromItem(newItem);
+                }
+
+                closeLayerActionMenus();
+            });
+        });
+    }
+
+    if (!document._layerActionMenuCloseListenerAdded) {
+        document.addEventListener('click', (event) => {
+            const openMenu = event.target.closest('.layer-actions-menu');
+            closeLayerActionMenus({ except: openMenu });
+        });
+        document._layerActionMenuCloseListenerAdded = true;
     }
     // Note: per-thumbnail delete handles removal; global remove button removed to avoid duplicates
 
@@ -1367,14 +1523,14 @@ export function removeLayer(event) {
     event.stopPropagation();
 
     const layerItem = event.target.closest('.layer-item');
-    const layerName = layerItem.querySelector('.layer-name').textContent;
+    const layerName = getLayerItemName(layerItem);
     removeLayerItem(layerName);
 }
 
 export function removeLayerItem(layerName) {
     const layerList = document.getElementById('layerList');
     const layerItem = Array.from(layerList?.querySelectorAll('.layer-item') || [])
-        .find((item) => item.querySelector('.layer-name')?.textContent === layerName);
+        .find((item) => getLayerItemName(item) === layerName);
 
     if (!layerItem) {
         removeManagedLayer(layerName);
@@ -1409,3 +1565,4 @@ export function removeLayerItem(layerName) {
 
     syncLabelsToggle();
 }
+
