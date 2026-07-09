@@ -892,34 +892,96 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
 
 .layer-actions-dropdown {
     position: absolute;
-    top: calc(100% + 8px);
-    right: -2px;
+    top: 0;
+    left: calc(100% + 5px);
+    right: auto;
     z-index: 20;
-    min-width: 176px;
-    padding: 8px;
+    min-width: 168px;
+    max-width: min(220px, calc(100vw - 24px));
+    padding: 6px;
     border: 1px solid var(--gray-200);
-    border-radius: 10px;
+    border-radius: 9px;
     background: white;
     box-shadow: 0 12px 28px rgba(15, 23, 42, 0.14);
     display: none;
     flex-direction: column;
-    gap: 3px;
+    gap: 2px;
+    transform: translateY(-8px);
+    max-height: calc(100vh - 24px);
+    overflow-y: auto;
 }
 
 .layer-actions-menu[data-open="true"] .layer-actions-dropdown {
     display: flex;
 }
 
+.layer-rename-popover {
+    position: absolute;
+    top: 0;
+    left: calc(100% + 5px);
+    z-index: 25;
+    display: grid;
+    gap: 10px;
+    width: min(280px, calc(100vw - 28px));
+    padding: 12px;
+    border: 1px solid rgba(148, 163, 184, 0.28);
+    border-radius: 10px;
+    background: #ffffff;
+    box-shadow: 0 16px 34px rgba(15, 23, 42, 0.18);
+}
+
+.layer-rename-title {
+    font-size: 12px;
+    font-weight: 800;
+    color: var(--gray-900);
+    letter-spacing: 0;
+}
+
+.layer-rename-field {
+    display: grid;
+}
+
+.layer-rename-input {
+    width: 100%;
+    min-height: 38px;
+    padding: 9px 10px;
+    border: 1px solid var(--gray-300);
+    border-radius: 8px;
+    background: #ffffff;
+    color: var(--gray-900);
+    font-size: 13px;
+}
+
+.layer-rename-input:focus {
+    outline: none;
+    border-color: rgba(37, 99, 235, 0.45);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.layer-rename-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.layer-rename-actions .btn {
+    min-height: 34px;
+    padding: 8px 12px;
+    font-size: 11px;
+}
+
 .layer-actions-item {
     width: 100%;
     border: none;
-    border-radius: 8px;
+    border-radius: 7px;
     background: transparent;
     color: var(--gray-700);
     text-align: left;
     font-size: 12px;
     font-weight: 600;
-    padding: 10px 12px;
+    min-height: 34px;
+    padding: 8px 11px;
+    line-height: 1.2;
     cursor: pointer;
     transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
 }

@@ -7,6 +7,151 @@ import { showToast } from './toast.js';
 
 let layerNameTooltipElement = null;
 let layerNameTooltipListenersBound = false;
+let activeLayerRenamePopover = null;
+let floatingLayerRoot = null;
+let activeLayerActionsOverlay = null;
+
+function ensureFloatingLayerRoot() {
+    if (floatingLayerRoot?.isConnected) {
+        return floatingLayerRoot;
+    }
+
+    floatingLayerRoot = document.createElement('div');
+    floatingLayerRoot.setAttribute('data-layer-floating-root', 'true');
+    Object.assign(floatingLayerRoot.style, {
+        position: 'fixed',
+        inset: '0',
+        zIndex: '1600',
+        pointerEvents: 'none'
+    });
+    document.body.appendChild(floatingLayerRoot);
+    return floatingLayerRoot;
+}
+
+function clampFloatingPosition(value, min, max) {
+    if (max < min) {
+        return min;
+    }
+
+    return Math.min(Math.max(value, min), max);
+}
+
+function positionFloatingElement(trigger, element) {
+    if (!(trigger instanceof HTMLElement) || !(element instanceof HTMLElement)) {
+        return;
+    }
+
+    const viewportPadding = 12;
+    const triggerRect = trigger.getBoundingClientRect();
+    const elementRect = element.getBoundingClientRect();
+    const gap = 5;
+
+    let left = triggerRect.right + gap;
+    if (left + elementRect.width > window.innerWidth - viewportPadding) {
+        left = triggerRect.left - gap - elementRect.width;
+    }
+
+    let top = triggerRect.top;
+    if (top + elementRect.height > window.innerHeight - viewportPadding) {
+        top = window.innerHeight - viewportPadding - elementRect.height;
+    }
+
+    element.style.left = `${clampFloatingPosition(left, viewportPadding, window.innerWidth - viewportPadding - elementRect.width)}px`;
+    element.style.top = `${clampFloatingPosition(top, viewportPadding, window.innerHeight - viewportPadding - elementRect.height)}px`;
+}
+
+function mountFloatingElement(trigger, element, displayValue) {
+    const root = ensureFloatingLayerRoot();
+    root.appendChild(element);
+    Object.assign(element.style, {
+        position: 'fixed',
+        left: '0',
+        top: '0',
+        display: displayValue,
+        pointerEvents: 'auto'
+    });
+    positionFloatingElement(trigger, element);
+}
+
+function unmountLayerActionsOverlay() {
+    const activeOverlay = activeLayerActionsOverlay;
+    if (!activeOverlay) {
+        return;
+    }
+
+    const {
+        menu,
+        dropdown,
+        onWindowResize,
+        onSidebarScroll
+    } = activeOverlay;
+
+    window.removeEventListener('resize', onWindowResize, true);
+    document.removeEventListener('scroll', onSidebarScroll, true);
+
+    dropdown.style.position = '';
+    dropdown.style.left = '';
+    dropdown.style.top = '';
+    dropdown.style.display = '';
+    dropdown.style.pointerEvents = '';
+
+    if (menu?.isConnected) {
+        menu.appendChild(dropdown);
+    } else {
+        dropdown.remove();
+    }
+
+    activeLayerActionsOverlay = null;
+}
+
+function syncLayerActionsOverlay(menu) {
+    if (!(menu instanceof HTMLElement)) {
+        unmountLayerActionsOverlay();
+        return;
+    }
+
+    const dropdown = menu.querySelector('.layer-actions-dropdown');
+    const trigger = menu.querySelector('.layer-actions-trigger');
+    if (!(dropdown instanceof HTMLElement) || !(trigger instanceof HTMLElement)) {
+        unmountLayerActionsOverlay();
+        return;
+    }
+
+    if (activeLayerActionsOverlay?.menu !== menu) {
+        unmountLayerActionsOverlay();
+
+        const onReposition = () => positionFloatingElement(trigger, dropdown);
+        activeLayerActionsOverlay = {
+            menu,
+            dropdown,
+            trigger,
+            onWindowResize: onReposition,
+            onSidebarScroll: onReposition
+        };
+
+        window.addEventListener('resize', onReposition, true);
+        document.addEventListener('scroll', onReposition, true);
+    }
+
+    mountFloatingElement(trigger, dropdown, 'flex');
+}
+
+function getLayerActionsMenuForTarget(target) {
+    if (!(target instanceof Element)) {
+        return null;
+    }
+
+    const inlineMenu = target.closest('.layer-actions-menu');
+    if (inlineMenu) {
+        return inlineMenu;
+    }
+
+    if (activeLayerActionsOverlay?.dropdown?.contains(target)) {
+        return activeLayerActionsOverlay.menu;
+    }
+
+    return null;
+}
 
 function getEmptyStateMarkup() {
     return `
@@ -174,6 +319,10 @@ function closeLayerActionMenus({ except } = {}) {
         if (trigger) {
             trigger.setAttribute('aria-expanded', 'false');
         }
+
+        if (activeLayerActionsOverlay?.menu === menu) {
+            unmountLayerActionsOverlay();
+        }
     });
 }
 
@@ -189,33 +338,49 @@ function zoomToLayerFromItem(layerItem) {
     fitLayerToView(record.source);
 }
 
-function renameLayerFromItem(layerItem) {
-    const previousName = getLayerItemName(layerItem);
+function closeLayerRenamePopover({ restoreFocus = false } = {}) {
+    const activePopover = activeLayerRenamePopover;
+    if (!activePopover) {
+        return;
+    }
+
+    const {
+        popover,
+        onDocumentPointerDown,
+        onWindowKeyDown,
+        onReposition,
+        trigger
+    } = activePopover;
+
+    document.removeEventListener('pointerdown', onDocumentPointerDown, true);
+    window.removeEventListener('keydown', onWindowKeyDown, true);
+    window.removeEventListener('resize', onReposition, true);
+    document.removeEventListener('scroll', onReposition, true);
+    popover.remove();
+
+    if (restoreFocus && trigger instanceof HTMLElement) {
+        trigger.focus();
+    }
+
+    activeLayerRenamePopover = null;
+}
+
+function applyLayerRename(layerItem, previousName, nextName) {
     const record = getLayerRecord(previousName);
     if (!record) {
         showToast('Rename Failed', 'Could not find that layer.', 'error');
-        return;
-    }
-
-    const requestedName = window.prompt('Rename layer', previousName);
-    if (requestedName === null) {
-        return;
-    }
-
-    const nextName = requestedName.trim();
-    if (!nextName || nextName === previousName) {
-        return;
+        return false;
     }
 
     if (getLayerRecord(nextName)) {
         showToast('Name In Use', `A layer named "${nextName}" already exists.`, 'warning');
-        return;
+        return false;
     }
 
     const renamed = renameLayerRecord(previousName, nextName);
     if (!renamed) {
         showToast('Rename Failed', 'Could not rename that layer.', 'error');
-        return;
+        return false;
     }
 
     if (typeof record.displayName === 'string' || record.isWMS) {
@@ -237,6 +402,108 @@ function renameLayerFromItem(layerItem) {
     }
 
     selectLayer(layerItem);
+    return true;
+}
+
+function renameLayerFromItem(layerItem) {
+    const previousName = getLayerItemName(layerItem);
+    const record = getLayerRecord(previousName);
+    if (!record) {
+        showToast('Rename Failed', 'Could not find that layer.', 'error');
+        return;
+    }
+
+    closeLayerRenamePopover();
+
+    const trigger = layerItem.querySelector('.layer-actions-trigger');
+    if (!(trigger instanceof HTMLElement)) {
+        return;
+    }
+
+    const popover = document.createElement('div');
+    popover.className = 'layer-rename-popover';
+    popover.setAttribute('role', 'dialog');
+    popover.setAttribute('aria-modal', 'false');
+    popover.setAttribute('aria-label', `Rename layer ${previousName}`);
+    popover.innerHTML = `
+        <div class="layer-rename-title">Rename layer</div>
+        <div class="layer-rename-field">
+            <input
+                type="text"
+                class="layer-rename-input"
+                value="${escapeHtml(previousName)}"
+                maxlength="120"
+                aria-label="Layer name"
+            />
+        </div>
+        <div class="layer-rename-actions">
+            <button type="button" class="btn btn-secondary layer-rename-cancel">Cancel</button>
+            <button type="button" class="btn btn-primary layer-rename-save">Save</button>
+        </div>
+    `;
+
+    mountFloatingElement(trigger, popover, 'grid');
+
+    const input = popover.querySelector('.layer-rename-input');
+    const cancelButton = popover.querySelector('.layer-rename-cancel');
+    const saveButton = popover.querySelector('.layer-rename-save');
+
+    const cancelRename = ({ restoreFocus = false } = {}) => {
+        closeLayerRenamePopover({ restoreFocus });
+    };
+
+    const commitRename = () => {
+        const nextName = input.value.trim();
+        if (!nextName || nextName === previousName) {
+            cancelRename({ restoreFocus: true });
+            return;
+        }
+
+        if (applyLayerRename(layerItem, previousName, nextName)) {
+            closeLayerRenamePopover();
+        }
+    };
+
+    const onDocumentPointerDown = (event) => {
+        if (!popover.contains(event.target)) {
+            cancelRename();
+        }
+    };
+
+    const onWindowKeyDown = (event) => {
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            cancelRename({ restoreFocus: true });
+            return;
+        }
+
+        if (event.key === 'Enter' && event.target === input) {
+            event.preventDefault();
+            commitRename();
+        }
+    };
+
+    activeLayerRenamePopover = {
+        popover,
+        onDocumentPointerDown,
+        onWindowKeyDown,
+        onReposition: () => positionFloatingElement(trigger, popover),
+        trigger
+    };
+
+    document.addEventListener('pointerdown', onDocumentPointerDown, true);
+    window.addEventListener('keydown', onWindowKeyDown, true);
+    window.addEventListener('resize', activeLayerRenamePopover.onReposition, true);
+    document.addEventListener('scroll', activeLayerRenamePopover.onReposition, true);
+
+    cancelButton.addEventListener('click', () => cancelRename({ restoreFocus: true }));
+    saveButton.addEventListener('click', commitRename);
+    popover.addEventListener('pointerdown', (event) => event.stopPropagation());
+
+    requestAnimationFrame(() => {
+        input.focus();
+        input.select();
+    });
 }
 
 function setupLayerGroupToggleListeners(layerList) {
@@ -1016,6 +1283,12 @@ export function addLayerItem(name, color, featureCount, options = {}) {
             closeLayerActionMenus({ except: isOpen ? null : layerActionsMenu });
             layerActionsMenu.setAttribute('data-open', isOpen ? 'false' : 'true');
             layerActionsTrigger.setAttribute('aria-expanded', String(!isOpen));
+
+            if (isOpen) {
+                unmountLayerActionsOverlay();
+            } else {
+                syncLayerActionsOverlay(layerActionsMenu);
+            }
         });
     }
 
@@ -1038,7 +1311,7 @@ export function addLayerItem(name, color, featureCount, options = {}) {
 
     if (!document._layerActionMenuCloseListenerAdded) {
         document.addEventListener('click', (event) => {
-            const openMenu = event.target.closest('.layer-actions-menu');
+            const openMenu = getLayerActionsMenuForTarget(event.target);
             closeLayerActionMenus({ except: openMenu });
         });
         document._layerActionMenuCloseListenerAdded = true;
