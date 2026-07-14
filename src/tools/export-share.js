@@ -513,6 +513,9 @@ function serializeLayerSettings() {
                     gpLayerName: record.gpLayerName || '',
                     gpLayerType: record.gpLayerType || '',
                     gpTileUrl: record.gpTileUrl || '',
+                    layerExtent: Array.isArray(record.layerExtent) ? record.layerExtent : null,
+                    layerExtentProjection: record.layerExtentProjection || '',
+                    zoomUnavailableReason: record.zoomUnavailableReason || '',
                     displayName: record.displayName || layerName
                 };
             }
@@ -523,6 +526,9 @@ function serializeLayerSettings() {
                     type: 'wms',
                     wmsUrl: record.wmsUrl || '',
                     wmsLayerName: record.wmsLayerName || '',
+                    layerExtent: Array.isArray(record.layerExtent) ? record.layerExtent : null,
+                    layerExtentProjection: record.layerExtentProjection || '',
+                    zoomUnavailableReason: record.zoomUnavailableReason || '',
                     displayName: record.displayName || layerName
                 };
             }
@@ -694,6 +700,9 @@ function applyLayerState(layerState) {
         record = addWmsLayer(layerState.name, source, layer, {
             wmsUrl: layerState.wmsUrl,
             wmsLayerName: layerState.wmsLayerName,
+            layerExtent: Array.isArray(layerState.layerExtent) ? layerState.layerExtent : null,
+            layerExtentProjection: layerState.layerExtentProjection || '',
+            zoomUnavailableReason: layerState.zoomUnavailableReason || '',
             displayName: layerState.displayName || layerState.name,
             sourceCrs: layerState.sourceCrs || 'Unknown CRS',
             sourceCrsDetected: Boolean(layerState.sourceCrsDetected)
@@ -718,6 +727,9 @@ function applyLayerState(layerState) {
             gpLayerName: layerState.gpLayerName,
             gpLayerType: layerState.gpLayerType || 'xyz',
             gpTileUrl: layerState.gpTileUrl || '',
+            layerExtent: Array.isArray(layerState.layerExtent) ? layerState.layerExtent : null,
+            layerExtentProjection: layerState.layerExtentProjection || '',
+            zoomUnavailableReason: layerState.zoomUnavailableReason || '',
             displayName: layerState.displayName || layerState.name,
             sourceCrs: layerState.sourceCrs || 'Unknown CRS',
             sourceCrsDetected: Boolean(layerState.sourceCrsDetected)
@@ -741,6 +753,9 @@ function applyLayerState(layerState) {
     record.opacity = opacity;
     record.sourceCrs = layerState.sourceCrs || record.sourceCrs || 'Unknown CRS';
     record.sourceCrsDetected = Boolean(layerState.sourceCrsDetected || record.sourceCrsDetected);
+    record.layerExtent = Array.isArray(layerState.layerExtent) ? layerState.layerExtent : record.layerExtent || null;
+    record.layerExtentProjection = layerState.layerExtentProjection || record.layerExtentProjection || '';
+    record.zoomUnavailableReason = layerState.zoomUnavailableReason || record.zoomUnavailableReason || '';
 
     if (!record.isWMS && layerState.color) {
         record.color = layerState.color;

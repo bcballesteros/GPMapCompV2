@@ -1,5 +1,5 @@
 import { DEFAULT_LINE_STROKE_WIDTH, DEFAULT_POINT_SIZE } from '../config/constants.js';
-import { fitLayerToView, removeManagedLayer, updateManagedLayerStyle } from '../map/layer-manager.js';
+import { canZoomToLayer, fitLayerToView, removeManagedLayer, updateManagedLayerStyle } from '../map/layer-manager.js';
 import { getLayerRecord, renameLayerRecord, setCurrentLayerName } from '../state/store.js';
 import { syncLabelsToggle } from '../tools/labels-tool.js';
 import { commitLayerOpacity as commitLayerOpacityValue, updateLayerOpacity as updateLayerOpacityValue } from '../tools/transparency-tool.js';
@@ -286,9 +286,17 @@ function getLayerItemName(layerItem) {
     return layerItem?.querySelector('.layer-name')?.textContent?.trim() || '';
 }
 
-function getLayerActionsMenuMarkup(safeName) {
+function getLayerActionsMenuMarkup(safeName, options = {}) {
     const itemsMarkup = LAYER_ACTIONS
-        .map((action) => `<button type="button" class="layer-actions-item" data-action="${action.id}" role="menuitem">${action.label}</button>`)
+        .map((action) => {
+            const isZoomAction = action.id === 'zoom';
+            const isDisabled = isZoomAction && options.zoomDisabled;
+            const title = isDisabled && options.zoomDisabledReason
+                ? ` title="${escapeHtml(options.zoomDisabledReason)}"`
+                : '';
+
+            return `<button type="button" class="layer-actions-item" data-action="${action.id}" role="menuitem"${isDisabled ? ' disabled aria-disabled="true"' : ''}${title}>${action.label}</button>`;
+        })
         .join('');
 
     return `
@@ -330,12 +338,12 @@ function zoomToLayerFromItem(layerItem) {
     const layerName = getLayerItemName(layerItem);
     const record = getLayerRecord(layerName);
 
-    if (!record?.source || typeof record.source.getExtent !== 'function') {
-        showToast('Zoom Unavailable', 'This layer does not have a zoomable extent yet.', 'warning');
+    if (!canZoomToLayer(record)) {
+        showToast('Zoom Unavailable', record?.zoomUnavailableReason || 'This layer does not have a zoomable extent yet.', 'warning');
         return;
     }
 
-    fitLayerToView(record.source);
+    fitLayerToView(record);
 }
 
 function closeLayerRenamePopover({ restoreFocus = false } = {}) {
@@ -801,6 +809,8 @@ export function addLayerItem(name, color, featureCount, options = {}) {
     const isPolygonLayer = Boolean(record?.isPolygonLayer);
     const groupKey = getLayerGroupKey(record, options);
     const opacityValue = Math.round((record?.opacity ?? 1) * 100);
+    const canZoom = canZoomToLayer(record);
+    const zoomDisabledReason = record?.zoomUnavailableReason || 'This layer does not have a zoomable extent yet.';
     const pointSizeValue = Math.round(record?.pointSize ?? DEFAULT_POINT_SIZE);
     const svgMarkerDataUrl = record?.svgMarkerDataUrl || '';
     const markerPresetType = record?.markerPresetType || null;
@@ -1017,7 +1027,10 @@ export function addLayerItem(name, color, featureCount, options = {}) {
                     </div>
                     <div class="layer-header-actions">
                         <button type="button" class="layer-expand-btn" aria-expanded="false" title="Layer controls"><i class="fas fa-chevron-down" aria-hidden="true"></i></button>
-                        ${getLayerActionsMenuMarkup(safeName)}
+                        ${getLayerActionsMenuMarkup(safeName, {
+        zoomDisabled: !canZoom,
+        zoomDisabledReason
+    })}
                     </div>
                 </div>
             </div>
@@ -1297,6 +1310,10 @@ export function addLayerItem(name, color, featureCount, options = {}) {
             actionItem.addEventListener('pointerdown', (event) => event.stopPropagation());
             actionItem.addEventListener('click', (event) => {
                 event.stopPropagation();
+                if (actionItem.disabled) {
+                    return;
+                }
+
                 const action = actionItem.getAttribute('data-action');
                 if (action === 'zoom') {
                     zoomToLayerFromItem(newItem);

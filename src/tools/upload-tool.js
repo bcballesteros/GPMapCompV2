@@ -296,15 +296,93 @@ function buildCapabilitiesUrl(wmsUrl) {
     return url.toString();
 }
 
+function normalizeLayerExtent(extent) {
+    if (!Array.isArray(extent) || extent.length !== 4) {
+        return null;
+    }
+
+    const normalized = extent.map((value) => Number(value));
+    if (!normalized.every(Number.isFinite)) {
+        return null;
+    }
+
+    const [minX, minY, maxX, maxY] = normalized;
+    if (minX >= maxX || minY >= maxY) {
+        return null;
+    }
+
+    return normalized;
+}
+
+function normalizeExtentProjection(code) {
+    const value = String(code || '').trim().toUpperCase();
+    if (!value) {
+        return null;
+    }
+
+    if (value.includes('CRS:84') || value.includes('OGC:1.3:CRS84') || value.includes('EPSG:4326')) {
+        return 'EPSG:4326';
+    }
+
+    if (value.includes('EPSG:3857') || value.includes('EPSG:900913')) {
+        return 'EPSG:3857';
+    }
+
+    return null;
+}
+
+function extractLayerExtentInfo(layer) {
+    const geographicExtent = normalizeLayerExtent(layer?.EX_GeographicBoundingBox);
+    if (geographicExtent) {
+        return {
+            layerExtent: geographicExtent,
+            layerExtentProjection: 'EPSG:4326',
+            zoomUnavailableReason: ''
+        };
+    }
+
+    const latLonExtent = normalizeLayerExtent(layer?.LatLonBoundingBox?.extent);
+    if (latLonExtent) {
+        return {
+            layerExtent: latLonExtent,
+            layerExtentProjection: 'EPSG:4326',
+            zoomUnavailableReason: ''
+        };
+    }
+
+    const bbox = (layer?.BoundingBox || [])
+        .map((entry) => ({
+            extent: normalizeLayerExtent(entry?.extent),
+            projection: normalizeExtentProjection(entry?.crs || entry?.srs)
+        }))
+        .find((entry) => entry.extent && entry.projection);
+
+    if (bbox) {
+        return {
+            layerExtent: bbox.extent,
+            layerExtentProjection: bbox.projection,
+            zoomUnavailableReason: ''
+        };
+    }
+
+    return {
+        layerExtent: null,
+        layerExtentProjection: '',
+        zoomUnavailableReason: 'This service does not advertise a usable geographic extent for this layer.'
+    };
+}
+
 function flattenWmsCapabilityLayers(layer, layers = []) {
     if (!layer) {
         return layers;
     }
 
     if (layer.Name) {
+        const extentInfo = extractLayerExtentInfo(layer);
         layers.push({
             name: layer.Name,
-            title: layer.Title || layer.Name
+            title: layer.Title || layer.Name,
+            ...extentInfo
         });
     }
 
@@ -414,6 +492,9 @@ function addWmsLayerToMap(wmsUrl, layerInfo) {
             wmsUrl,
             wmsLayerName: layerInfo.name,
             displayName,
+            layerExtent: layerInfo.layerExtent,
+            layerExtentProjection: layerInfo.layerExtentProjection,
+            zoomUnavailableReason: layerInfo.zoomUnavailableReason,
             sourceCrs: 'Unknown CRS',
             sourceCrsDetected: false
         });
@@ -791,6 +872,9 @@ function addGpLayerToMap(gpUrl, layerInfo) {
             wmsUrl: layerInfo.type === 'wms' ? (layerInfo.url || gpUrl) : '',
             wmsLayerName: layerInfo.type === 'wms' ? layerInfo.name : '',
             displayName,
+            layerExtent: layerInfo.layerExtent || null,
+            layerExtentProjection: layerInfo.layerExtentProjection || '',
+            zoomUnavailableReason: layerInfo.zoomUnavailableReason || 'This Geoportal layer does not expose a geographic extent in the configured catalog.',
             sourceCrs: 'Unknown CRS',
             sourceCrsDetected: false
         });

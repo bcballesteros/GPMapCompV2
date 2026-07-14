@@ -85,6 +85,9 @@ export function addVectorLayer(layerName, layerColor, geojson, features, metadat
         isLineLayer: isLineLayer(geojson),
         isPolygonLayer: isPolygonLayer(geojson),
         isWMS: false,
+        layerExtent: null,
+        layerExtentProjection: '',
+        zoomUnavailableReason: '',
         sourceCrs: metadata.sourceCrs || 'Unknown CRS',
         sourceCrsDetected: Boolean(metadata.sourceCrsDetected),
         labelsVisible: false,
@@ -115,6 +118,9 @@ export function addWmsLayer(layerName, source, layer, metadata = {}) {
         geometryType: 'WMS',
         isWMS: true,
         isGP: Boolean(metadata.isGP),
+        layerExtent: Array.isArray(metadata.layerExtent) ? metadata.layerExtent : null,
+        layerExtentProjection: metadata.layerExtentProjection || '',
+        zoomUnavailableReason: metadata.zoomUnavailableReason || '',
         sourceCrs: metadata.sourceCrs || 'Unknown CRS',
         sourceCrsDetected: Boolean(metadata.sourceCrsDetected),
         wmsUrl: metadata.wmsUrl || '',
@@ -130,6 +136,83 @@ export function addWmsLayer(layerName, source, layer, metadata = {}) {
     return getLayerRecord(layerName);
 }
 
+function normalizeExtent(extent) {
+    if (!Array.isArray(extent) || extent.length !== 4) {
+        return null;
+    }
+
+    const normalized = extent.map((value) => Number(value));
+    if (!normalized.every(Number.isFinite)) {
+        return null;
+    }
+
+    const [minX, minY, maxX, maxY] = normalized;
+    if (minX >= maxX || minY >= maxY) {
+        return null;
+    }
+
+    return normalized;
+}
+
+function normalizeProjectionCode(code) {
+    const value = String(code || '').trim().toUpperCase();
+    if (!value) {
+        return '';
+    }
+
+    if (value.includes('CRS:84') || value.includes('OGC:1.3:CRS84')) {
+        return 'EPSG:4326';
+    }
+
+    if (value.includes('EPSG:4326')) {
+        return 'EPSG:4326';
+    }
+
+    if (value.includes('EPSG:3857') || value.includes('EPSG:900913')) {
+        return 'EPSG:3857';
+    }
+
+    return value;
+}
+
+function getStoredRecordExtent(record) {
+    const storedExtent = normalizeExtent(record?.layerExtent);
+    if (!storedExtent) {
+        return null;
+    }
+
+    const mapProjection = getMap()?.getView?.()?.getProjection?.()?.getCode?.() || 'EPSG:3857';
+    const sourceProjection = normalizeProjectionCode(record?.layerExtentProjection) || mapProjection;
+    if (sourceProjection === mapProjection) {
+        return storedExtent;
+    }
+
+    try {
+        return normalizeExtent(ol.proj.transformExtent(storedExtent, sourceProjection, mapProjection));
+    } catch {
+        return null;
+    }
+}
+
+export function getZoomExtent(target) {
+    if (target?.source) {
+        return getZoomExtent(target.source) || getStoredRecordExtent(target);
+    }
+
+    if (typeof target?.getExtent === 'function') {
+        const sourceExtent = normalizeExtent(target.getExtent());
+        if (sourceExtent && !ol.extent.isEmpty(sourceExtent)) {
+            return sourceExtent;
+        }
+    }
+
+    return null;
+}
+
+export function canZoomToLayer(target) {
+    return Boolean(getZoomExtent(target));
+}
+
 export function removeManagedLayer(layerName) {
     const record = getLayerRecord(layerName);
     if (!record) {
@@ -141,7 +224,7 @@ export function removeManagedLayer(layerName) {
 }
 
 export function fitLayerToView(source) {
-    const extent = source.getExtent();
+    const extent = getZoomExtent(source);
     if (extent && !ol.extent.isEmpty(extent)) {
         getMap().getView().fit(extent, {
             padding: DEFAULT_VIEW_PADDING,

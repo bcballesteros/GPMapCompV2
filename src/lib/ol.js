@@ -19,7 +19,7 @@ import { unByKey } from 'ol/Observable.js';
 import { defaults as defaultControls, Attribution, ScaleLine, Zoom } from 'ol/control.js';
 import { click } from 'ol/events/condition.js';
 import { isEmpty } from 'ol/extent.js';
-import { fromLonLat, toLonLat } from 'ol/proj.js';
+import { fromLonLat, toLonLat, transformExtent } from 'ol/proj.js';
 import { OSM, TileWMS, Vector as VectorSource, XYZ } from 'ol/source.js';
 import { Circle, Fill, Icon, Stroke, Style, Text } from 'ol/style.js';
 
@@ -30,7 +30,8 @@ const ol = {
     View,
     proj: {
         fromLonLat,
-        toLonLat
+        toLonLat,
+        transformExtent
     },
     extent: {
         isEmpty

@@ -10,31 +10,36 @@ export const DEMO_GP_LAYERS = [
         name: 'administrative-boundaries',
         title: 'Administrative Boundaries',
         type: 'xyz',
-        tileUrl: DEMO_TILE_URL
+        tileUrl: DEMO_TILE_URL,
+        zoomUnavailableReason: 'This Geoportal demo layer is configured only with an XYZ tile URL and does not expose layer extent metadata.'
     },
     {
         name: 'roads-network',
         title: 'Roads Network',
         type: 'xyz',
-        tileUrl: DEMO_TILE_URL
+        tileUrl: DEMO_TILE_URL,
+        zoomUnavailableReason: 'This Geoportal demo layer is configured only with an XYZ tile URL and does not expose layer extent metadata.'
     },
     {
         name: 'hydrography',
         title: 'Hydrography',
         type: 'xyz',
-        tileUrl: DEMO_TILE_URL
+        tileUrl: DEMO_TILE_URL,
+        zoomUnavailableReason: 'This Geoportal demo layer is configured only with an XYZ tile URL and does not expose layer extent metadata.'
     },
     {
         name: 'land-cover',
         title: 'Land Cover',
         type: 'xyz',
-        tileUrl: DEMO_TILE_URL
+        tileUrl: DEMO_TILE_URL,
+        zoomUnavailableReason: 'This Geoportal demo layer is configured only with an XYZ tile URL and does not expose layer extent metadata.'
     },
     {
         name: 'topographic-map',
         title: 'Topographic Map',
         type: 'xyz',
-        tileUrl: DEMO_TILE_URL
+        tileUrl: DEMO_TILE_URL,
+        zoomUnavailableReason: 'This Geoportal demo layer is configured only with an XYZ tile URL and does not expose layer extent metadata.'
     }
 ];
 
