@@ -8,3 +8,5 @@ export const DEFAULT_POINT_SIZE = 5;
 export const DEFAULT_LINE_STROKE_WIDTH = 2;
 export const DEFAULT_SVG_BASE_SIZE = 24;
 export const DEFAULT_SVG_BASE_SCALE = 1;
+export const WMS_URL = 'http://192.168.8.87:8080/geoserver/wms';
+export const GEOPORTAL_WMS_URL = 'https://geoserver.geoportal.gov.ph/geoserver/geoportal/wms';

@@ -242,7 +242,7 @@ function buildModalHelp(modalId) {
     if (modalId === 'gpModal') {
         return {
             primary: 'Connect Geoportal layers.',
-            secondary: 'Fetch the catalog, then check Geoportal layers to preview them. Demo layers appear when no live service is available.'
+            secondary: 'Browse and add published layers from the official Geoportal Philippines service. Change the URL only if you need another compatible Geoportal or WMS service.'
         };
     }
 

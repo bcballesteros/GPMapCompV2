@@ -4,13 +4,13 @@ import { addVectorLayer, addWmsLayer, fitLayerToView } from '../map/layer-manage
 import { getCurrentLayerData, getLayerRecord, getState, setCurrentLayerData } from '../state/store.js';
 import { formatFileSize } from '../utils/format.js';
 import { parseUploadFile } from '../services/shapefile-service.js';
-import { createGpLayerConfig, DEFAULT_GP_URL, DEMO_GP_LAYERS } from '../services/gp-service.js';
+import { createGpLayerConfig } from '../services/gp-service.js';
 import { createWmsLayerConfig } from '../services/wms-service.js';
 import { addLayerItem, removeLayerItem } from '../ui/layers-panel.js';
 import { closeModal } from '../ui/modal.js';
 import { showToast } from '../ui/toast.js';
+import { GEOPORTAL_WMS_URL, WMS_URL } from '../config/constants.js';
 
-const DEFAULT_WMS_URL = 'http://192.168.8.87:8080/geoserver/wms';
 let availableWmsLayers = [];
 let wmsFetchRequestId = 0;
 let availableGpLayers = [];
@@ -640,7 +640,7 @@ export function resetWmsLayerFormSession({ restoreDefaultUrl = true } = {}) {
     availableWmsLayers = [];
 
     if (restoreDefaultUrl && input) {
-        input.value = DEFAULT_WMS_URL;
+        input.value = WMS_URL;
     }
 
     resetWmsFetchFeedback();
@@ -661,7 +661,7 @@ export function initializeWmsLayerForm() {
     }
 
     if (!input.value.trim()) {
-        input.value = DEFAULT_WMS_URL;
+        input.value = WMS_URL;
     }
 
     updateWmsFetchButtonVisibility();
@@ -727,23 +727,7 @@ function updateGpFetchButtonVisibility() {
     fetchButton.hidden = input.value.trim().length === 0;
 }
 
-function shouldTryGpCapabilities(gpUrl) {
-    const normalizedUrl = gpUrl.toLowerCase();
-    return normalizedUrl.includes('wms') || normalizedUrl.includes('geoserver') || normalizedUrl.includes('mapserver');
-}
-
 async function fetchGpLayers(gpUrl) {
-    if (!shouldTryGpCapabilities(gpUrl)) {
-        await new Promise((resolve) => {
-            window.setTimeout(resolve, 250);
-        });
-        return {
-            layers: DEMO_GP_LAYERS,
-            isDemo: true,
-            message: 'Demo Geoportal catalog loaded. Connect a WMS or map service endpoint for live layers.'
-        };
-    }
-
     try {
         const response = await fetch(buildCapabilitiesUrl(gpUrl));
         if (!response.ok) {
@@ -767,9 +751,9 @@ async function fetchGpLayers(gpUrl) {
     } catch (error) {
         console.warn('Geoportal layer fetch failed:', error);
         return {
-            layers: DEMO_GP_LAYERS,
-            isDemo: true,
-            message: 'Live Geoportal catalog unavailable. Showing demo layers until an accessible service endpoint is configured.'
+            layers: [],
+            isDemo: false,
+            message: 'Could not fetch Geoportal layers. Check the URL, network access, or CORS settings.'
         };
     }
 }
@@ -991,7 +975,7 @@ export function resetGpLayerFormSession({ restoreDefaultUrl = true } = {}) {
     availableGpLayers = [];
 
     if (restoreDefaultUrl && input) {
-        input.value = DEFAULT_GP_URL;
+        input.value = GEOPORTAL_WMS_URL;
     }
 
     resetGpFetchFeedback();
@@ -1012,7 +996,7 @@ export function initializeGpLayerForm() {
     }
 
     if (!input.value.trim()) {
-        input.value = DEFAULT_GP_URL;
+        input.value = GEOPORTAL_WMS_URL;
     }
 
     updateGpFetchButtonVisibility();
