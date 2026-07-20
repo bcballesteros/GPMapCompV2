@@ -164,10 +164,11 @@ function getEmptyStateMarkup() {
     `;
 }
 
-const LAYER_GROUP_ORDER = ['vector', 'wms', 'annotation', 'other'];
+const LAYER_GROUP_ORDER = ['vector', 'wms', 'geoportal', 'annotation', 'other'];
 const LAYER_GROUP_LABELS = {
     vector: 'Vector Layers',
     wms: 'WMS Layers',
+    geoportal: 'Geoportal Layers',
     annotation: 'Annotations',
     other: 'Other Layers'
 };
@@ -177,6 +178,9 @@ const LAYER_ACTIONS = [
 ];
 
 function getLayerGroupKey(record, options = {}) {
+    if (record?.isGP || options.isGP) {
+        return 'geoportal';
+    }
     if (record?.isWMS || options.isWMS) {
         return 'wms';
     }

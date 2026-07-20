@@ -66,7 +66,7 @@
     --spacing-5: 20px;
     --spacing-6: 24px;
     --spacing-8: 32px;
-    --left-sidebar-width: 232px;
+    --left-sidebar-width: 248px;
     --right-sidebar-width: 252px;
     --navbar-height: 64px;
     --nav-control-height: 38px;
@@ -4494,7 +4494,7 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
 
 @media (max-width: 1366px) {
     :root {
-        --left-sidebar-width: 224px;
+        --left-sidebar-width: 240px;
         --right-sidebar-width: 244px;
     }
 
