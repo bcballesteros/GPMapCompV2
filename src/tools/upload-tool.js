@@ -15,6 +15,11 @@ let availableWmsLayers = [];
 let wmsFetchRequestId = 0;
 let availableGpLayers = [];
 let gpFetchRequestId = 0;
+let gpLayerCache = null;
+let gpLayerFetchPromise = null;
+let gpSearchDebounceId = null;
+let gpHighlightedLayerIndex = -1;
+const GP_SEARCH_DEBOUNCE_MS = 180;
 
 function formatLayerNameFromFileName(fileName = '') {
     const baseName = fileName
@@ -688,74 +693,48 @@ function setGpFetchFeedback(message = '', state = '') {
     feedback.dataset.state = state;
 }
 
-function resetGpFetchFeedback() {
-    setGpFetchFeedback('', '');
-}
-
-function setGpFetchBusyState(isBusy) {
-    const fetchButton = document.getElementById('gpFetchButton');
-    if (!fetchButton) {
-        return;
-    }
-
-    fetchButton.disabled = isBusy;
-    fetchButton.setAttribute('aria-busy', isBusy ? 'true' : 'false');
-    fetchButton.innerHTML = isBusy
-        ? '<i class="fas fa-spinner fa-spin"></i> Fetching'
-        : '<i class="fas fa-cloud-arrow-down"></i> Fetch';
-}
-
-function setGpLayerChecklistEmpty(message = 'Fetch Geoportal layers to show available layers.') {
+function setGpLayerChecklistEmpty(message, { retry = false } = {}) {
     const checklist = document.getElementById('gpLayerChecklist');
     if (!checklist) {
         return;
     }
 
-    checklist.replaceChildren(Object.assign(document.createElement('div'), {
+    const emptyState = Object.assign(document.createElement('div'), {
         className: 'wms-layer-empty',
         textContent: message
-    }));
-}
+    });
 
-function updateGpFetchButtonVisibility() {
-    const input = document.getElementById('gpUrl');
-    const fetchButton = document.getElementById('gpFetchButton');
-    if (!input || !fetchButton) {
+    if (!retry) {
+        checklist.replaceChildren(emptyState);
         return;
     }
 
-    fetchButton.hidden = input.value.trim().length === 0;
+    const retryButton = Object.assign(document.createElement('button'), {
+        type: 'button',
+        className: 'btn btn-secondary gp-layer-retry',
+        textContent: 'Retry'
+    });
+    retryButton.addEventListener('click', () => fetchGpLayersFromForm());
+    checklist.replaceChildren(emptyState, retryButton);
 }
 
-async function fetchGpLayers(gpUrl) {
-    try {
-        const response = await fetch(buildCapabilitiesUrl(gpUrl));
-        if (!response.ok) {
-            throw new Error(`Geoportal capabilities failed with HTTP ${response.status}`);
-        }
-
-        const xmlText = await response.text();
-        const parsedCapabilities = new ol.format.WMSCapabilities().read(xmlText);
-        const layers = flattenWmsCapabilityLayers(parsedCapabilities?.Capability?.Layer)
-            .map((layerInfo) => ({
-                ...layerInfo,
-                type: 'wms',
-                url: gpUrl
-            }));
-
-        return {
-            layers,
-            isDemo: false,
-            message: `${layers.length} Geoportal layer${layers.length === 1 ? '' : 's'} available.`
-        };
-    } catch (error) {
-        console.warn('Geoportal layer fetch failed:', error);
-        return {
-            layers: [],
-            isDemo: false,
-            message: 'Could not fetch Geoportal layers. Check the URL, network access, or CORS settings.'
-        };
+function setGpLayerLoadingState(isLoading) {
+    const search = document.getElementById('gpLayerSearch');
+    if (search) {
+        search.disabled = isLoading;
+        search.setAttribute('aria-busy', isLoading ? 'true' : 'false');
     }
+    const clearButton = document.getElementById('gpLayerSearchClear');
+    if (clearButton) clearButton.hidden = isLoading || !search?.value;
+}
+
+function setGpLayerLoadingMessage() {
+    const checklist = document.getElementById('gpLayerChecklist');
+    if (!checklist) return;
+    checklist.replaceChildren(Object.assign(document.createElement('div'), {
+        className: 'wms-layer-empty gp-layer-loading',
+        innerHTML: '<i class="fas fa-spinner fa-spin" aria-hidden="true"></i><span>Loading official Geoportal layers...</span>'
+    }));
 }
 
 function normalizeGpUrl(gpUrl) {
@@ -797,34 +776,6 @@ function buildGpDisplayName(layerInfo) {
         index += 1;
     }
     return `${gpName} ${index}`;
-}
-
-function updateGpLayerPickerSummary() {
-    const summary = document.getElementById('gpLayerPickerSummary');
-    if (!summary) {
-        return;
-    }
-
-    if (availableGpLayers.length === 0) {
-        summary.textContent = 'Fetch layers to select';
-        return;
-    }
-
-    const selectedCount = document.querySelectorAll('#gpLayerChecklist input[type="checkbox"]:checked').length;
-    summary.textContent = selectedCount > 0
-        ? `${selectedCount} Geoportal layer${selectedCount === 1 ? '' : 's'} selected`
-        : `${availableGpLayers.length} layers available`;
-}
-
-function setGpLayerChecklistOpen(isOpen) {
-    const trigger = document.getElementById('gpLayerPickerTrigger');
-    const checklist = document.getElementById('gpLayerChecklist');
-    if (!trigger || !checklist) {
-        return;
-    }
-
-    checklist.hidden = !isOpen;
-    trigger.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
 }
 
 function removeGpLayerFromMap(gpUrl, gpLayerName) {
@@ -875,7 +826,7 @@ function handleGpLayerChecklistChange(event) {
         return;
     }
 
-    const gpUrl = document.getElementById('gpUrl')?.value?.trim() || '';
+    const gpUrl = GEOPORTAL_WMS_URL;
     const layerInfo = availableGpLayers.find((layer) => layer.name === checkbox.value);
     if (!gpUrl || !layerInfo) {
         checkbox.checked = false;
@@ -888,7 +839,6 @@ function handleGpLayerChecklistChange(event) {
         removeGpLayerFromMap(gpUrl, layerInfo.name);
     }
 
-    updateGpLayerPickerSummary();
 }
 
 function renderGpLayerChecklist(layers) {
@@ -898,19 +848,27 @@ function renderGpLayerChecklist(layers) {
     }
 
     if (layers.length === 0) {
-        setGpLayerChecklistEmpty('No Geoportal layers available from this source.');
-        updateGpLayerPickerSummary();
+        gpHighlightedLayerIndex = -1;
+        const query = document.getElementById('gpLayerSearch')?.value.trim() || '';
+        const emptyState = document.createElement('div');
+        emptyState.className = 'gp-layer-no-results';
+        emptyState.innerHTML = `<div class="gp-layer-no-results-icon" aria-hidden="true">🔍</div><div class="gp-layer-no-results-title">No Geoportal layers found</div><div>No layers match &quot;${query.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')}&quot;.</div><div>Try another keyword.</div>`;
+        checklist.replaceChildren(emptyState);
         return;
     }
 
-    checklist.replaceChildren(...layers.map((layerInfo) => {
+    checklist.replaceChildren(...layers.map((layerInfo, index) => {
         const label = document.createElement('label');
         label.className = 'wms-layer-checklist-item';
+        label.dataset.gpLayerIndex = String(index);
 
         const checkbox = document.createElement('input');
         checkbox.type = 'checkbox';
         checkbox.value = layerInfo.name;
+        checkbox.checked = Boolean(findExistingGpLayerName(GEOPORTAL_WMS_URL, layerInfo.name));
         checkbox.addEventListener('change', handleGpLayerChecklistChange);
+        label.addEventListener('click', () => setGpHighlightedLayer(index));
+        label.addEventListener('pointerenter', () => setGpHighlightedLayer(index));
 
         const text = document.createElement('span');
         const title = document.createElement('span');
@@ -926,85 +884,158 @@ function renderGpLayerChecklist(layers) {
         return label;
     }));
 
-    updateGpLayerPickerSummary();
+    if (gpHighlightedLayerIndex >= 0) {
+        setGpHighlightedLayer(Math.min(gpHighlightedLayerIndex, layers.length - 1));
+    }
+}
+
+function getVisibleGpLayerItems() {
+    return Array.from(document.querySelectorAll('#gpLayerChecklist .wms-layer-checklist-item'));
+}
+
+function setGpHighlightedLayer(index, { scrollIntoView = false } = {}) {
+    const items = getVisibleGpLayerItems();
+    if (items.length === 0) {
+        gpHighlightedLayerIndex = -1;
+        return;
+    }
+
+    gpHighlightedLayerIndex = Math.min(Math.max(index, 0), items.length - 1);
+    items.forEach((item, itemIndex) => {
+        const isHighlighted = itemIndex === gpHighlightedLayerIndex;
+        item.classList.toggle('is-active', isHighlighted);
+    });
+
+    if (scrollIntoView) {
+        items[gpHighlightedLayerIndex].scrollIntoView({ block: 'nearest' });
+    }
+}
+
+function handleGpLayerSearchKeydown(event) {
+    if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+        const items = getVisibleGpLayerItems();
+        if (items.length === 0) return;
+
+        event.preventDefault();
+        const direction = event.key === 'ArrowUp' ? -1 : 1;
+        const startIndex = gpHighlightedLayerIndex < 0
+            ? (direction > 0 ? 0 : items.length - 1)
+            : gpHighlightedLayerIndex + direction;
+        setGpHighlightedLayer(startIndex, { scrollIntoView: true });
+        return;
+    }
+
+    if (event.key === 'Enter' && gpHighlightedLayerIndex >= 0) {
+        const checkbox = getVisibleGpLayerItems()[gpHighlightedLayerIndex]?.querySelector('input[type="checkbox"]');
+        if (!checkbox) return;
+
+        event.preventDefault();
+        if (!checkbox.checked) {
+            checkbox.checked = true;
+            checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+    }
 }
 
 export async function fetchGpLayersFromForm() {
-    const input = document.getElementById('gpUrl');
-    const gpUrl = input?.value?.trim() || '';
     const requestId = gpFetchRequestId + 1;
     gpFetchRequestId = requestId;
-
-    resetGpFetchFeedback();
-
-    if (!gpUrl) {
-        updateGpFetchButtonVisibility();
-        return;
-    }
-
-    setGpFetchBusyState(true);
+    const gpUrl = GEOPORTAL_WMS_URL;
+    setGpFetchFeedback('Loading official Geoportal layers...', '');
+    setGpLayerLoadingState(true);
+    setGpLayerLoadingMessage();
 
     try {
-        const result = await fetchGpLayers(gpUrl);
+        gpLayerFetchPromise ||= (async () => {
+            const response = await fetch(buildCapabilitiesUrl(gpUrl));
+            if (!response.ok) {
+                throw new Error(`Geoportal capabilities failed with HTTP ${response.status}`);
+            }
+            const parsedCapabilities = new ol.format.WMSCapabilities().read(await response.text());
+            return flattenWmsCapabilityLayers(parsedCapabilities?.Capability?.Layer)
+                .map((layerInfo) => ({ ...layerInfo, type: 'wms', url: gpUrl }))
+                .sort((a, b) => (a.title || a.name).localeCompare(b.title || b.name, undefined, { sensitivity: 'base' }));
+        })();
+        const layers = await gpLayerFetchPromise;
         if (requestId !== gpFetchRequestId) {
             return;
         }
-
-        availableGpLayers = result.layers;
-        renderGpLayerChecklist(result.layers);
-        setGpLayerChecklistOpen(true);
-
-        if (result.layers.length === 0) {
-            setGpFetchFeedback('No Geoportal layers found for this source.', 'warning');
-            return;
-        }
-
-        setGpFetchFeedback(result.message, result.isDemo ? 'warning' : 'success');
-    } finally {
-        if (requestId === gpFetchRequestId) {
-            setGpFetchBusyState(false);
-            updateGpFetchButtonVisibility();
-        }
+        gpLayerCache = layers;
+        availableGpLayers = layers;
+        renderGpLayerChecklist(getFilteredGpLayers());
+        updateGpLayerCount();
+        setGpLayerLoadingState(false);
+        document.getElementById('gpLayerSearch')?.focus();
+    } catch (error) {
+        if (requestId !== gpFetchRequestId) return;
+        console.warn('Geoportal layer fetch failed:', error);
+        gpLayerFetchPromise = null;
+        setGpFetchFeedback('Could not load official Geoportal layers. Please check your connection and try again.', 'warning');
+        setGpLayerChecklistEmpty('Unable to load official Geoportal layers.', { retry: true });
+        setGpLayerLoadingState(false);
+        document.getElementById('gpLayerSearch')?.focus();
     }
 }
 
-export function resetGpLayerFormSession({ restoreDefaultUrl = true } = {}) {
-    const input = document.getElementById('gpUrl');
+function getFilteredGpLayers() {
+    const query = document.getElementById('gpLayerSearch')?.value.trim().toLocaleLowerCase() || '';
+    return !query ? availableGpLayers : availableGpLayers.filter((layer) =>
+        `${layer.title || ''} ${layer.name || ''}`.toLocaleLowerCase().includes(query)
+    );
+}
 
-    gpFetchRequestId += 1;
-    availableGpLayers = [];
+function updateGpLayerCount() {
+    const filteredCount = getFilteredGpLayers().length;
+    const hasSearch = Boolean(document.getElementById('gpLayerSearch')?.value.trim());
+    setGpFetchFeedback(hasSearch
+        ? `${filteredCount.toLocaleString()} matching layer${filteredCount === 1 ? '' : 's'}`
+        : `${availableGpLayers.length.toLocaleString()} layers available`, 'success');
+}
 
-    if (restoreDefaultUrl && input) {
-        input.value = GEOPORTAL_WMS_URL;
+function handleGpLayerSearch() {
+    const search = document.getElementById('gpLayerSearch');
+    const clearButton = document.getElementById('gpLayerSearchClear');
+    if (clearButton) clearButton.hidden = !search?.value;
+    renderGpLayerChecklist(getFilteredGpLayers());
+    updateGpLayerCount();
+}
+
+function scheduleGpLayerSearch() {
+    const search = document.getElementById('gpLayerSearch');
+    const clearButton = document.getElementById('gpLayerSearchClear');
+    if (clearButton) clearButton.hidden = !search?.value;
+
+    window.clearTimeout(gpSearchDebounceId);
+    gpSearchDebounceId = window.setTimeout(handleGpLayerSearch, GP_SEARCH_DEBOUNCE_MS);
+}
+
+export function prepareGpLayerDialog() {
+    const search = document.getElementById('gpLayerSearch');
+    window.clearTimeout(gpSearchDebounceId);
+    gpHighlightedLayerIndex = -1;
+    if (search) search.value = '';
+    if (gpLayerCache) {
+        availableGpLayers = gpLayerCache;
+        setGpLayerLoadingState(false);
+        renderGpLayerChecklist(availableGpLayers);
+        updateGpLayerCount();
+        search?.focus();
+        return;
     }
-
-    resetGpFetchFeedback();
-    setGpFetchBusyState(false);
-    setGpLayerChecklistEmpty();
-    updateGpLayerPickerSummary();
-    setGpLayerChecklistOpen(false);
-    updateGpFetchButtonVisibility();
+    fetchGpLayersFromForm();
 }
 
 export function initializeGpLayerForm() {
-    const input = document.getElementById('gpUrl');
-    const fetchButton = document.getElementById('gpFetchButton');
-    const pickerTrigger = document.getElementById('gpLayerPickerTrigger');
-    const checklist = document.getElementById('gpLayerChecklist');
-    if (!input || !fetchButton || !pickerTrigger || !checklist) {
+    const search = document.getElementById('gpLayerSearch');
+    if (!search || !document.getElementById('gpLayerChecklist')) {
         return;
     }
-
-    if (!input.value.trim()) {
-        input.value = GEOPORTAL_WMS_URL;
-    }
-
-    updateGpFetchButtonVisibility();
-    input.addEventListener('input', () => {
-        resetGpLayerFormSession({ restoreDefaultUrl: false });
-    });
-    fetchButton.addEventListener('click', () => fetchGpLayersFromForm());
-    pickerTrigger.addEventListener('click', () => {
-        setGpLayerChecklistOpen(checklist.hidden);
+    search.addEventListener('input', scheduleGpLayerSearch);
+    search.addEventListener('keydown', handleGpLayerSearchKeydown);
+    document.getElementById('gpLayerSearchClear')?.addEventListener('click', () => {
+        search.value = '';
+        window.clearTimeout(gpSearchDebounceId);
+        handleGpLayerSearch();
+        search.focus();
     });
 }

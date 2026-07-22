@@ -3948,6 +3948,81 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
     box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
 }
 
+.gp-layer-checklist {
+    max-height: 360px;
+    box-shadow: none;
+}
+
+.gp-layer-search-field {
+    position: relative;
+}
+
+.gp-layer-search-field .form-input {
+    padding-right: 38px;
+}
+
+/* Keep the application clear action as the only visible search reset control. */
+.gp-layer-search-field .form-input::-webkit-search-cancel-button,
+.gp-layer-search-field .form-input::-webkit-search-decoration {
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+.gp-layer-search-field .form-input::-ms-clear {
+    display: none;
+}
+
+.gp-layer-search-clear {
+    position: absolute;
+    top: 50%;
+    right: 8px;
+    width: 26px;
+    height: 26px;
+    transform: translateY(-50%);
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--gray-500);
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.gp-layer-search-clear:hover {
+    background: var(--gray-100);
+    color: var(--gray-700);
+}
+
+.gp-layer-loading,
+.gp-layer-no-results {
+    padding: var(--spacing-8) var(--spacing-4);
+    text-align: center;
+    color: var(--gray-500);
+}
+
+.gp-layer-loading {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: var(--spacing-2);
+}
+
+.gp-layer-no-results-icon {
+    margin-bottom: var(--spacing-2);
+    font-size: 24px;
+}
+
+.gp-layer-no-results-title {
+    margin-bottom: var(--spacing-1);
+    color: var(--gray-700);
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.gp-layer-retry {
+    margin: 0 var(--spacing-4) var(--spacing-4);
+}
+
 .wms-layer-checklist-item {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr);
@@ -3962,8 +4037,32 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
     border-bottom: 0;
 }
 
-.wms-layer-checklist-item:hover {
+.wms-layer-checklist:not(.gp-layer-checklist) .wms-layer-checklist-item:hover {
     background: var(--gray-50);
+}
+
+.gp-layer-checklist .wms-layer-checklist-item:has(input:checked) {
+    background: rgba(37, 99, 235, 0.06);
+    box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.gp-layer-checklist .wms-layer-checklist-item:has(input:checked) .wms-layer-checklist-title {
+    font-weight: 700;
+}
+
+.wms-layer-checklist-item.is-active {
+    background: var(--blue-50);
+    box-shadow: inset 3px 0 0 var(--blue-500);
+}
+
+.gp-layer-checklist .wms-layer-checklist-item.is-active {
+    background: var(--gray-50);
+    box-shadow: none;
+}
+
+.gp-layer-checklist .wms-layer-checklist-item.is-active:has(input:checked) {
+    background: rgba(37, 99, 235, 0.1);
+    box-shadow: inset 3px 0 0 var(--accent);
 }
 
 .wms-layer-checklist-item input {

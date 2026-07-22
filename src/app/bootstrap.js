@@ -2,7 +2,7 @@ import { activateAnnotation, activateDrawing, activateMeasureArea, activateMeasu
 import { copyToClipboard, downloadMap, generateLink, renderMapPreview, restoreSharedStateFromUrl } from '../tools/export-share.js';
 import { initializeMap } from '../map/map-init.js';
 import { changeBasemapLayer } from '../map/layer-manager.js';
-import { addGPLayerFromForm, addWMSLayerFromForm, clearCsvSelection, clearFileSelection, clearGeoJSONSelection, clearKmlSelection, fetchGpLayersFromForm, fetchWmsCapabilitiesFromForm, handleCsvSelect, handleFileSelect, handleGeoJSONSelect, handleKmlSelect, initializeGpLayerForm, initializeUploadForm, initializeWmsLayerForm, resetGpLayerFormSession, resetWmsLayerFormSession, submitUpload, updateDataSection } from '../tools/upload-tool.js';
+import { addGPLayerFromForm, addWMSLayerFromForm, clearCsvSelection, clearFileSelection, clearGeoJSONSelection, clearKmlSelection, fetchGpLayersFromForm, fetchWmsCapabilitiesFromForm, handleCsvSelect, handleFileSelect, handleGeoJSONSelect, handleKmlSelect, initializeGpLayerForm, initializeUploadForm, initializeWmsLayerForm, prepareGpLayerDialog, resetWmsLayerFormSession, submitUpload, updateDataSection } from '../tools/upload-tool.js';
 import { commitLayerOpacity, removeLayer, selectLayer, updateLayerColor, updateLayerOpacity, updateLineStrokeWidth } from '../ui/layers-panel.js';
 import { bindModalEscapeDismissal, bindModalOverlayDismissal, closeModal, openModal, toggleSection } from '../ui/modal.js';
 import { initializeLocationSearch } from '../ui/location-search.js';
@@ -49,7 +49,7 @@ function openModalWithHooks(modalId) {
                 : modalId === 'wmsModal'
                     ? () => runOptionalStartupStep('WMS modal reset', () => resetWmsLayerFormSession())
                     : modalId === 'gpModal'
-                        ? () => runOptionalStartupStep('GP modal reset', () => resetGpLayerFormSession())
+                        ? () => runOptionalStartupStep('GP layer loading', () => prepareGpLayerDialog())
                     : undefined
     });
 }

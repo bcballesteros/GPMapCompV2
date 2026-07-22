@@ -794,29 +794,18 @@
             </div>
             <div class="modal-body">
                 <div class="form-group">
-                    <div class="form-label">Geoportal WMS URL</div>
-                    <div class="form-input-action-row">
-                        <input type="text" class="form-input" id="gpUrl" placeholder="e.g., https://geoserver.geoportal.gov.ph/geoserver/geoportal/wms or another compatible WMS endpoint">
-                        <button type="button" class="btn btn-secondary form-input-action" id="gpFetchButton"><i class="fas fa-cloud-arrow-down"></i> Fetch</button>
+                    <div class="gp-layer-search-field">
+                        <input type="search" class="form-input" id="gpLayerSearch" placeholder="Search Geoportal layers..." autocomplete="off">
+                        <button type="button" class="gp-layer-search-clear" id="gpLayerSearchClear" aria-label="Clear Geoportal layer search" title="Clear search" hidden>&times;</button>
                     </div>
                     <div id="gpFetchFeedback" class="inline-feedback" aria-live="polite"></div>
                 </div>
 
                 <div class="form-group">
                     <div class="form-label">Select Layers</div>
-                    <div class="wms-layer-picker" id="gpLayerPicker">
-                        <button type="button" class="form-input wms-layer-picker-trigger" id="gpLayerPickerTrigger" aria-expanded="false" aria-controls="gpLayerChecklist">
-                            <span id="gpLayerPickerSummary">Fetch layers to select</span>
-                            <i class="fas fa-chevron-down"></i>
-                        </button>
-                        <div class="wms-layer-checklist" id="gpLayerChecklist" hidden>
-                            <div class="wms-layer-empty">Fetch Geoportal layers to show available layers.</div>
-                        </div>
+                    <div class="wms-layer-checklist gp-layer-checklist" id="gpLayerChecklist">
+                        <div class="wms-layer-empty gp-layer-loading"><i class="fas fa-spinner fa-spin" aria-hidden="true"></i><span>Loading official Geoportal layers...</span></div>
                     </div>
-                </div>
-
-                <div class="warning-box">
-                    <i class="fas fa-info-circle"></i> Connect to the Geoportal Philippines WMS endpoint to browse live layers. Enter a different WMS/map service URL only if you need to point to another production service.
                 </div>
             </div>
             <div class="modal-footer">
