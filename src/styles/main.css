@@ -549,14 +549,113 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
 /* ========== LEFT SIDEBAR ========== */
 .sidebar-left {
     width: var(--left-sidebar-width);
+    flex: 0 0 var(--left-sidebar-width);
     background: white;
     border-right: 1px solid var(--gray-200);
     display: flex;
     flex-direction: column;
-    overflow-y: auto;
+    overflow: visible;
     /* Ensure sidebar spans the viewport height minus navbar so scrolling is contained */
     height: calc(100vh - var(--navbar-height));
     box-shadow: 2px 0 7px rgba(15, 23, 42, 0.06);
+}
+
+.sidebar-left {
+    transition: width 0.2s ease, flex-basis 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+    position: relative;
+}
+
+.sidebar-main {
+    width: 100%;
+    flex: 0 0 auto;
+    min-width: 0;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden auto;
+    transition: opacity 0.16s ease;
+}
+
+.sidebar-left.is-collapsed {
+    width: 0;
+    flex-basis: 0;
+    border-right-color: transparent;
+    box-shadow: none;
+}
+
+.sidebar-left.is-collapsed .sidebar-main {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+}
+
+.sidebar-title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-3);
+    margin-bottom: var(--spacing-4);
+}
+
+.sidebar-title-row .sidebar-title {
+    margin-bottom: 0;
+}
+
+.sidebar-layout-handle {
+    position: absolute;
+    /* Align with the Layers title row (the header has 20px top padding). */
+    top: 14px;
+    /* Keep the 44px hit target outside the sidebar edge in both states. */
+    right: -44px;
+    z-index: 20;
+    display: inline-flex;
+    width: 44px;
+    height: 44px;
+    padding: 6px;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--accent);
+    cursor: pointer;
+}
+
+.sidebar-layout-handle i {
+    display: inline-flex;
+    width: 32px;
+    height: 32px;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--gray-300);
+    border-radius: 999px;
+    background: white;
+    color: var(--accent);
+    box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08);
+    font-size: 13px;
+    line-height: 1;
+    transition: transform 0.18s ease, color 0.18s ease, border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+}
+
+.sidebar-layout-handle:hover i {
+    transform: scale(1.125);
+    border-color: var(--accent);
+    background: var(--blue-50);
+    color: var(--accent);
+    box-shadow: 0 4px 10px rgba(37, 99, 235, 0.18);
+}
+
+.sidebar-layout-handle:focus-visible {
+    outline: 2px solid var(--accent-light);
+    outline-offset: 2px;
+}
+
+.sidebar-layout-handle:active i {
+    transform: scale(1.05);
+    border-color: var(--accent);
+    background: var(--accent);
+    color: white;
+    box-shadow: 0 2px 6px rgba(37, 99, 235, 0.28);
 }
 
 .sidebar-header {
@@ -908,7 +1007,7 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
     gap: 2px;
     transform: translateY(-8px);
     max-height: calc(100vh - 24px);
-    overflow-y: auto;
+    overflow: visible;
 }
 
 .layer-actions-menu[data-open="true"] .layer-actions-dropdown {
@@ -1822,6 +1921,7 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
 /* ========== CANVAS AREA ========== */
 .canvas-area {
     flex: 1;
+    min-width: 0;
     display: flex;
     flex-direction: column;
     position: relative;
@@ -3947,6 +4047,64 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
     background: white;
     box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
 }
+
+/* The attribute table benefits from a larger, user-resizable work area. */
+.attributes-modal {
+    width: 860px;
+    max-width: 90vw;
+    min-width: 320px;
+    height: 560px;
+    min-height: 260px;
+    max-height: 90vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+}
+
+.attributes-modal .modal-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.attributes-modal .modal-body .form-group {
+    flex: 0 0 auto;
+}
+
+.attributes-modal .modal-header {
+    cursor: grab;
+    user-select: none;
+    touch-action: none;
+}
+
+.attributes-modal .modal-header:active {
+    cursor: grabbing;
+}
+
+.attributes-modal #attributeTableContainer {
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: none;
+}
+
+.modal-resize-handle {
+    position: absolute;
+    z-index: 3;
+    touch-action: none;
+}
+.modal-resize-n, .modal-resize-s { left: 8px; right: 8px; height: 8px; cursor: ns-resize; }
+.modal-resize-n { top: -4px; }
+.modal-resize-s { bottom: -4px; }
+.modal-resize-e, .modal-resize-w { top: 8px; bottom: 8px; width: 8px; cursor: ew-resize; }
+.modal-resize-e { right: -4px; }
+.modal-resize-w { left: -4px; }
+.modal-resize-ne, .modal-resize-nw, .modal-resize-se, .modal-resize-sw { width: 12px; height: 12px; }
+.modal-resize-ne { top: -4px; right: -4px; cursor: nesw-resize; }
+.modal-resize-nw { top: -4px; left: -4px; cursor: nwse-resize; }
+.modal-resize-se { bottom: -4px; right: -4px; cursor: nwse-resize; }
+.modal-resize-sw { bottom: -4px; left: -4px; cursor: nesw-resize; }
 
 .gp-layer-checklist {
     max-height: 360px;

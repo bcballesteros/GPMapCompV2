@@ -7,6 +7,7 @@ import { commitLayerOpacity, removeLayer, selectLayer, updateLayerColor, updateL
 import { bindModalEscapeDismissal, bindModalOverlayDismissal, closeModal, openModal, toggleSection } from '../ui/modal.js';
 import { initializeLocationSearch } from '../ui/location-search.js';
 import { openAttributeTable } from '../ui/sidebar.js';
+import { initializeLayersSidebar } from '../ui/layers-sidebar.js';
 import { initializeWorkspaceStatus } from '../ui/workspace-status.js';
 import { showToast } from '../ui/toast.js';
 import { bindAnnotationPopupDismissal } from '../ui/toolbar.js';
@@ -108,6 +109,7 @@ export function bootstrapApp() {
             onAnnotationSelect: selectAnnotationForDeletion
         });
         bindGlobalHandlers();
+        runOptionalStartupStep('layers sidebar init', () => initializeLayersSidebar());
 
         runOptionalStartupStep('location search init', () => initializeLocationSearch());
         runOptionalStartupStep('annotation interaction init', () => initializeAnnotationInteractions());

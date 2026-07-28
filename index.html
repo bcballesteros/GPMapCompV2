@@ -219,20 +219,25 @@
     <div class="app-container">
         <!-- LEFT SIDEBAR -->
         <aside class="sidebar-left">
-            <div class="sidebar-header">
-                <div class="sidebar-title"><i class="fas fa-layer-group"></i> Layers</div>
-                <button class="btn-upload" onclick="openModal('uploadModal')"><i class="fas fa-plus"></i> Add Geospatial Data</button>
-            </div>
-            <div class="sidebar-content">
-                <div id="layerList" class="layer-list">
-                    <div class="empty-state">
-                        <div class="empty-state-icon" aria-hidden="true"><i class="fas fa-layer-group"></i></div>
-                        <div class="empty-state-title">No layers in this workspace</div>
-                        <div class="empty-state-text">Use Add Geospatial Data to add an uploaded dataset, WMS layer, or Geoportal layer, then start styling, inspecting, and exporting your map composition.</div>
-                        <div class="empty-state-formats">Supported: Shapefile (.zip), KML (.kml), GeoJSON (.geojson/.json), CSV (.csv), WMS, and Geoportal layers.</div>
+            <div class="sidebar-main">
+                    <div class="sidebar-header">
+                        <div class="sidebar-title-row">
+                            <div class="sidebar-title"><i class="fas fa-layer-group"></i> Layers</div>
+                        </div>
+                    <button class="btn-upload" onclick="openModal('uploadModal')"><i class="fas fa-plus"></i> Add Geospatial Data</button>
+                </div>
+                <div class="sidebar-content">
+                    <div id="layerList" class="layer-list">
+                        <div class="empty-state">
+                            <div class="empty-state-icon" aria-hidden="true"><i class="fas fa-layer-group"></i></div>
+                            <div class="empty-state-title">No layers in this workspace</div>
+                            <div class="empty-state-text">Use Add Geospatial Data to add an uploaded dataset, WMS layer, or Geoportal layer, then start styling, inspecting, and exporting your map composition.</div>
+                            <div class="empty-state-formats">Supported: Shapefile (.zip), KML (.kml), GeoJSON (.geojson/.json), CSV (.csv), WMS, and Geoportal layers.</div>
+                        </div>
                     </div>
                 </div>
             </div>
+            <button type="button" class="sidebar-layout-handle" aria-expanded="true"><i class="fas fa-chevron-left" aria-hidden="true"></i></button>
         </aside>
 
         <!-- MAIN CANVAS -->
@@ -387,11 +392,9 @@
                         <div class="tool-buttons">
                             <button id="addTextAnnotationBtn" class="tool-btn" onclick="activateAnnotation('text')">
                                 <span><i class="fas fa-font"></i> Add Text Annotation</span>
-                                <span class="tool-btn-arrow">&rsaquo;</span>
                             </button>
                             <button class="tool-btn" onclick="activateAnnotation('labels')">
                                 <span><i class="fas fa-tags"></i> Feature Labels</span>
-                                <span class="tool-btn-arrow">&rsaquo;</span>
                             </button>
                         </div>
                     </div>
@@ -411,19 +414,15 @@
                         <div class="tool-buttons">
                             <button class="tool-btn" data-draw-mode="point" onclick="activateDrawing('point')">
                                 <span><i class="fas fa-location-dot"></i> Draw Point</span>
-                                <span class="tool-btn-arrow">&rsaquo;</span>
                             </button>
                             <button class="tool-btn" data-draw-mode="line" onclick="activateDrawing('line')">
                                 <span><i class="fas fa-slash"></i> Draw Line</span>
-                                <span class="tool-btn-arrow">&rsaquo;</span>
                             </button>
                             <button class="tool-btn" data-draw-mode="polygon" onclick="activateDrawing('polygon')">
                                 <span><i class="fas fa-draw-polygon"></i> Draw Polygon</span>
-                                <span class="tool-btn-arrow">&rsaquo;</span>
                             </button>
                             <button class="tool-btn" data-draw-mode="freehand" onclick="activateDrawing('freehand')">
                                 <span><i class="fas fa-signature"></i> Freehand</span>
-                                <span class="tool-btn-arrow">&rsaquo;</span>
                             </button>
                         </div>
                     </div>
@@ -443,11 +442,9 @@
                         <div class="tool-buttons">
                             <button id="measureDistanceBtn" class="tool-btn" onclick="activateMeasureDistance()">
                                 <span><i class="fas fa-ruler-horizontal"></i> Measure Distance</span>
-                                <span class="tool-btn-arrow">&rsaquo;</span>
                             </button>
                             <button id="measureAreaBtn" class="tool-btn" onclick="activateMeasureArea()">
                                 <span><i class="fas fa-draw-polygon"></i> Measure Area</span>
-                                <span class="tool-btn-arrow">&rsaquo;</span>
                             </button>
                         </div>
                     </div>
@@ -467,7 +464,6 @@
                         <div class="tool-buttons">
                             <button class="tool-btn" onclick="openAttributeTable()">
                                 <span><i class="fas fa-table"></i> View Attribute Table</span>
-                                <span class="tool-btn-arrow">&rsaquo;</span>
                             </button>
                         </div>
                     </div>
@@ -487,15 +483,12 @@
                         <div class="tool-buttons">
                             <button class="tool-btn" onclick="openModal('wmsModal')">
                                 <span><i class="fas fa-globe"></i> Add WMS Layer</span>
-                                <span class="tool-btn-arrow">&rsaquo;</span>
                             </button>
                             <button class="tool-btn" onclick="openModal('gpModal')">
                                 <span><i class="fas fa-map-location-dot"></i> Add Geoportal Layer</span>
-                                <span class="tool-btn-arrow">&rsaquo;</span>
                             </button>
                             <button class="tool-btn">
                                 <span><i class="fas fa-image"></i> Add GeoTIFF</span>
-                                <span class="tool-btn-arrow">&rsaquo;</span>
                             </button>
                         </div>
                     </div>
@@ -764,7 +757,7 @@
 
     <!-- Attributes Modal -->
     <div class="modal-overlay" id="attributesModal">
-        <div class="modal" style="max-width: 680px;">
+        <div class="modal attributes-modal">
             <div class="modal-header">
                 <div class="modal-title"><i class="fas fa-table"></i> View Attribute Table</div>
                 <button class="modal-close" onclick="closeModal('attributesModal')" title="Close" aria-label="Close dialog">&times;</button>
@@ -776,7 +769,7 @@
                 <div id="attributeTableStatus" style="margin-bottom: 10px; font-size: 12px; font-weight: 700; color: var(--gray-500);">
                     No records
                 </div>
-                <div id="attributeTableContainer" style="border: 1px solid var(--gray-200); border-radius: 10px; overflow: auto; max-height: 450px;">
+                <div id="attributeTableContainer" style="border: 1px solid var(--gray-200); border-radius: 10px; overflow: auto;">
                     <div style="padding: var(--spacing-8); text-align: center; color: var(--gray-500); font-size: 13px; font-weight: 700;">
                         Select a layer to view attributes
                     </div>
