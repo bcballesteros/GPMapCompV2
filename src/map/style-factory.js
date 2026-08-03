@@ -148,6 +148,42 @@ export function pickDefaultLabelField(features = []) {
     return rankedCandidates[0]?.[0] || null;
 }
 
+const SYSTEM_ATTRIBUTE_FIELDS = new Set([
+    'geometry',
+    'objectid',
+    'shape',
+    'shape_length',
+    'shape_area',
+    'globalid'
+]);
+
+/**
+ * Returns usable, user-facing attribute names found on a vector layer's
+ * features. The order reflects the source feature properties, which keeps a
+ * future label-field picker stable and predictable.
+ */
+export function getAvailableLabelFields(features = []) {
+    const fields = [];
+    const seenFields = new Set();
+
+    features.forEach((feature) => {
+        const properties = feature?.getProperties?.() || feature?.properties || {};
+        Object.keys(properties).forEach((field) => {
+            const fieldName = String(field);
+            if (!fieldName.trim() || SYSTEM_ATTRIBUTE_FIELDS.has(fieldName.toLowerCase())) {
+                return;
+            }
+
+            if (!seenFields.has(fieldName)) {
+                seenFields.add(fieldName);
+                fields.push(fieldName);
+            }
+        });
+    });
+
+    return fields;
+}
+
 export function getFeatureLabelText(feature, labelField) {
     if (!feature || !labelField) {
         return '';
@@ -403,20 +439,22 @@ export function createAnnotationStyle(feature) {
     const fontSize = feature.get('fontSize') || 12;
     const fontColor = feature.get('fontColor') || '#000000';
     const isSelected = feature.get('selected');
-    const isVisible = feature.get('annotationVisible') !== false;
-    const markerColor = isSelected ? '#dc2626' : isVisible ? '#2563eb' : '#64748b';
+    const isLabelVisible = feature.get('annotationVisible') !== false;
+    const isPointVisible = feature.get('annotationPointVisible') !== false;
+    const markerColor = isSelected ? '#dc2626' : isLabelVisible ? '#2563eb' : '#64748b';
+    const styles = [];
 
-    const styles = [
-        new ol.style.Style({
+    if (isPointVisible) {
+        styles.push(new ol.style.Style({
             image: new ol.style.Circle({
-                radius: isSelected ? 7 : isVisible ? 5 : 4,
+                radius: isSelected ? 7 : isLabelVisible ? 5 : 4,
                 fill: new ol.style.Fill({ color: markerColor }),
                 stroke: new ol.style.Stroke({ color: '#fff', width: 2 })
             })
-        })
-    ];
+        }));
+    }
 
-    if (isVisible) {
+    if (isLabelVisible) {
         styles.push(new ol.style.Style({
             text: new ol.style.Text({
                 text,

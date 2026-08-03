@@ -487,6 +487,8 @@ function serializeAnnotations() {
                 text: feature.get('text') || '',
                 fontSize: Number(feature.get('fontSize') || 12),
                 fontColor: feature.get('fontColor') || '#000000',
+                annotationVisible: feature.get('annotationVisible') !== false,
+                annotationPointVisible: feature.get('annotationPointVisible') !== false,
                 coordinates: [Number(longitude.toFixed(6)), Number(latitude.toFixed(6))]
             };
         })
@@ -811,11 +813,15 @@ function restoreAnnotations(annotationStates = []) {
             return;
         }
 
+        const labelVisible = annotationState.annotationVisible !== false;
+        const pointVisible = annotationState.annotationPointVisible !== false;
         const feature = new ol.Feature({
             geometry: new ol.geom.Point(ol.proj.fromLonLat([longitude, latitude])),
             text: annotationState.text,
             fontSize: Number(annotationState.fontSize) || 12,
             fontColor: annotationState.fontColor || '#000000',
+            annotationVisible: labelVisible || !pointVisible,
+            annotationPointVisible: pointVisible,
             isAnnotation: true,
             isDragging: false
         });

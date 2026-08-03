@@ -6,7 +6,7 @@ import { addGPLayerFromForm, addWMSLayerFromForm, clearCsvSelection, clearFileSe
 import { commitLayerOpacity, removeLayer, selectLayer, updateLayerColor, updateLayerOpacity, updateLineStrokeWidth } from '../ui/layers-panel.js';
 import { bindModalEscapeDismissal, bindModalOverlayDismissal, closeModal, openModal, toggleSection } from '../ui/modal.js';
 import { initializeLocationSearch } from '../ui/location-search.js';
-import { openAttributeTable } from '../ui/sidebar.js';
+import { initializeLabelAttributeControl, openAttributeTable } from '../ui/sidebar.js';
 import { initializeLayersSidebar } from '../ui/layers-sidebar.js';
 import { initializeWorkspaceStatus } from '../ui/workspace-status.js';
 import { showToast } from '../ui/toast.js';
@@ -110,6 +110,7 @@ export function bootstrapApp() {
         });
         bindGlobalHandlers();
         runOptionalStartupStep('layers sidebar init', () => initializeLayersSidebar());
+        runOptionalStartupStep('label attribute control init', () => initializeLabelAttributeControl());
 
         runOptionalStartupStep('location search init', () => initializeLocationSearch());
         runOptionalStartupStep('annotation interaction init', () => initializeAnnotationInteractions());

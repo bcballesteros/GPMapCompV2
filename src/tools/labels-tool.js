@@ -39,15 +39,22 @@ export function toggleSelectedLayerLabels() {
 }
 
 export function syncLabelsToggle() {
-    const toggle = document.getElementById('labelsToggle');
-    if (!toggle) {
-        return;
-    }
-
     const uploadedLayers = Object.entries(getState().uploadedLayers)
         .filter(([layerName, record]) => layerName !== ANNOTATION_LAYER_ID && record && !record.isWMS);
 
-    toggle.checked = uploadedLayers.some(([, record]) => record.labelsVisible);
+    const allLayersToggle = document.getElementById('labelsToggle');
+    if (allLayersToggle) {
+        allLayersToggle.checked = uploadedLayers.some(([, record]) => record.labelsVisible);
+    }
+
+    const selectedLayerToggle = document.getElementById('featureLabelsToggle');
+    if (selectedLayerToggle) {
+        const layerName = getLabelTargetLayerName();
+        const record = layerName ? getLayerRecord(layerName) : null;
+        const isEligibleLayer = Boolean(record && !record.isWMS && record.labelField);
+        selectedLayerToggle.checked = Boolean(isEligibleLayer && record.labelsVisible);
+        selectedLayerToggle.disabled = !isEligibleLayer;
+    }
 }
 
 export function applyLabelsVisibility(isVisible) {

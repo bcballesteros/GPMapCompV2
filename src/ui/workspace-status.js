@@ -137,7 +137,7 @@ function buildSelectedFeatureHelp(feature) {
     if (kind === 'annotation') {
         return {
             primary: 'Annotation selected.',
-            secondary: 'Edit text, Move the note, Hide/Show its label, or Delete it. Clear All removes every annotation.'
+            secondary: 'Edit text, Move the note, Hide/Show its label or point, or Delete it. Clear All removes every annotation.'
         };
     }
 

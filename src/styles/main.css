@@ -2212,40 +2212,6 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
     text-align: center;
 }
 
-#moveAnnotationBtn {
-    border-color: #cbd5e1;
-    background: #f1f5f9;
-    color: #475569;
-}
-
-#moveAnnotationBtn:hover:not(:disabled) {
-    border-color: #94a3b8;
-    background: #e2e8f0;
-    color: #334155;
-}
-
-#toggleAnnotationVisibilityBtn {
-    border-color: #fcd9bd;
-    background: #fff6ed;
-    color: #9a3412;
-}
-
-#toggleAnnotationVisibilityBtn:hover:not(:disabled) {
-    border-color: #f5b98a;
-    background: #ffedd5;
-    color: #7c2d12;
-}
-
-#toggleAnnotationVisibilityBtn[data-state="hidden"] {
-    border-color: #fdba74;
-    background: #fed7aa;
-    color: #7c2d12;
-}
-
-#toggleAnnotationVisibilityBtn[data-state="hidden"] i {
-    color: #9a3412;
-}
-
 .annotation-controls-hint {
     margin-top: 9px;
     font-size: 11px;
@@ -2422,6 +2388,71 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
     display: flex;
     flex-direction: column;
     gap: 10px;
+}
+
+.label-attribute-control {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.label-attribute-control label {
+    color: var(--gray-700);
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.label-attribute-select {
+    width: 100%;
+    min-height: 42px;
+    padding: 11px 38px 11px 14px;
+    color: var(--gray-800);
+    background-color: #fff;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%2364748b' d='m1.4 1.2 4.6 4.6 4.6-4.6L12 2.6 6 8 0 2.6z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+    border: 1px solid var(--gray-200);
+    border-radius: 12px;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 18px;
+    appearance: none;
+    -webkit-appearance: none;
+    cursor: pointer;
+}
+
+.label-attribute-select:focus-visible {
+    outline: 2px solid rgba(37, 99, 235, 0.35);
+    outline-offset: 2px;
+    border-color: var(--accent);
+}
+
+.label-attribute-select:disabled {
+    color: var(--gray-500);
+    background: var(--gray-100);
+    cursor: not-allowed;
+}
+
+.feature-labels-control {
+    margin: 0;
+}
+
+.feature-labels-control i {
+    width: 16px;
+    margin-right: 8px;
+    color: var(--accent);
+    text-align: center;
+}
+
+.feature-labels-control input:disabled + span {
+    color: var(--gray-500);
+}
+
+.label-attribute-hint {
+    color: var(--gray-500);
+    font-size: 11px;
+    line-height: 1.35;
 }
 
 .tool-btn {
@@ -3294,6 +3325,7 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
     grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+#deleteAnnotationBtn,
 #clearAnnotationsBtn {
     grid-column: 1 / -1;
 }
@@ -3365,6 +3397,10 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
     line-height: 1.2;
 }
 
+.annotation-controls-actions .tool-btn {
+    justify-content: center;
+}
+
 .annotation-controls-actions .tool-btn:disabled,
 .context-controls-actions .tool-btn:disabled {
     background: #ffffff;
@@ -3379,6 +3415,8 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
 }
 
 .annotation-controls-actions #deleteAnnotationBtn,
+.annotation-controls-actions #clearAnnotationsBtn,
+.annotation-controls-actions .annotation-danger-action,
 .delete-selected-drawing-btn,
 .delete-selected-measurement-btn {
     color: #b42318;
@@ -3387,6 +3425,8 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
 }
 
 .annotation-controls-actions #deleteAnnotationBtn:hover:not(:disabled),
+.annotation-controls-actions #clearAnnotationsBtn:hover:not(:disabled),
+.annotation-controls-actions .annotation-danger-action:hover:not(:disabled),
 .delete-selected-drawing-btn:hover:not(:disabled),
 .delete-selected-measurement-btn:hover:not(:disabled) {
     color: #991b1b;
@@ -3396,6 +3436,10 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
 
 .annotation-controls-actions #deleteAnnotationBtn:focus-visible:not(:disabled),
 .annotation-controls-actions #deleteAnnotationBtn:active:not(:disabled),
+.annotation-controls-actions #clearAnnotationsBtn:focus-visible:not(:disabled),
+.annotation-controls-actions #clearAnnotationsBtn:active:not(:disabled),
+.annotation-controls-actions .annotation-danger-action:focus-visible:not(:disabled),
+.annotation-controls-actions .annotation-danger-action:active:not(:disabled),
 .delete-selected-drawing-btn:focus-visible:not(:disabled),
 .delete-selected-drawing-btn:active:not(:disabled),
 .delete-selected-measurement-btn:focus-visible:not(:disabled),
@@ -3407,6 +3451,8 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
 }
 
 .annotation-controls-actions #deleteAnnotationBtn:focus-visible:not(:disabled),
+.annotation-controls-actions #clearAnnotationsBtn:focus-visible:not(:disabled),
+.annotation-controls-actions .annotation-danger-action:focus-visible:not(:disabled),
 .delete-selected-drawing-btn:focus-visible:not(:disabled),
 .delete-selected-measurement-btn:focus-visible:not(:disabled) {
     box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12);
@@ -3414,8 +3460,10 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
 
 .annotation-controls-actions #editAnnotationBtn,
 #moveAnnotationBtn,
-#toggleAnnotationVisibilityBtn,
-#toggleAnnotationVisibilityBtn[data-state="hidden"],
+#toggleAnnotationLabelVisibilityBtn,
+#toggleAnnotationPointVisibilityBtn,
+#toggleAnnotationLabelVisibilityBtn[data-state="hidden"],
+#toggleAnnotationPointVisibilityBtn[data-state="hidden"],
 .context-clear-btn,
 .clear-drawings-btn,
 .clear-measurements-btn {
@@ -3425,13 +3473,26 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
     box-shadow: none;
 }
 
-#toggleAnnotationVisibilityBtn[data-state="hidden"] {
+#toggleAnnotationLabelVisibilityBtn[data-state="hidden"],
+#toggleAnnotationPointVisibilityBtn[data-state="hidden"] {
     background: var(--gray-50);
     color: var(--gray-900);
 }
 
-#toggleAnnotationVisibilityBtn[data-state="hidden"] i {
+#toggleAnnotationLabelVisibilityBtn[data-state="hidden"] i,
+#toggleAnnotationPointVisibilityBtn[data-state="hidden"] i {
     color: currentColor;
+}
+
+.annotation-controls-actions #editAnnotationBtn:hover:not(:disabled),
+.annotation-controls-actions #moveAnnotationBtn:hover:not(:disabled),
+.annotation-controls-actions #toggleAnnotationLabelVisibilityBtn:hover:not(:disabled),
+.annotation-controls-actions #toggleAnnotationPointVisibilityBtn:hover:not(:disabled) {
+    border-color: rgba(var(--system-panel-rgb, var(--system-tools-rgb)), 0.3);
+    background: rgba(var(--system-panel-rgb, var(--system-tools-rgb)), 0.065);
+    color: var(--gray-900);
+    box-shadow: 0 0 0 1px rgba(var(--system-panel-rgb, var(--system-tools-rgb)), 0.05) inset;
+    transform: none;
 }
 
 .measure-results-panel {

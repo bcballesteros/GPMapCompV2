@@ -3,7 +3,7 @@ import { DEFAULT_VIEW_PADDING } from '../config/defaults.js';
 import ol from '../lib/ol.js';
 import { createBasemapSource } from '../config/basemaps.js';
 import { getLayerRecord, getMap, getState, removeLayerRecord, setActiveBasemap, setCurrentLayerName, setLayerRecord } from '../state/store.js';
-import { createAnnotationStyle, createManagedFeatureStyles, pickDefaultLabelField } from './style-factory.js';
+import { createAnnotationStyle, createManagedFeatureStyles, getAvailableLabelFields, pickDefaultLabelField } from './style-factory.js';
 
 export function findLayerNameByLayer(targetLayer) {
     const uploadedLayers = getState().uploadedLayers;
@@ -250,6 +250,41 @@ export function updateManagedLayerStyle(layerName, styleFactory) {
 
     record.layer.setStyle(styleFactory || ((feature) => createManagedFeatureStyles(record, feature)));
     record.layer.changed();
+}
+
+/**
+ * Gets the non-system attribute fields that can be offered as label fields for
+ * a managed vector layer.
+ */
+export function getManagedLayerLabelFields(layerName) {
+    const record = getLayerRecord(layerName);
+    if (!record || record.isWMS) {
+        return [];
+    }
+
+    return getAvailableLabelFields(record.features);
+}
+
+/**
+ * Changes a vector layer's label field and reapplies its managed style.
+ * Pass null (or an empty string) to clear the selected field.
+ *
+ * @returns {boolean} True when the field was applied.
+ */
+export function setManagedLayerLabelField(layerName, labelField) {
+    const record = getLayerRecord(layerName);
+    if (!record || record.isWMS) {
+        return false;
+    }
+
+    const normalizedField = typeof labelField === 'string' ? labelField.trim() : '';
+    if (normalizedField && !getManagedLayerLabelFields(layerName).includes(normalizedField)) {
+        return false;
+    }
+
+    record.labelField = normalizedField || null;
+    updateManagedLayerStyle(layerName);
+    return true;
 }
 
 export function ensureAnnotationLayer() {

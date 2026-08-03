@@ -1953,6 +1953,7 @@ export function submitAnnotation() {
         fontColor,
         isAnnotation: true,
         annotationVisible: annotationsVisible,
+        annotationPointVisible: true,
         isDragging: false
     });
 
@@ -2106,7 +2107,8 @@ export function updateAnnotationControls() {
     const editBtn = document.getElementById('editAnnotationBtn');
     const deleteBtn = document.getElementById('deleteAnnotationBtn');
     const moveBtn = document.getElementById('moveAnnotationBtn');
-    const visibilityBtn = document.getElementById('toggleAnnotationVisibilityBtn');
+    const labelVisibilityBtn = document.getElementById('toggleAnnotationLabelVisibilityBtn');
+    const pointVisibilityBtn = document.getElementById('toggleAnnotationPointVisibilityBtn');
     const clearBtn = document.getElementById('clearAnnotationsBtn');
     const hint = document.querySelector('.annotation-controls-hint');
 
@@ -2115,7 +2117,8 @@ export function updateAnnotationControls() {
     }
 
     if (selectedAnnotation) {
-        const annotationVisible = selectedAnnotation.get('annotationVisible') !== false;
+        const labelVisible = selectedAnnotation.get('annotationVisible') !== false;
+        const pointVisible = selectedAnnotation.get('annotationPointVisible') !== false;
         controls.style.display = '';
         editBtn.disabled = false;
         deleteBtn.disabled = false;
@@ -2123,25 +2126,35 @@ export function updateAnnotationControls() {
         if (clearBtn) {
             clearBtn.disabled = false;
         }
-        if (visibilityBtn) {
-            visibilityBtn.disabled = false;
-            visibilityBtn.classList.toggle('active', !annotationVisible);
-            visibilityBtn.dataset.state = annotationVisible ? 'visible' : 'hidden';
-            visibilityBtn.setAttribute('aria-pressed', annotationVisible ? 'false' : 'true');
-            visibilityBtn.innerHTML = annotationVisible
-                ? '<i class="fas fa-eye-slash"></i> Hide'
-                : '<i class="fas fa-eye"></i> Show';
-            visibilityBtn.title = annotationVisible
-                ? 'Hide annotation text'
-                : 'Show annotation text';
-        }
+        updateAnnotationVisibilityButton(labelVisibilityBtn, {
+            visible: labelVisible,
+            canHide: pointVisible,
+            visibleLabel: 'Hide Label',
+            hiddenLabel: 'Show Label',
+            visibleIcon: 'fa-eye-slash',
+            hiddenIcon: 'fa-eye',
+            visibleTitle: 'Hide annotation label',
+            hiddenTitle: 'Show annotation label'
+        });
+        updateAnnotationVisibilityButton(pointVisibilityBtn, {
+            visible: pointVisible,
+            canHide: labelVisible,
+            visibleLabel: 'Hide Point',
+            hiddenLabel: 'Show Point',
+            visibleIcon: 'fa-location-dot',
+            hiddenIcon: 'fa-location-dot',
+            visibleTitle: 'Hide annotation point',
+            hiddenTitle: 'Show annotation point'
+        });
         if (hint) {
             if (annotationMoveMode) {
                 hint.textContent = 'Drag the selected annotation on the map. Click Move again to finish repositioning.';
             } else {
-                hint.textContent = annotationVisible
-                    ? 'Selected annotation is visible. Use Hide to keep its anchor and remove the text from view.'
-                    : 'Selected annotation text is hidden. Use Show to restore it.';
+                hint.textContent = !labelVisible
+                    ? 'Selected annotation label is hidden. Its gray placeholder point remains selectable.'
+                    : !pointVisible
+                        ? 'Selected annotation point is hidden. Its visible label remains selectable.'
+                        : 'Hide either the label or point. One part must remain visible so the annotation stays selectable.';
             }
         }
     } else {
@@ -2152,14 +2165,8 @@ export function updateAnnotationControls() {
         if (clearBtn) {
             clearBtn.disabled = true;
         }
-        if (visibilityBtn) {
-            visibilityBtn.disabled = true;
-            visibilityBtn.classList.remove('active');
-            visibilityBtn.dataset.state = 'visible';
-            visibilityBtn.setAttribute('aria-pressed', 'false');
-            visibilityBtn.innerHTML = '<i class="fas fa-eye-slash"></i> Hide';
-            visibilityBtn.title = 'Toggle annotation visibility';
-        }
+        updateAnnotationVisibilityButton(labelVisibilityBtn, { disabled: true, visible: true, visibleLabel: 'Hide Label', visibleIcon: 'fa-eye-slash', visibleTitle: 'Toggle annotation label visibility' });
+        updateAnnotationVisibilityButton(pointVisibilityBtn, { disabled: true, visible: true, visibleLabel: 'Hide Point', visibleIcon: 'fa-location-dot', visibleTitle: 'Toggle annotation point visibility' });
         if (hint) {
             hint.textContent = 'Select an annotation on the map to edit its text, move its position, or remove it.';
         }
@@ -2176,11 +2183,30 @@ export function updateAnnotationControls() {
     updateContextualInspectorVisibility();
 }
 
+function updateAnnotationVisibilityButton(button, { disabled = false, visible, canHide = true, visibleLabel, hiddenLabel, visibleIcon, hiddenIcon, visibleTitle, hiddenTitle }) {
+    if (!button) {
+        return;
+    }
+
+    const isDisabled = disabled || (visible && !canHide);
+    button.disabled = isDisabled;
+    button.classList.toggle('active', !visible);
+    button.dataset.state = visible ? 'visible' : 'hidden';
+    button.setAttribute('aria-pressed', visible ? 'false' : 'true');
+    const icon = visible ? visibleIcon : hiddenIcon;
+    const iconMarkup = `<i class="fas ${icon}"></i>`;
+    button.innerHTML = `${iconMarkup} ${visible ? visibleLabel : hiddenLabel}`;
+    button.title = isDisabled && visible && !disabled
+        ? 'Show the other annotation part before hiding this one'
+        : visible ? visibleTitle : hiddenTitle;
+}
+
 export function bindAnnotationControls() {
     const editBtn = document.getElementById('editAnnotationBtn');
     const deleteBtn = document.getElementById('deleteAnnotationBtn');
     const moveBtn = document.getElementById('moveAnnotationBtn');
-    const visibilityBtn = document.getElementById('toggleAnnotationVisibilityBtn');
+    const labelVisibilityBtn = document.getElementById('toggleAnnotationLabelVisibilityBtn');
+    const pointVisibilityBtn = document.getElementById('toggleAnnotationPointVisibilityBtn');
     const clearBtn = document.getElementById('clearAnnotationsBtn');
 
     if (editBtn) {
@@ -2212,8 +2238,8 @@ export function bindAnnotationControls() {
         };
     }
 
-    if (visibilityBtn) {
-        visibilityBtn.onclick = () => {
+    if (labelVisibilityBtn) {
+        labelVisibilityBtn.onclick = () => {
             if (!selectedAnnotation) {
                 return;
             }
@@ -2223,10 +2249,31 @@ export function bindAnnotationControls() {
             ensureAnnotationLayer().layer.changed();
             updateAnnotationControls();
             showToast(
-                nextVisible ? 'Annotation Shown' : 'Annotation Hidden',
+                nextVisible ? 'Label Shown' : 'Label Hidden',
                 nextVisible
-                    ? 'The selected annotation text is visible again.'
-                    : 'The text is hidden, but its map anchor remains selectable.',
+                    ? 'The selected annotation label is visible again.'
+                    : 'The label is hidden, but its gray placeholder point remains selectable.',
+                'info',
+                1800
+            );
+        };
+    }
+
+    if (pointVisibilityBtn) {
+        pointVisibilityBtn.onclick = () => {
+            if (!selectedAnnotation) {
+                return;
+            }
+
+            const nextVisible = selectedAnnotation.get('annotationPointVisible') === false;
+            selectedAnnotation.set('annotationPointVisible', nextVisible);
+            ensureAnnotationLayer().layer.changed();
+            updateAnnotationControls();
+            showToast(
+                nextVisible ? 'Point Shown' : 'Point Hidden',
+                nextVisible
+                    ? 'The selected annotation point is visible again.'
+                    : 'The point is hidden, but its label remains selectable.',
                 'info',
                 1800
             );
@@ -2260,7 +2307,8 @@ export function setTextAnnotationsVisibility(isVisible) {
 
     annotationLayer.source.getFeatures().forEach((feature) => {
         if (feature.get('isAnnotation')) {
-            feature.set('annotationVisible', isVisible);
+            // The workspace-wide label toggle must not make an annotation unrecoverable.
+            feature.set('annotationVisible', isVisible || feature.get('annotationPointVisible') === false);
         }
     });
 

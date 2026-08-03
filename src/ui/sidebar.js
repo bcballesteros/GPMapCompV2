@@ -1,4 +1,6 @@
 import { getCurrentLayerName, getLayerRecord } from '../state/store.js';
+import { getManagedLayerLabelFields, setManagedLayerLabelField } from '../map/layer-manager.js';
+import { syncLabelsToggle } from '../tools/labels-tool.js';
 import { openModal } from './modal.js';
 import { queryAll } from '../utils/dom.js';
 import { showToast } from './toast.js';
@@ -10,6 +12,60 @@ function getSelectedLayerName() {
     }
 
     return document.querySelector('.layer-item.active .layer-name')?.textContent || null;
+}
+
+/** Keeps the Layer Information label-field picker aligned with the active layer. */
+export function syncLabelAttributeControl() {
+    const select = document.getElementById('labelAttributeSelect');
+    const hint = document.getElementById('labelAttributeHint');
+    if (!select) {
+        return;
+    }
+
+    const layerName = getSelectedLayerName();
+    const record = layerName ? getLayerRecord(layerName) : null;
+    const fields = record && !record.isWMS ? getManagedLayerLabelFields(layerName) : [];
+
+    select.replaceChildren();
+    if (!fields.length) {
+        const option = new Option('No suitable attributes', '');
+        select.add(option);
+        select.disabled = true;
+        if (hint) {
+            hint.textContent = record?.isWMS
+                ? 'Label attributes are available for uploaded vector layers only.'
+                : 'No suitable attributes are available for this layer.';
+        }
+        syncLabelsToggle();
+        return;
+    }
+
+    fields.forEach((field) => select.add(new Option(field, field)));
+    select.disabled = false;
+    select.value = fields.includes(record.labelField) ? record.labelField : fields[0];
+    if (hint) {
+        hint.textContent = 'Changes apply to the selected layer immediately.';
+    }
+    syncLabelsToggle();
+}
+
+export function initializeLabelAttributeControl() {
+    const select = document.getElementById('labelAttributeSelect');
+    if (!select) {
+        return;
+    }
+
+    select.addEventListener('change', () => {
+        const layerName = getSelectedLayerName();
+        if (!layerName || !setManagedLayerLabelField(layerName, select.value)) {
+            syncLabelAttributeControl();
+            return;
+        }
+
+        syncLabelAttributeControl();
+    });
+
+    syncLabelAttributeControl();
 }
 
 function getAttributeRows(record) {

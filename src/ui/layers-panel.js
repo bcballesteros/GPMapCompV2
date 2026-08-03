@@ -4,6 +4,7 @@ import { getLayerRecord, renameLayerRecord, setCurrentLayerName } from '../state
 import { syncLabelsToggle } from '../tools/labels-tool.js';
 import { commitLayerOpacity as commitLayerOpacityValue, updateLayerOpacity as updateLayerOpacityValue } from '../tools/transparency-tool.js';
 import { showToast } from './toast.js';
+import { syncLabelAttributeControl } from './sidebar.js';
 
 let layerNameTooltipElement = null;
 let layerNameTooltipListenersBound = false;
@@ -1398,6 +1399,7 @@ export function selectLayer(element) {
 
     const layerName = element.querySelector('.layer-name').textContent;
     setCurrentLayerName(layerName);
+    syncLabelAttributeControl();
 }
 
 export function updateLayerColor(colorPicker) {

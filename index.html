@@ -140,7 +140,7 @@
         <div class="startup-card">
             <div class="startup-logo">
                 <img
-                    src="https://geoportal.gov.ph/viewer/assets/img/gplogo.png"
+                    src="https://geoportal.gov.ph/img/gplogo.png"
                     alt="Geoportal Logo"
                     width="56"
                     height="56"
@@ -157,7 +157,7 @@
             <a href="./" class="app-brand" aria-label="Geoportal Philippines Map Composer home">
                 <div class="app-logo">
                     <img
-                        src="https://geoportal.gov.ph/viewer/assets/img/gplogo.png"
+                        src="https://geoportal.gov.ph/img/gplogo.png"
                         alt="Geoportal Logo"
                         width="44"
                         height="44"
@@ -297,11 +297,12 @@
                         <strong data-badge-type="text">Text</strong>
                     </div>
                     <div class="annotation-controls-actions">
-                    <button id="editAnnotationBtn" class="tool-btn tool-btn-solid tool-btn-accent" disabled><i class="fas fa-edit"></i> Edit</button>
-                    <button id="deleteAnnotationBtn" class="tool-btn tool-btn-solid tool-btn-danger" disabled><i class="fas fa-trash"></i> Delete Selected</button>
-                    <button id="moveAnnotationBtn" class="tool-btn tool-btn-solid tool-btn-muted" disabled><i class="fas fa-arrows-alt"></i> Move</button>
-                    <button id="toggleAnnotationVisibilityBtn" class="tool-btn tool-btn-solid tool-btn-muted" disabled aria-pressed="false" data-state="visible"><i class="fas fa-eye-slash"></i> Hide</button>
-                    <button id="clearAnnotationsBtn" class="tool-btn context-clear-btn clear-annotations-btn" disabled><i class="fas fa-eraser"></i> Clear All Annotations</button>
+                    <button id="editAnnotationBtn" class="tool-btn" disabled><i class="fas fa-edit"></i> Edit</button>
+                    <button id="moveAnnotationBtn" class="tool-btn" disabled><i class="fas fa-arrows-alt"></i> Move</button>
+                    <button id="toggleAnnotationLabelVisibilityBtn" class="tool-btn" disabled aria-pressed="false" data-state="visible"><i class="fas fa-eye-slash"></i> Hide Label</button>
+                    <button id="toggleAnnotationPointVisibilityBtn" class="tool-btn" disabled aria-pressed="false" data-state="visible"><i class="fas fa-location-dot"></i> Hide Point</button>
+                    <button id="deleteAnnotationBtn" class="tool-btn annotation-danger-action" disabled><i class="fas fa-trash"></i> Delete Selected</button>
+                    <button id="clearAnnotationsBtn" class="tool-btn context-clear-btn clear-annotations-btn annotation-danger-action" disabled><i class="fas fa-eraser"></i> Clear All Annotations</button>
                     </div>
                     <div class="annotation-controls-hint">Select an annotation on the map to edit its text, move its position, or remove it.</div>
                 </div>
@@ -393,9 +394,6 @@
                             <button id="addTextAnnotationBtn" class="tool-btn" onclick="activateAnnotation('text')">
                                 <span><i class="fas fa-font"></i> Add Text Annotation</span>
                             </button>
-                            <button class="tool-btn" onclick="activateAnnotation('labels')">
-                                <span><i class="fas fa-tags"></i> Feature Labels</span>
-                            </button>
                         </div>
                     </div>
                 </div>
@@ -462,6 +460,17 @@
                     </div>
                     <div class="tool-section-content collapsed">
                         <div class="tool-buttons">
+                            <div class="label-attribute-control">
+                                <label for="labelAttributeSelect">Label Attribute</label>
+                                <select id="labelAttributeSelect" class="label-attribute-select" disabled aria-describedby="labelAttributeHint">
+                                    <option>No suitable attributes</option>
+                                </select>
+                                <div id="labelAttributeHint" class="label-attribute-hint">Select a vector layer to choose its label attribute.</div>
+                            </div>
+                            <label class="settings-item feature-labels-control" title="Toggle labels for the selected layer">
+                                <input type="checkbox" id="featureLabelsToggle" onchange="activateAnnotation('labels')">
+                                <span>Show Labels</span>
+                            </label>
                             <button class="tool-btn" onclick="openAttributeTable()">
                                 <span><i class="fas fa-table"></i> View Attribute Table</span>
                             </button>
