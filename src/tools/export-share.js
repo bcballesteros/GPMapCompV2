@@ -10,6 +10,7 @@ import { closeModal } from '../ui/modal.js';
 import { restoreSearchState } from '../ui/location-search.js';
 import { showToast } from '../ui/toast.js';
 import { syncLabelsToggle } from './labels-tool.js';
+import { setTextAnnotationsVisibility, updateAnnotationControls } from './annotation-tool.js';
 import ol from '../lib/ol.js';
 
 const SHARE_TOKEN_KEY = 's';
@@ -487,7 +488,8 @@ function serializeAnnotations() {
                 text: feature.get('text') || '',
                 fontSize: Number(feature.get('fontSize') || 12),
                 fontColor: feature.get('fontColor') || '#000000',
-                annotationVisible: feature.get('annotationVisible') !== false,
+                annotationVisible: feature.get('annotationLabelHidden') !== true,
+                annotationLabelHidden: feature.get('annotationLabelHidden') === true,
                 annotationPointVisible: feature.get('annotationPointVisible') !== false,
                 coordinates: [Number(longitude.toFixed(6)), Number(latitude.toFixed(6))]
             };
@@ -553,6 +555,7 @@ function serializeLayerSettings() {
 function serializeUiSettings() {
     return {
         labels: Boolean(document.getElementById('labelsToggle')?.checked),
+        annotationText: document.getElementById('annotationsToggle')?.checked !== false,
         scaleBar: document.getElementById('scaleBarToggle')?.checked !== false,
         northArrow: document.getElementById('northArrowToggle')?.checked !== false
     };
@@ -813,14 +816,16 @@ function restoreAnnotations(annotationStates = []) {
             return;
         }
 
-        const labelVisible = annotationState.annotationVisible !== false;
+        const labelHidden = typeof annotationState.annotationLabelHidden === 'boolean'
+            ? annotationState.annotationLabelHidden
+            : annotationState.annotationVisible === false;
         const pointVisible = annotationState.annotationPointVisible !== false;
         const feature = new ol.Feature({
             geometry: new ol.geom.Point(ol.proj.fromLonLat([longitude, latitude])),
             text: annotationState.text,
             fontSize: Number(annotationState.fontSize) || 12,
             fontColor: annotationState.fontColor || '#000000',
-            annotationVisible: labelVisible || !pointVisible,
+            annotationLabelHidden: labelHidden,
             annotationPointVisible: pointVisible,
             isAnnotation: true,
             isDragging: false
@@ -830,6 +835,7 @@ function restoreAnnotations(annotationStates = []) {
     });
 
     annotationLayer.layer.changed();
+    updateAnnotationControls();
 }
 
 function restoreViewState(viewState) {
@@ -1270,6 +1276,7 @@ export function restoreSharedStateFromUrl() {
         }
 
         if (state.settings) {
+            setTextAnnotationsVisibility(state.settings.annotationText !== false);
             setCheckboxValue('scaleBarToggle', state.settings.scaleBar !== false);
             setCheckboxValue('northArrowToggle', state.settings.northArrow !== false);
             setCheckboxValue('labelsToggle', Boolean(state.settings.labels));

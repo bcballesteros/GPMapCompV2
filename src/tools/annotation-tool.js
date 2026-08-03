@@ -41,6 +41,8 @@ let interactiveEscapeKeyHandler = null;
 let selectedMeasurement = null;
 let hoveredMeasurement = null;
 let hasLatestMeasurementResult = false;
+let observedAnnotationSource = null;
+let annotationSourceChangeHandler = null;
 const DRAW_INTERACTION_KIND = 'drawing';
 const MEASURE_INTERACTION_KIND = 'measurement';
 const DRAWING_HIT_TOLERANCE_PX = 10;
@@ -570,6 +572,58 @@ function updateContextualInspectorVisibility() {
     });
 
     inspector.hidden = !hasVisibleContext;
+}
+
+function getAnnotationCount() {
+    const annotationLayer = getLayerRecord(ANNOTATION_LAYER_ID);
+    if (!annotationLayer?.source) {
+        return 0;
+    }
+
+    return annotationLayer.source.getFeatures().filter((feature) => feature.get('isAnnotation')).length;
+}
+
+function updateAnnotationVisibilityAvailability(annotationCount = getAnnotationCount()) {
+    const hasAnnotations = annotationCount > 0;
+    const toggles = [
+        document.getElementById('annotationsToggle'),
+        document.getElementById('annotationToolsTextToggle')
+    ].filter(Boolean);
+
+    toggles.forEach((toggle) => {
+        toggle.disabled = !hasAnnotations;
+        if (!hasAnnotations) {
+            toggle.checked = true;
+        }
+    });
+
+    return hasAnnotations;
+}
+
+function observeAnnotationSource() {
+    const source = getLayerRecord(ANNOTATION_LAYER_ID)?.source || null;
+    if (source === observedAnnotationSource) {
+        return;
+    }
+
+    if (observedAnnotationSource && annotationSourceChangeHandler) {
+        observedAnnotationSource.un('addfeature', annotationSourceChangeHandler);
+        observedAnnotationSource.un('removefeature', annotationSourceChangeHandler);
+        observedAnnotationSource.un('clear', annotationSourceChangeHandler);
+    }
+
+    observedAnnotationSource = source;
+    annotationSourceChangeHandler = null;
+    if (!source) {
+        return;
+    }
+
+    annotationSourceChangeHandler = () => {
+        updateAnnotationControls();
+    };
+    source.on('addfeature', annotationSourceChangeHandler);
+    source.on('removefeature', annotationSourceChangeHandler);
+    source.on('clear', annotationSourceChangeHandler);
 }
 
 function createMeasureTooltip() {
@@ -1939,8 +1993,6 @@ export function submitAnnotation() {
     const y = parseFloat(input.dataset.y);
     const fontSize = parseInt(document.getElementById('annotationFontSize').value, 10) || 12;
     const fontColor = document.getElementById('annotationFontColor').value || '#000000';
-    const annotationsVisible = document.getElementById('annotationsToggle')?.checked !== false;
-
     if (!text) {
         showToast('Annotation Required', 'Enter some text for the annotation.', 'warning');
         return;
@@ -1952,7 +2004,7 @@ export function submitAnnotation() {
         fontSize,
         fontColor,
         isAnnotation: true,
-        annotationVisible: annotationsVisible,
+        annotationLabelHidden: false,
         annotationPointVisible: true,
         isDragging: false
     });
@@ -2103,6 +2155,8 @@ export function selectAnnotationForDeletion(event) {
 }
 
 export function updateAnnotationControls() {
+    observeAnnotationSource();
+    const hasAnnotations = updateAnnotationVisibilityAvailability();
     const controls = document.getElementById('annotationControls');
     const editBtn = document.getElementById('editAnnotationBtn');
     const deleteBtn = document.getElementById('deleteAnnotationBtn');
@@ -2116,8 +2170,10 @@ export function updateAnnotationControls() {
         return;
     }
 
-    if (selectedAnnotation) {
-        const labelVisible = selectedAnnotation.get('annotationVisible') !== false;
+    if (selectedAnnotation && hasAnnotations) {
+        const isGlobalLabelVisible = document.getElementById('annotationsToggle')?.checked !== false;
+        const individualLabelVisible = selectedAnnotation.get('annotationLabelHidden') !== true;
+        const labelVisible = isGlobalLabelVisible && individualLabelVisible;
         const pointVisible = selectedAnnotation.get('annotationPointVisible') !== false;
         controls.style.display = '';
         editBtn.disabled = false;
@@ -2127,6 +2183,7 @@ export function updateAnnotationControls() {
             clearBtn.disabled = false;
         }
         updateAnnotationVisibilityButton(labelVisibilityBtn, {
+            disabled: !isGlobalLabelVisible,
             visible: labelVisible,
             canHide: pointVisible,
             visibleLabel: 'Hide Label',
@@ -2244,8 +2301,8 @@ export function bindAnnotationControls() {
                 return;
             }
 
-            const nextVisible = selectedAnnotation.get('annotationVisible') === false;
-            selectedAnnotation.set('annotationVisible', nextVisible);
+            const nextVisible = selectedAnnotation.get('annotationLabelHidden') === true;
+            selectedAnnotation.set('annotationLabelHidden', !nextVisible);
             ensureAnnotationLayer().layer.changed();
             updateAnnotationControls();
             showToast(
@@ -2300,31 +2357,40 @@ export function initializeDrawingSelectionControls() {
 }
 
 export function setTextAnnotationsVisibility(isVisible) {
+    const hasAnnotations = updateAnnotationVisibilityAvailability();
+    const nextVisible = hasAnnotations && isVisible !== false;
+    const toggles = [
+        document.getElementById('annotationsToggle'),
+        document.getElementById('annotationToolsTextToggle')
+    ].filter(Boolean);
+
+    toggles.forEach((toggle) => {
+        toggle.checked = hasAnnotations ? nextVisible : true;
+    });
+
     const annotationLayer = getLayerRecord(ANNOTATION_LAYER_ID);
     if (!annotationLayer) {
+        updateAnnotationControls();
         return;
     }
-
-    annotationLayer.source.getFeatures().forEach((feature) => {
-        if (feature.get('isAnnotation')) {
-            // The workspace-wide label toggle must not make an annotation unrecoverable.
-            feature.set('annotationVisible', isVisible || feature.get('annotationPointVisible') === false);
-        }
-    });
 
     annotationLayer.layer.changed();
     updateAnnotationControls();
 }
 
 export function bindAnnotationVisibilityToggle() {
-    const toggle = document.getElementById('annotationsToggle');
-    if (!toggle) {
+    const toggles = [
+        document.getElementById('annotationsToggle'),
+        document.getElementById('annotationToolsTextToggle')
+    ].filter(Boolean);
+    if (toggles.length === 0) {
         return;
     }
 
-    toggle.addEventListener('change', (event) => {
+    toggles.forEach((toggle) => toggle.addEventListener('change', (event) => {
         setTextAnnotationsVisibility(event.target.checked);
-    });
+    }));
+    setTextAnnotationsVisibility(toggles[0].checked);
 }
 
 export function initializeMeasurementControls() {

@@ -439,7 +439,8 @@ export function createAnnotationStyle(feature) {
     const fontSize = feature.get('fontSize') || 12;
     const fontColor = feature.get('fontColor') || '#000000';
     const isSelected = feature.get('selected');
-    const isLabelVisible = feature.get('annotationVisible') !== false;
+    const isGlobalLabelVisible = document.getElementById('annotationsToggle')?.checked !== false;
+    const isLabelVisible = isGlobalLabelVisible && feature.get('annotationLabelHidden') !== true;
     const isPointVisible = feature.get('annotationPointVisible') !== false;
     const markerColor = isSelected ? '#dc2626' : isLabelVisible ? '#2563eb' : '#64748b';
     const styles = [];
