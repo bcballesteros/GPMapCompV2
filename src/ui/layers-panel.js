@@ -311,10 +311,10 @@ function getLayerActionsMenuMarkup(safeName, options = {}) {
                 class="layer-actions-trigger"
                 aria-haspopup="menu"
                 aria-expanded="false"
-                title="More actions"
-                aria-label="More actions for ${safeName}"
+                title="More Actions"
+                aria-label="More Actions For ${safeName}"
             >&#8942;</button>
-            <div class="layer-actions-dropdown" role="menu" aria-label="Layer actions">
+            <div class="layer-actions-dropdown" role="menu" aria-label="Layer Actions">
                 ${itemsMarkup}
             </div>
         </div>
@@ -616,7 +616,7 @@ function renderSvgMarkerGallery(record, layerItem) {
     const isSvgActive = Boolean(record.svgMarkerDataUrl && !record.markerPresetType);
 
     if (statusEl) {
-        statusEl.textContent = gallery.length > 0 ? `${gallery.length} uploaded` : 'None';
+        statusEl.textContent = gallery.length > 0 ? `${gallery.length} Uploaded` : 'None';
     }
 
     if (!galleryContainer) {
@@ -624,7 +624,7 @@ function renderSvgMarkerGallery(record, layerItem) {
     }
 
     if (gallery.length === 0) {
-        galleryContainer.innerHTML = `<div class="svg-marker-gallery-empty">No uploaded SVGs</div>`;
+        galleryContainer.innerHTML = `<div class="svg-marker-gallery-empty">No Uploaded SVGs</div>`;
         return;
     }
 
@@ -841,7 +841,7 @@ export function addLayerItem(name, color, featureCount, options = {}) {
         colorControl = `
             <div class="control-row">
                 <label>
-                    <span>Point color:</span>
+                    <span>Point Color</span>
                     <input type="color" class="color-picker" value="${color}" onchange="updateLayerColor(this)">
                 </label>
             </div>
@@ -849,7 +849,7 @@ export function addLayerItem(name, color, featureCount, options = {}) {
         pointSizeControl = `
             <div class="control-row control-row-stack point-size-row">
                 <div class="transparency-header">
-                    <span class="control-label">Point size</span>
+                    <span class="control-label">Point Size</span>
                     <span class="point-size-value">${pointSizeValue}px</span>
                 </div>
                 <div class="transparency-control">
@@ -860,8 +860,8 @@ export function addLayerItem(name, color, featureCount, options = {}) {
                         max="18"
                         step="1"
                         value="${pointSizeValue}"
-                        title="Point size"
-                        aria-label="Point size"
+                        title="Point Size"
+                        aria-label="Point Size"
                     >
                 </div>
             </div>
@@ -871,7 +871,7 @@ export function addLayerItem(name, color, featureCount, options = {}) {
 
                 <div class="control-row">
                     <label style="display:flex;align-items:center;gap:8px;width:100%;">
-                        <span>Marker type:</span>
+                        <span>Marker Type</span>
                         <!-- Native select retained for logic, visually replaced by custom icon dropdown -->
                         <select class="marker-type-select" aria-hidden="true" style="position:absolute;opacity:0;pointer-events:none;">
                             <option value="circle" ${markerPresetType === 'circle' || (!markerPresetType && !svgMarkerDataUrl) ? 'selected' : ''}>Default Circle</option>
@@ -883,7 +883,7 @@ export function addLayerItem(name, color, featureCount, options = {}) {
                         </select>
 
                         <div class="marker-type-dropdown" data-selected="${markerPresetType || (svgMarkerDataUrl ? 'custom' : 'circle')}">
-                            <button type="button" class="marker-type-current" aria-haspopup="listbox" aria-expanded="false" title="Marker type" aria-label="Marker type">
+                            <button type="button" class="marker-type-current" aria-haspopup="listbox" aria-expanded="false" title="Marker Type" aria-label="Marker Type">
                                 <!-- current icon preview inserted by JS on init; fallback: simple circle -->
                                 <span class="marker-type-icon marker-type-icon-circle" aria-hidden="true"></span>
                                 <i class="fas fa-caret-down" style="margin-left:8px;color:var(--gray-400);"></i>
@@ -901,7 +901,7 @@ export function addLayerItem(name, color, featureCount, options = {}) {
 
                 <div class="marker-svg-section">
                     <div class="marker-svg-header">
-                        <span class="marker-svg-label">Custom SVG:</span>
+                        <span class="marker-svg-label">Custom SVG</span>
                         <span class="svg-marker-upload-status">${svgMarkerDataUrl ? 'Uploaded' : 'None'}</span>
                     </div>
                     <div class="marker-control-row">
@@ -915,19 +915,19 @@ export function addLayerItem(name, color, featureCount, options = {}) {
                     <div class="marker-stroke-toggle">
                         <label class="checkbox-label">
                             <input type="checkbox" class="marker-stroke-enabled" ${markerStrokeEnabled ? 'checked' : ''}>
-                            <span>Add stroke</span>
+                            <span>Add Stroke</span>
                         </label>
                     </div>
                     <div class="marker-stroke-controls" style="display: ${markerStrokeEnabled ? 'block' : 'none'};">
                         <div class="marker-stroke-color-row">
                             <label>
-                                <span class="marker-stroke-color-label">Stroke color:</span>
+                                <span class="marker-stroke-color-label">Stroke Color</span>
                                 <input type="color" class="marker-stroke-color-picker" value="${markerStrokeColor}">
                             </label>
                         </div>
                         <div class="marker-stroke-width-row">
                             <div class="transparency-header">
-                                <span class="control-label">Stroke width</span>
+                                <span class="control-label">Stroke Width</span>
                                 <span class="marker-stroke-width-value">${markerStrokeWidth}px</span>
                             </div>
                             <div class="transparency-control">
@@ -938,8 +938,8 @@ export function addLayerItem(name, color, featureCount, options = {}) {
                                     max="4"
                                     step="1"
                                     value="${markerStrokeWidth}"
-                                    title="Stroke width"
-                                    aria-label="Stroke width"
+                                    title="Stroke Width"
+                                    aria-label="Stroke Width"
                                 >
                             </div>
                         </div>
@@ -947,12 +947,12 @@ export function addLayerItem(name, color, featureCount, options = {}) {
                 </div>
             </div>
         `;
-        opacityLabel = 'Point opacity';
+        opacityLabel = 'Point Opacity';
     } else if (isLineLayer) {
         colorControl = `
             <div class="control-row">
                 <label>
-                    <span>Stroke color:</span>
+                    <span>Line Color</span>
                     <input type="color" class="color-picker" value="${color}" onchange="updateLayerColor(this)">
                 </label>
             </div>
@@ -960,7 +960,7 @@ export function addLayerItem(name, color, featureCount, options = {}) {
         lineWidthControl = `
             <div class="control-row control-row-stack line-width-row">
                 <div class="transparency-header">
-                    <span class="control-label">Stroke width</span>
+                    <span class="control-label">Line Width</span>
                     <span class="line-width-value">${lineStrokeWidthValue}px</span>
                 </div>
                 <div class="transparency-control">
@@ -971,30 +971,30 @@ export function addLayerItem(name, color, featureCount, options = {}) {
                         max="12"
                         step="1"
                         value="${lineStrokeWidthValue}"
-                        title="Line width"
-                        aria-label="Line width"
+                        title="Line Width"
+                        aria-label="Line Width"
                     >
                 </div>
             </div>
         `;
-        opacityLabel = 'Line opacity';
+        opacityLabel = 'Line Opacity';
     } else if (isPolygonLayer) {
         polygonStyleControls = `
             <div class="control-row">
                 <label>
-                    <span>Fill color:</span>
+                    <span>Fill Color</span>
                     <input type="color" class="color-picker polygon-fill-picker" value="${polygonFillColor}">
                 </label>
             </div>
             <div class="control-row">
                 <label>
-                    <span>Border color:</span>
+                    <span>Stroke Color</span>
                     <input type="color" class="color-picker polygon-stroke-picker" value="${polygonStrokeColor}">
                 </label>
             </div>
             <div class="control-row control-row-stack polygon-width-row">
                 <div class="transparency-header">
-                    <span class="control-label">Border width</span>
+                    <span class="control-label">Stroke Width</span>
                     <span class="polygon-width-value">${polygonStrokeWidthValue}px</span>
                 </div>
                 <div class="transparency-control">
@@ -1005,8 +1005,8 @@ export function addLayerItem(name, color, featureCount, options = {}) {
                         max="12"
                         step="1"
                         value="${polygonStrokeWidthValue}"
-                        title="Border width"
-                        aria-label="Border width"
+                        title="Stroke Width"
+                        aria-label="Stroke Width"
                     >
                 </div>
             </div>
@@ -1022,7 +1022,7 @@ export function addLayerItem(name, color, featureCount, options = {}) {
     const layerHTML = `
         <div class="layer-item collapsed" data-layer-name="${safeName}">
             <div class="layer-item-header" role="button" tabindex="0">
-                <input type="checkbox" class="layer-toggle" ${isVisible ? 'checked' : ''} title="Toggle layer visibility">
+                        <input type="checkbox" class="layer-toggle" ${isVisible ? 'checked' : ''} title="Toggle Layer Visibility">
                 <div class="layer-header-main">
                     <div class="layer-info-short">
                         <div class="layer-name-wrap" data-tooltip="${safeName}">
@@ -1031,7 +1031,7 @@ export function addLayerItem(name, color, featureCount, options = {}) {
                         <div class="layer-stats">${statsText}</div>
                     </div>
                     <div class="layer-header-actions">
-                        <button type="button" class="layer-expand-btn" aria-expanded="false" title="Layer controls"><i class="fas fa-chevron-down" aria-hidden="true"></i></button>
+                        <button type="button" class="layer-expand-btn" aria-expanded="false" title="Layer Controls"><i class="fas fa-chevron-down" aria-hidden="true"></i></button>
                         ${getLayerActionsMenuMarkup(safeName, {
         zoomDisabled: !canZoom,
         zoomDisabledReason
@@ -1063,7 +1063,7 @@ export function addLayerItem(name, color, featureCount, options = {}) {
                         </div>
                     </div>
                     <div class="control-row control-row-action">
-                        <button class="layer-action-btn danger layer-action-btn-full" onclick="removeLayer(event)" title="Remove layer"><i class="fas fa-trash"></i> Remove</button>
+                        <button class="layer-action-btn danger layer-action-btn-full" onclick="removeLayer(event)" title="Remove Layer"><i class="fas fa-trash"></i> Remove</button>
                     </div>
                 </div>
             </div>
@@ -1638,13 +1638,13 @@ function updateMarkerStrokeEnabled(checkbox, layerName, layerItem) {
                 <div class="marker-stroke-controls">
                     <div class="marker-stroke-color-row">
                         <label>
-                            <span class="marker-stroke-color-label">Stroke color:</span>
+                            <span class="marker-stroke-color-label">Stroke Color</span>
                             <input type="color" class="marker-stroke-color-picker" value="${record.markerStrokeColor}">
                         </label>
                     </div>
                     <div class="marker-stroke-width-row">
                         <div class="transparency-header">
-                            <span class="control-label">Stroke width</span>
+                            <span class="control-label">Stroke Width</span>
                             <span class="marker-stroke-width-value">${record.markerStrokeWidth}px</span>
                         </div>
                         <div class="transparency-control">
@@ -1655,8 +1655,8 @@ function updateMarkerStrokeEnabled(checkbox, layerName, layerItem) {
                                 max="4"
                                 step="1"
                                 value="${record.markerStrokeWidth}"
-                                title="Stroke width"
-                                aria-label="Stroke width"
+                                title="Stroke Width"
+                                aria-label="Stroke Width"
                             >
                         </div>
                     </div>

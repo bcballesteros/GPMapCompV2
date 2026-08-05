@@ -398,7 +398,7 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
     font-size: 10px;
     color: rgba(255, 255, 255, 0.66);
     font-weight: 700;
-    text-transform: uppercase;
+    text-transform: none;
     letter-spacing: 0.55px;
     white-space: nowrap;
 }
@@ -461,7 +461,7 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
     display: inline-flex;
     align-items: center;
     gap: var(--spacing-2);
-    text-transform: uppercase;
+    text-transform: none;
     letter-spacing: 0.42px;
     justify-content: center;
     box-shadow: none;
@@ -512,6 +512,18 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
     background: var(--gray-200);
     border-color: var(--gray-400);
     transform: translateY(-1px);
+}
+
+#uploadModal .btn,
+#wmsModal .btn,
+#gpModal .btn {
+    text-transform: none;
+    letter-spacing: normal;
+}
+
+#uploadModal .layer-source-btn {
+    text-transform: none;
+    letter-spacing: normal;
 }
 
 .svg-marker-remove-button {
@@ -669,7 +681,7 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
     font-weight: 700;
     color: var(--gray-900);
     margin-bottom: var(--spacing-4);
-    text-transform: uppercase;
+    text-transform: none;
     letter-spacing: 0.5px;
     display: flex;
     align-items: center;
@@ -700,7 +712,7 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s ease;
-    text-transform: uppercase;
+    text-transform: none;
     letter-spacing: 0.4px;
     box-shadow: 0 6px 20px rgba(22, 163, 74, 0.3);
     font-family: 'Inter', sans-serif;
@@ -4043,8 +4055,15 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
     font-weight: 700;
     color: var(--gray-900);
     margin-bottom: var(--spacing-2);
-    text-transform: uppercase;
+    text-transform: none;
     letter-spacing: 0.4px;
+}
+
+#uploadModal .form-label,
+#wmsModal .form-label,
+#gpModal .form-label {
+    text-transform: none;
+    letter-spacing: 0;
 }
 
 .form-input {
