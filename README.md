@@ -1,3 +1,6 @@
+<p align="center">
+  <img src="assets/images/gp-infog-2.png" alt="Geoportal Philippines Map Composer V2" width="100%">
+</p>
 
 # Geoportal Philippines: Map Composer V2 (GPMapCompV2)
 
