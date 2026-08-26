@@ -4,6 +4,7 @@ import { ensureAnnotationLayer } from '../map/layer-manager.js';
 import { getLayerRecord, getMap, getState, removeLayerRecord, setAnnotationMode, setLayerRecord, setSelectedFeature, setSelectedTool } from '../state/store.js';
 import { toggleSelectedLayerLabels } from './labels-tool.js';
 import { showToast } from '../ui/toast.js';
+import { confirmDestructiveAction } from '../ui/confirmation-dialog.js';
 
 let annotationMode = false;
 let annotationClickListener = null;
@@ -1794,10 +1795,18 @@ export function updateDrawingControls() {
     updateContextualInspectorVisibility();
 }
 
-export function deleteSelectedDrawing() {
+export async function deleteSelectedDrawing() {
     const drawingLayer = getLayerRecord(DRAWING_LAYER_ID);
     if (!drawingLayer?.source || !selectedDrawing) {
         showToast('No Drawing Selected', 'Select a drawing on the map before using Delete Selected.', 'info', 1700);
+        return;
+    }
+
+    if (!await confirmDestructiveAction({
+        title: 'Delete Drawing?',
+        message: 'Delete the selected drawing?',
+        confirmLabel: 'Delete'
+    })) {
         return;
     }
 
@@ -1814,10 +1823,18 @@ export function deleteSelectedDrawing() {
     syncMapCursor();
 }
 
-export function clearDrawings() {
+export async function clearDrawings() {
     const drawingLayer = getLayerRecord(DRAWING_LAYER_ID);
     if (!drawingLayer?.source) {
         showToast('No Drawings', 'There are no drawings to clear.', 'info', 1500);
+        return;
+    }
+
+    if (!await confirmDestructiveAction({
+        title: 'Clear All Drawings?',
+        message: 'Clear all drawings? This action cannot be undone.',
+        confirmLabel: 'Clear All'
+    })) {
         return;
     }
 
@@ -1943,9 +1960,17 @@ export function activateMeasureArea() {
     activateMeasurementTool(MEASUREMENT_TYPE_AREA);
 }
 
-export function clearMeasurements() {
+export async function clearMeasurements() {
     if (!measureLayer?.getSource()) {
         showToast('No Measurements', 'There are no measurements to clear.', 'info', 1500);
+        return;
+    }
+
+    if (!await confirmDestructiveAction({
+        title: 'Clear All Measurements?',
+        message: 'Clear all measurements? This action cannot be undone.',
+        confirmLabel: 'Clear All'
+    })) {
         return;
     }
 
@@ -1961,9 +1986,17 @@ export function clearMeasurements() {
     showToast('Measurements Cleared', 'All measurements were removed.', 'success', 1600);
 }
 
-export function deleteSelectedMeasurement() {
+export async function deleteSelectedMeasurement() {
     if (!measureLayer?.getSource() || !selectedMeasurement) {
         showToast('No Measurement Selected', 'Select a distance or area measurement before using Delete Selected.', 'info', 1700);
+        return;
+    }
+
+    if (!await confirmDestructiveAction({
+        title: 'Delete Measurement?',
+        message: 'Delete the selected measurement?',
+        confirmLabel: 'Delete'
+    })) {
         return;
     }
 
@@ -2096,9 +2129,17 @@ export function editAnnotation(feature) {
     };
 }
 
-export function deleteAnnotation(feature) {
+export async function deleteAnnotation(feature) {
     const annotationLayer = getLayerRecord(ANNOTATION_LAYER_ID);
     if (!annotationLayer) {
+        return;
+    }
+
+    if (!await confirmDestructiveAction({
+        title: 'Delete Annotation?',
+        message: 'Delete the selected annotation?',
+        confirmLabel: 'Delete'
+    })) {
         return;
     }
 
@@ -2116,7 +2157,7 @@ export function deleteAnnotation(feature) {
     }
 }
 
-export function clearAnnotations() {
+export async function clearAnnotations() {
     const annotationLayer = getLayerRecord(ANNOTATION_LAYER_ID);
     if (!annotationLayer?.source) {
         showToast('No Annotations', 'There are no text annotations to clear.', 'info', 1500);
@@ -2126,6 +2167,14 @@ export function clearAnnotations() {
     const annotationCount = annotationLayer.source.getFeatures().filter((feature) => feature.get('isAnnotation')).length;
     if (annotationCount === 0) {
         showToast('No Annotations', 'There are no text annotations to clear.', 'info', 1500);
+        return;
+    }
+
+    if (!await confirmDestructiveAction({
+        title: 'Clear All Annotations?',
+        message: 'Clear all annotations? This action cannot be undone.',
+        confirmLabel: 'Clear All'
+    })) {
         return;
     }
 
@@ -2278,8 +2327,6 @@ export function bindAnnotationControls() {
         deleteBtn.onclick = () => {
             if (selectedAnnotation) {
                 deleteAnnotation(selectedAnnotation);
-                selectedAnnotation = null;
-                updateAnnotationControls();
             }
         };
     }

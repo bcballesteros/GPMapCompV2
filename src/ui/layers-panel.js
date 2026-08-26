@@ -5,6 +5,7 @@ import { syncLabelsToggle } from '../tools/labels-tool.js';
 import { commitLayerOpacity as commitLayerOpacityValue, updateLayerOpacity as updateLayerOpacityValue } from '../tools/transparency-tool.js';
 import { showToast } from './toast.js';
 import { syncLabelAttributeControl } from './sidebar.js';
+import { confirmDestructiveAction } from './confirmation-dialog.js';
 
 let layerNameTooltipElement = null;
 let layerNameTooltipListenersBound = false;
@@ -643,11 +644,19 @@ function renderSvgMarkerGallery(record, layerItem) {
         const deleteButton = thumb.querySelector('.svg-marker-delete');
         if (deleteButton) {
             deleteButton.addEventListener('pointerdown', (event) => event.stopPropagation());
-            deleteButton.addEventListener('click', (event) => {
+            deleteButton.addEventListener('click', async (event) => {
                 event.stopPropagation();
                 const index = Number(thumb.getAttribute('data-svg-index'));
                 const record = getLayerRecord(layerItem.querySelector('.layer-name').textContent);
                 if (!record || !Number.isFinite(index)) {
+                    return;
+                }
+                const markerName = getSvgGallery(record)[index]?.name || 'this SVG';
+                if (!await confirmDestructiveAction({
+                    title: 'Delete SVG?',
+                    message: `Delete "${markerName}"?`,
+                    confirmLabel: 'Delete'
+                })) {
                     return;
                 }
                 record.activeSvgMarkerIndex = index;
@@ -1815,11 +1824,19 @@ export function commitLayerOpacity(slider) {
     commitLayerOpacityValue(slider);
 }
 
-export function removeLayer(event) {
+export async function removeLayer(event) {
     event.stopPropagation();
 
     const layerItem = event.target.closest('.layer-item');
     const layerName = getLayerItemName(layerItem);
+    if (!layerName || !await confirmDestructiveAction({
+        title: 'Remove Layer?',
+        message: `Remove "${layerName}"?`,
+        confirmLabel: 'Remove'
+    })) {
+        return;
+    }
+
     removeLayerItem(layerName);
 }
 

@@ -491,6 +491,19 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
     transform: translateY(0);
 }
 
+.btn-danger {
+    background: #dc2626;
+    color: white;
+    border-color: rgba(127, 29, 29, 0.24);
+    box-shadow: 0 6px 14px rgba(185, 28, 28, 0.2);
+}
+
+.btn-danger:hover {
+    background: #b91c1c;
+    box-shadow: 0 7px 16px rgba(185, 28, 28, 0.24);
+    transform: none;
+}
+
 .btn-share {
     background: rgba(255, 255, 255, 0.035);
     color: rgba(255, 255, 255, 0.88);
@@ -2795,30 +2808,6 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
     background: linear-gradient(135deg, #f87171 0%, #dc2626 100%);
 }
 
-.clear-drawings-btn {
-    background: #ffffff;
-    border-color: rgba(148, 163, 184, 0.42);
-    color: var(--gray-700);
-    box-shadow: none;
-}
-
-.clear-drawings-btn span,
-.clear-drawings-btn i {
-    color: var(--gray-700);
-}
-
-.clear-drawings-btn:hover {
-    background: #f8fafc;
-    border-color: rgba(100, 116, 139, 0.45);
-    color: var(--gray-900);
-    box-shadow: none;
-}
-
-.clear-drawings-btn:hover span,
-.clear-drawings-btn:hover i {
-    color: var(--gray-900);
-}
-
 .measure-controls-inline {
     display: grid;
     gap: 8px;
@@ -3096,31 +3085,6 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
 
 .tool-btn-muted:hover {
     background: linear-gradient(135deg, #a7b4c7 0%, #64748b 100%);
-}
-
-.clear-measurements-btn {
-    background: rgba(255, 255, 255, 0.82);
-    border-color: rgba(100, 116, 139, 0.22);
-    color: var(--gray-700);
-    width: 100%;
-    justify-content: flex-start;
-}
-
-.clear-measurements-btn span,
-.clear-measurements-btn i {
-    color: var(--gray-700);
-}
-
-.clear-measurements-btn:hover {
-    background: #f8fafc;
-    border-color: rgba(100, 116, 139, 0.45);
-    color: var(--gray-900);
-    box-shadow: none;
-}
-
-.clear-measurements-btn:hover span,
-.clear-measurements-btn:hover i {
-    color: var(--gray-900);
 }
 
 .measurement-context-panel {
@@ -3437,7 +3401,8 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
 .annotation-controls-actions #clearAnnotationsBtn,
 .annotation-controls-actions .annotation-danger-action,
 .delete-selected-drawing-btn,
-.delete-selected-measurement-btn {
+.delete-selected-measurement-btn,
+.context-controls-actions .annotation-danger-action {
     color: #b42318;
     border-color: rgba(180, 35, 24, 0.2);
     background: #ffffff;
@@ -3447,7 +3412,8 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
 .annotation-controls-actions #clearAnnotationsBtn:hover:not(:disabled),
 .annotation-controls-actions .annotation-danger-action:hover:not(:disabled),
 .delete-selected-drawing-btn:hover:not(:disabled),
-.delete-selected-measurement-btn:hover:not(:disabled) {
+.delete-selected-measurement-btn:hover:not(:disabled),
+.context-controls-actions .annotation-danger-action:hover:not(:disabled) {
     color: #991b1b;
     border-color: rgba(153, 27, 27, 0.3);
     background: #fffafa;
@@ -3462,7 +3428,9 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
 .delete-selected-drawing-btn:focus-visible:not(:disabled),
 .delete-selected-drawing-btn:active:not(:disabled),
 .delete-selected-measurement-btn:focus-visible:not(:disabled),
-.delete-selected-measurement-btn:active:not(:disabled) {
+.delete-selected-measurement-btn:active:not(:disabled),
+.context-controls-actions .annotation-danger-action:focus-visible:not(:disabled),
+.context-controls-actions .annotation-danger-action:active:not(:disabled) {
     outline: none;
     color: #991b1b;
     border-color: rgba(153, 27, 27, 0.34);
@@ -3473,7 +3441,8 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
 .annotation-controls-actions #clearAnnotationsBtn:focus-visible:not(:disabled),
 .annotation-controls-actions .annotation-danger-action:focus-visible:not(:disabled),
 .delete-selected-drawing-btn:focus-visible:not(:disabled),
-.delete-selected-measurement-btn:focus-visible:not(:disabled) {
+.delete-selected-measurement-btn:focus-visible:not(:disabled),
+.context-controls-actions .annotation-danger-action:focus-visible:not(:disabled) {
     box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12);
 }
 
@@ -3482,10 +3451,7 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
 #toggleAnnotationLabelVisibilityBtn,
 #toggleAnnotationPointVisibilityBtn,
 #toggleAnnotationLabelVisibilityBtn[data-state="hidden"],
-#toggleAnnotationPointVisibilityBtn[data-state="hidden"],
-.context-clear-btn,
-.clear-drawings-btn,
-.clear-measurements-btn {
+#toggleAnnotationPointVisibilityBtn[data-state="hidden"] {
     border-color: var(--gray-200);
     background: #ffffff;
     color: var(--gray-800);
@@ -3774,9 +3740,7 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
 .context-clear-btn,
 .clear-drawings-btn,
 .clear-measurements-btn {
-    color: var(--gray-800);
-    border-color: var(--gray-200);
-    background: #ffffff;
+    justify-content: flex-start;
 }
 
 .settings-list {
@@ -4284,6 +4248,17 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
 
 .wms-layer-checklist:not(.gp-layer-checklist) .wms-layer-checklist-item:hover {
     background: var(--gray-50);
+}
+
+.confirmation-modal {
+    max-width: 440px;
+}
+
+.confirmation-dialog-message {
+    margin: 0;
+    color: var(--gray-700);
+    font-size: 14px;
+    line-height: 1.55;
 }
 
 .gp-layer-checklist .wms-layer-checklist-item:has(input:checked) {
