@@ -55,6 +55,16 @@ function openModalWithHooks(modalId) {
     });
 }
 
+function syncBasemapSelectTitle() {
+    const basemapSelect = document.getElementById('basemapSelect');
+    if (!basemapSelect) {
+        return;
+    }
+
+    const selectedOption = basemapSelect.options[basemapSelect.selectedIndex];
+    basemapSelect.title = selectedOption ? selectedOption.text : '';
+}
+
 function bindGlobalHandlers() {
     window.showToast = showToast;
     window.openModal = openModalWithHooks;
@@ -109,6 +119,7 @@ export function bootstrapApp() {
             onAnnotationSelect: selectAnnotationForDeletion
         });
         bindGlobalHandlers();
+        syncBasemapSelectTitle();
         runOptionalStartupStep('layers sidebar init', () => initializeLayersSidebar());
         runOptionalStartupStep('label attribute control init', () => initializeLabelAttributeControl());
 

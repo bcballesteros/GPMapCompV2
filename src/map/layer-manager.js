@@ -1,7 +1,7 @@
 import { DEFAULT_LAYER_COLOR, DEFAULT_LINE_STROKE_WIDTH, DEFAULT_POINT_SIZE, DEFAULT_VECTOR_OPACITY, ANNOTATION_LAYER_ID } from '../config/constants.js';
 import { DEFAULT_VIEW_PADDING } from '../config/defaults.js';
 import ol from '../lib/ol.js';
-import { createBasemapSource } from '../config/basemaps.js';
+import { createBasemapLayer } from '../config/basemaps.js';
 import { getLayerRecord, getMap, getState, removeLayerRecord, setActiveBasemap, setCurrentLayerName, setLayerRecord } from '../state/store.js';
 import { createAnnotationStyle, createManagedFeatureStyles, getAvailableLabelFields, pickDefaultLabelField } from './style-factory.js';
 
@@ -313,9 +313,14 @@ export function changeBasemapLayer(basemapName) {
         map.removeLayer(basemapLayer);
     }
 
-    map.getLayers().insertAt(0, new ol.layer.Tile({
-        source: createBasemapSource(basemapName)
-    }));
+    map.getLayers().insertAt(0, createBasemapLayer(basemapName));
 
     setActiveBasemap(basemapName);
+
+    const basemapSelect = document.getElementById('basemapSelect');
+    if (basemapSelect) {
+        basemapSelect.value = basemapName;
+        const selectedOption = basemapSelect.options[basemapSelect.selectedIndex];
+        basemapSelect.title = selectedOption ? selectedOption.text : '';
+    }
 }

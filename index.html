@@ -201,11 +201,15 @@
                     <i class="fas fa-map"></i>
                     <span>Basemap</span>
                 </label>
-                <select id="basemapSelect" onchange="changeBasemap(this.value)">
-                    <option value="namria">NAMRIA</option>
+                <select id="basemapSelect" onchange="changeBasemap(this.value)" title="NAMRIA Basemaps">
+                    <option value="namria">NAMRIA Basemaps</option>
+                    <option value="namria-orthoimage-2011">NAMRIA Orthoimage 2011 (selected areas)</option>
+                    <option value="namria-orthoimage-2013-2014">NAMRIA Orthoimage 2013–2014 (selected areas)</option>
+                    <option value="namria-orthorectified-radar">NAMRIA Orthorectified Radar Image</option>
+                    <option value="bing">Bing Maps – Aerial</option>
+                    <option value="arcgis-aerial">ArcGIS Online – Aerial</option>
                     <option value="osm">OpenStreetMap</option>
-                    <option value="google">Google</option>
-                    <option value="bing">Bing</option>
+                    <option value="google">Google Maps</option>
                 </select>
             </div>
             <div class="nav-actions">
