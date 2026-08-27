@@ -480,5 +480,4 @@ export function initializeWorkspaceStatus() {
     document.addEventListener('change', () => updateSmartHelpPanel());
     document.addEventListener('input', () => updateSmartHelpPanel());
 
-    mapContainer?.setAttribute('title', 'Scroll to zoom, drag to pan, and use the status bar for live map reference.');
 }

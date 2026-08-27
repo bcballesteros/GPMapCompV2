@@ -42,7 +42,7 @@ function scheduleToastRemoval(toast, duration) {
     toast.dataset.timeoutId = String(timeoutId);
 }
 
-export function showToast(title, message = '', type = 'info', duration = 4000) {
+export function showToast(title, message = '', type = 'info', duration) {
     const container = document.getElementById('toastContainer');
     if (!container) {
         return null;
@@ -51,11 +51,12 @@ export function showToast(title, message = '', type = 'info', duration = 4000) {
     cleanupRecentToasts();
 
     const toastKey = buildToastKey(title, message, type);
+    const effectiveDuration = duration ?? (type === 'warning' || type === 'error' ? 6000 : 5000);
     const existingToast = activeToasts.get(toastKey);
     if (existingToast?.isConnected) {
         existingToast.classList.remove('removing');
         window.clearTimeout(Number(existingToast.dataset.timeoutId));
-        scheduleToastRemoval(existingToast, duration);
+        scheduleToastRemoval(existingToast, effectiveDuration);
         recentToasts.set(toastKey, Date.now());
         return existingToast;
     }
@@ -81,7 +82,7 @@ export function showToast(title, message = '', type = 'info', duration = 4000) {
     };
 
     toast.innerHTML = `
-        <div class="toast-icon">${icons[type] || icons.info}</div>
+        <div class="toast-icon" aria-hidden="true">${icons[type] || icons.info}</div>
         <div class="toast-content">
             <div class="toast-title">${title}</div>
             ${message ? `<div class="toast-message">${message}</div>` : ''}
@@ -91,6 +92,6 @@ export function showToast(title, message = '', type = 'info', duration = 4000) {
     container.appendChild(toast);
     activeToasts.set(toastKey, toast);
     recentToasts.set(toastKey, Date.now());
-    scheduleToastRemoval(toast, duration);
+    scheduleToastRemoval(toast, effectiveDuration);
     return toast;
 }

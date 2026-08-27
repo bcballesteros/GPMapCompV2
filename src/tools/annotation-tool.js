@@ -450,6 +450,7 @@ function clearSelectedDrawingContext() {
     }
 
     updateDrawingControls();
+    updateContextualInspectorVisibility();
 }
 
 function updateDrawingHover(feature, coordinate = null) {
@@ -533,6 +534,7 @@ function setSelectedMeasurement(feature) {
 function clearSelectedMeasurementContext() {
     if (!selectedMeasurement && !hasLatestMeasurementResult) {
         updateMeasurementControls();
+        updateContextualInspectorVisibility();
         return;
     }
 
@@ -543,11 +545,13 @@ function clearSelectedMeasurementContext() {
     }
     updateMeasurementResultPanel(Number.NaN);
     updateMeasurementControls();
+    updateContextualInspectorVisibility();
 }
 
 function clearSelectedAnnotationContext() {
     if (!selectedAnnotation) {
         updateAnnotationControls();
+        updateContextualInspectorVisibility();
         return;
     }
 
@@ -560,6 +564,7 @@ function clearSelectedAnnotationContext() {
     setMoveMode(false);
     syncDraggableAnnotations();
     updateAnnotationControls();
+    updateContextualInspectorVisibility();
 }
 
 function updateContextualInspectorVisibility() {
@@ -1193,11 +1198,12 @@ function bindInteractiveEscapeKey() {
             return;
         }
 
-        if (selectedMeasurement) {
-            setSelectedMeasurement(null);
-            updateMeasurementCursor();
-            updateMeasurementResultPanel(Number.NaN);
-        }
+        clearSelectedAnnotationContext();
+        clearSelectedDrawingContext();
+        clearSelectedMeasurementContext();
+        updateAnnotationCursor();
+        updateDrawingHover(null);
+        updateMeasurementCursor();
     };
 
     window.addEventListener('keydown', interactiveEscapeKeyHandler);
@@ -2459,6 +2465,56 @@ export function initializeMeasurementControls() {
             deleteSelectedMeasurement();
         };
     }
+}
+
+/**
+ * Returns the user-created features that may be persisted. This intentionally
+ * exposes only the three feature collections owned by this tool; callers do
+ * not need to know about the backing layer records or interactions.
+ */
+export function getFeatureSavingCollections() {
+    const annotationSource = getLayerRecord(ANNOTATION_LAYER_ID)?.source;
+    const drawingSource = getLayerRecord(DRAWING_LAYER_ID)?.source;
+    const measurementSource = measureLayer?.getSource?.();
+
+    return {
+        annotations: annotationSource?.getFeatures?.().filter((feature) => feature.get('isAnnotation')) ?? [],
+        drawings: drawingSource?.getFeatures?.().filter((feature) => Boolean(feature.get('drawingType'))) ?? [],
+        measurements: measurementSource?.getFeatures?.().filter((feature) => {
+            const type = feature.get('measurementType');
+            return type === MEASUREMENT_TYPE_DISTANCE || type === MEASUREMENT_TYPE_AREA;
+        }) ?? []
+    };
+}
+
+/**
+ * Adds fully validated, restored features to their native layers. The saving
+ * service prepares the OpenLayers features first, so this operation is a
+ * merge and cannot leave a partially imported file in the workspace.
+ */
+export function restoreFeatureSavingCollections({ annotations = [], drawings = [], measurements = [] } = {}) {
+    if (annotations.length > 0) {
+        const annotationLayer = ensureAnnotationLayer();
+        annotationLayer.source.addFeatures(annotations);
+        annotationLayer.layer.changed();
+    }
+
+    if (drawings.length > 0) {
+        const drawingLayer = ensureDrawingLayer();
+        drawingLayer.source.addFeatures(drawings);
+        drawingLayer.layer.changed();
+    }
+
+    if (measurements.length > 0) {
+        const layer = ensureMeasureLayer();
+        layer.getSource().addFeatures(measurements);
+        layer.changed();
+    }
+
+    updateAnnotationControls();
+    updateDrawingControls();
+    updateMeasurementControls();
+    syncMapCursor();
 }
 
 

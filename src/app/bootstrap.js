@@ -11,6 +11,7 @@ import { initializeLayersSidebar } from '../ui/layers-sidebar.js';
 import { initializeWorkspaceStatus } from '../ui/workspace-status.js';
 import { showToast } from '../ui/toast.js';
 import { bindAnnotationPopupDismissal } from '../ui/toolbar.js';
+import { initializeFeatureSaving, loadFeaturesFromFile, openFeatureSaveDialog, saveSelectedFeatures } from '../ui/feature-saving.js';
 
 function runOptionalStartupStep(label, callback) {
     try {
@@ -109,6 +110,9 @@ function bindGlobalHandlers() {
     window.renderMapPreview = renderMapPreview;
     window.copyToClipboard = copyToClipboard;
     window.generateLink = generateLink;
+    window.openFeatureSaveDialog = openFeatureSaveDialog;
+    window.saveSelectedFeatures = saveSelectedFeatures;
+    window.loadFeaturesFromFile = loadFeaturesFromFile;
 }
 
 export function bootstrapApp() {
@@ -131,6 +135,7 @@ export function bootstrapApp() {
         runOptionalStartupStep('drawing selection controls init', () => initializeDrawingSelectionControls());
         runOptionalStartupStep('measurement controls init', () => initializeMeasurementControls());
         runOptionalStartupStep('workspace status init', () => initializeWorkspaceStatus());
+        runOptionalStartupStep('feature saving init', () => initializeFeatureSaving());
         runOptionalStartupStep('upload form init', () => initializeUploadForm());
         runOptionalStartupStep('WMS form init', () => initializeWmsLayerForm());
         runOptionalStartupStep('GP form init', () => initializeGpLayerForm());
