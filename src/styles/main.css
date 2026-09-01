@@ -2424,6 +2424,7 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
     display: -webkit-box;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
+    line-clamp: 2;
     overflow: hidden;
     max-width: 100%;
 }
