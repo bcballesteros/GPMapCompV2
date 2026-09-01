@@ -4606,16 +4606,29 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
 }
 
 .export-preview-shell {
+    --export-preview-aspect-ratio: 4 / 3;
     background: linear-gradient(135deg, var(--gray-100), var(--gray-150));
-    height: 200px;
+    width: 100%;
+    aspect-ratio: var(--export-preview-aspect-ratio);
+    max-width: min(100%, 600px);
+    /* Keep the complete snapshot visible on shorter laptop viewports. */
+    max-height: min(52vh, calc(100vh - 260px), 420px);
+    min-height: 0;
     border-radius: 10px;
-    margin-bottom: var(--spacing-5);
     border: 1px solid var(--gray-200);
     position: relative;
     overflow: hidden;
+    justify-self: center;
+    align-self: start;
 }
 
 .export-preview-map {
+    width: 100%;
+    height: 100%;
+}
+
+.export-preview-canvas {
+    display: block;
     width: 100%;
     height: 100%;
 }
@@ -4641,11 +4654,10 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
 
 .export-format-group {
     display: grid;
-    grid-template-columns: minmax(116px, max-content) minmax(160px, 1fr);
-    align-items: center;
-    column-gap: var(--spacing-3);
-    row-gap: var(--spacing-2);
-    margin-bottom: var(--spacing-4);
+    grid-template-columns: 1fr;
+    align-items: start;
+    gap: var(--spacing-2);
+    margin-bottom: 0;
     padding: var(--spacing-3);
     border: 1px solid var(--gray-200);
     border-radius: 8px;
@@ -4659,9 +4671,59 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
 }
 
 .export-format-group .form-input {
+    width: 100%;
     min-height: 40px;
     border-radius: 8px;
     background-color: var(--gray-50);
+}
+
+.export-modal {
+    width: min(800px, 92vw);
+    max-width: min(800px, 92vw);
+    max-height: calc(100vh - 48px);
+}
+
+.export-modal-body {
+    display: grid;
+    grid-template-columns: minmax(0, 2.1fr) minmax(220px, 0.85fr);
+    gap: var(--spacing-5);
+    /* The preview column defines the row height; center the settings section
+       as one compact group against it. */
+    align-items: center;
+    grid-auto-rows: max-content;
+}
+
+.export-preview-column {
+    min-width: 0;
+    display: grid;
+    gap: var(--spacing-3);
+}
+
+.export-settings-column {
+    min-width: 0;
+    display: grid;
+    gap: var(--spacing-4);
+    align-content: start;
+    align-self: center;
+    height: max-content;
+}
+
+.export-section-heading {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--gray-900);
+    letter-spacing: 0.4px;
+}
+
+.export-disclaimer {
+    margin-top: 0;
+    font-weight: 600;
+    line-height: 1.45;
+    padding: var(--spacing-3);
+}
+
+.export-disclaimer i {
+    margin-right: var(--spacing-2);
 }
 
 /* File Preview */
@@ -5030,10 +5092,6 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
         display: none;
     }
 
-    .export-format-group {
-        grid-template-columns: 1fr;
-    }
-
     .export-format-label {
         margin-bottom: var(--spacing-1);
     }
@@ -5054,6 +5112,25 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
     .toast {
         width: 100%;
         max-width: 100%;
+    }
+}
+
+@media (max-width: 720px) {
+    .export-modal {
+        width: min(100%, 92vw);
+        max-width: min(100%, 92vw);
+    }
+
+    .export-modal-body {
+        grid-template-columns: 1fr;
+        gap: var(--spacing-4);
+    }
+
+    .export-preview-shell {
+        width: 100%;
+        max-width: min(100%, 520px);
+        max-height: min(46vh, calc(100vh - 260px), 360px);
+        min-height: 0;
     }
 }
 

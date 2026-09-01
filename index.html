@@ -750,32 +750,37 @@
 
     <!-- Export Modal -->
     <div class="modal-overlay" id="exportModal">
-        <div class="modal">
+        <div class="modal export-modal">
             <div class="modal-header">
                 <div class="modal-title"><i class="fas fa-download"></i> Export Map</div>
                 <button class="modal-close" onclick="closeModal('exportModal')" title="Close" aria-label="Close dialog">&times;</button>
             </div>
-            <div class="modal-body">
-                <div id="mapPreviewContainer" class="export-preview-shell">
-                    <div id="mapPreviewMap" class="export-preview-map" aria-label="Map preview"></div>
-                    <div id="mapPreviewPlaceholder" class="export-preview-placeholder">
-                        <div style="font-size: 36px; margin-bottom: var(--spacing-3);"><i class="fas fa-map"></i></div>
-                        <div style="font-size: 13px; font-weight: 700;">Map Preview</div>
+            <div class="modal-body export-modal-body">
+                <section class="export-preview-column" aria-labelledby="exportPreviewHeading">
+                    <div class="export-section-heading" id="exportPreviewHeading">Map Preview</div>
+                    <div id="mapPreviewContainer" class="export-preview-shell">
+                        <div id="mapPreviewMap" class="export-preview-map" aria-label="Map preview"></div>
+                        <div id="mapPreviewPlaceholder" class="export-preview-placeholder">
+                            <div style="font-size: 36px; margin-bottom: var(--spacing-3);"><i class="fas fa-map"></i></div>
+                            <div style="font-size: 13px; font-weight: 700;">Map Preview</div>
+                        </div>
                     </div>
-                </div>
+                </section>
 
-                <div class="form-group export-format-group">
-                    <label class="form-label export-format-label" for="exportFormat">Export Format</label>
-                    <select class="form-input" id="exportFormat">
-                        <option value="png">PNG</option>
-                        <option value="jpeg">JPEG</option>
-                        <option value="pdf">PDF</option>
-                    </select>
-                </div>
+                <section class="export-settings-column">
+                    <div class="form-group export-format-group">
+                        <label class="form-label export-format-label" for="exportFormat">Export Format</label>
+                        <select class="form-input" id="exportFormat">
+                            <option value="png">PNG</option>
+                            <option value="jpeg">JPEG</option>
+                            <option value="pdf">PDF</option>
+                        </select>
+                    </div>
 
-                <div class="warning-box">
-                    <i class="fas fa-info-circle"></i> Uploaded datasets are processed temporarily and may not be permanently stored.
-                </div>
+                    <div class="warning-box export-disclaimer">
+                        <i class="fas fa-info-circle"></i> Uploaded datasets are processed temporarily and may not be permanently stored.
+                    </div>
+                </section>
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="closeModal('exportModal')">Cancel</button>
