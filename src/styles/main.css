@@ -555,8 +555,7 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
 }
 
 #uploadModal .btn,
-#wmsModal .btn,
-#gpModal .btn {
+#uploadModal .geospatial-footer-actions .btn {
     text-transform: none;
     letter-spacing: normal;
 }
@@ -1988,8 +1987,9 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
 /* Map Controls */
 .map-control-stack {
     position: absolute;
-    right: var(--spacing-6);
-    top: var(--spacing-6);
+    left: var(--spacing-4);
+    top: calc(var(--spacing-4) + 58px);
+    right: auto;
     z-index: 10;
 }
 
@@ -2116,12 +2116,43 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
 /* ========== RIGHT SIDEBAR ========== */
 .sidebar-right {
     width: var(--right-sidebar-width);
+    flex: 0 0 var(--right-sidebar-width);
     background: white;
     border-left: 1px solid var(--gray-200);
     display: flex;
     flex-direction: column;
-    overflow-y: auto;
+    overflow: visible;
     box-shadow: -2px 0 8px rgba(0, 0, 0, 0.08);
+    position: relative;
+    transition: width 0.2s ease, flex-basis 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.right-sidebar-main {
+    width: 100%;
+    min-width: 0;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden auto;
+    transition: opacity 0.16s ease;
+}
+
+.sidebar-right.is-collapsed {
+    width: 0;
+    flex-basis: 0;
+    border-left-color: transparent;
+    box-shadow: none;
+}
+
+.sidebar-right.is-collapsed .right-sidebar-main {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+}
+
+.right-sidebar-layout-handle {
+    left: -44px;
+    right: auto;
 }
 
 .right-sidebar-header {
@@ -4186,8 +4217,7 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
 }
 
 #uploadModal .form-label,
-#wmsModal .form-label,
-#gpModal .form-label {
+#uploadModal .form-label {
     text-transform: none;
     letter-spacing: 0;
 }
@@ -4474,6 +4504,13 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
     margin-bottom: var(--spacing-5);
 }
 
+.geospatial-footer-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--spacing-3);
+    width: 100%;
+}
+
 .layer-source-btn {
     min-height: 58px;
     border: 1px solid var(--gray-200);
@@ -4496,6 +4533,17 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
     border-color: var(--accent);
     color: var(--accent);
     background: rgba(37, 99, 235, 0.04);
+}
+
+.layer-source-btn[role="tab"]:focus-visible {
+    outline: 3px solid rgba(37, 99, 235, 0.3);
+    outline-offset: 2px;
+}
+
+@media (max-width: 480px) {
+    .layer-source-actions { gap: 6px; }
+    .layer-source-btn { min-height: 52px; font-size: 11px; }
+    .layer-source-btn i { font-size: 15px; }
 }
 
 .upload-area {
@@ -4575,7 +4623,10 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
     color: #9a3412;
 }
 
-.warning-box {
+.disclaimer-box {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--spacing-2);
     background: linear-gradient(135deg, var(--orange-50) 0%, #fff7ed 100%);
     border: 1px solid #fdba74;
     border-radius: 10px;
@@ -4584,26 +4635,13 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
     color: #92400e;
     margin-top: var(--spacing-3);
     font-weight: 600;
-}
-
-.notice-box {
-    display: flex;
-    align-items: flex-start;
-    gap: var(--spacing-2);
-    background: var(--gray-50);
-    border: 1px solid var(--gray-200);
-    border-radius: 8px;
-    padding: var(--spacing-3);
-    font-size: 12px;
-    color: var(--gray-600);
-    margin-top: var(--spacing-3);
-    font-weight: 600;
     line-height: 1.4;
 }
 
-.notice-box i {
-    color: var(--gray-500);
+.disclaimer-box i {
+    color: #c2410c;
     margin-top: 1px;
+    flex: 0 0 auto;
 }
 
 .export-preview-shell {
@@ -4611,9 +4649,10 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
     background: linear-gradient(135deg, var(--gray-100), var(--gray-150));
     width: 100%;
     aspect-ratio: var(--export-preview-aspect-ratio);
-    max-width: min(100%, 600px);
+    /* Constrain width by height while retaining the snapshot's aspect ratio. */
+    max-width: min(100%, calc((100vh - 350px) * 4 / 3));
     /* Keep the complete snapshot visible on shorter laptop viewports. */
-    max-height: min(52vh, calc(100vh - 260px), 420px);
+    max-height: none;
     min-height: 0;
     border-radius: 10px;
     border: 1px solid var(--gray-200);
@@ -4679,34 +4718,32 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
 }
 
 .export-modal {
-    width: min(800px, 92vw);
-    max-width: min(800px, 92vw);
-    max-height: calc(100vh - 48px);
+    width: min(720px, 92vw);
+    max-width: min(720px, 92vw);
+    max-height: calc(100vh - 32px);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
 }
 
 .export-modal-body {
     display: grid;
-    grid-template-columns: minmax(0, 2.1fr) minmax(220px, 0.85fr);
-    gap: var(--spacing-5);
-    /* The preview column defines the row height; center the settings section
-       as one compact group against it. */
-    align-items: center;
-    grid-auto-rows: max-content;
+    gap: var(--spacing-4);
+    flex: 1 1 auto;
+    overflow-y: auto;
+    min-height: 0;
 }
 
-.export-preview-column {
+.export-preview-section {
     min-width: 0;
     display: grid;
     gap: var(--spacing-3);
 }
 
-.export-settings-column {
+.export-controls-section {
     min-width: 0;
     display: grid;
-    gap: var(--spacing-4);
-    align-content: start;
-    align-self: center;
-    height: max-content;
+    gap: var(--spacing-3);
 }
 
 .export-section-heading {
@@ -4718,13 +4755,6 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
 
 .export-disclaimer {
     margin-top: 0;
-    font-weight: 600;
-    line-height: 1.45;
-    padding: var(--spacing-3);
-}
-
-.export-disclaimer i {
-    margin-right: var(--spacing-2);
 }
 
 /* File Preview */
@@ -5023,8 +5053,9 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
     }
 
     .map-control-stack {
-        top: var(--spacing-4);
-        right: var(--spacing-4);
+        top: calc(var(--spacing-4) + 58px);
+        left: var(--spacing-4);
+        right: auto;
     }
 
     .map-overlay {
@@ -5118,19 +5149,18 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
 
 @media (max-width: 720px) {
     .export-modal {
-        width: min(100%, 92vw);
-        max-width: min(100%, 92vw);
+        width: min(720px, 92vw);
+        max-width: 92vw;
     }
 
     .export-modal-body {
         grid-template-columns: 1fr;
-        gap: var(--spacing-4);
     }
 
     .export-preview-shell {
         width: 100%;
-        max-width: min(100%, 520px);
-        max-height: min(46vh, calc(100vh - 260px), 360px);
+        max-width: min(100%, calc((100vh - 350px) * 4 / 3));
+        max-height: none;
         min-height: 0;
     }
 }

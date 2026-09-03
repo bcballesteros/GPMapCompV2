@@ -226,23 +226,24 @@ function buildDrawingHelp(drawingType) {
 
 function buildModalHelp(modalId) {
     if (modalId === 'uploadModal') {
+        const activeTab = document.querySelector('[data-geospatial-tab][aria-selected="true"]')?.dataset.geospatialTab;
+        if (activeTab === 'wms') {
+            return {
+                primary: 'Connect a WMS service.',
+                secondary: 'Enter a WMS URL, fetch capabilities, then check layers to add them to the map. Use Done when finished.'
+            };
+        }
+
+        if (activeTab === 'geoportal') {
+            return {
+                primary: 'Browse Geoportal layers.',
+                secondary: 'Search the official Geoportal Philippines catalog and select published layers to add them to the map.'
+            };
+        }
+
         return {
             primary: 'Upload Dataset.',
             secondary: 'Choose Shapefile ZIP, GeoJSON, KML, or CSV. Confirm the layer name and color, then upload.'
-        };
-    }
-
-    if (modalId === 'wmsModal') {
-        return {
-            primary: 'Connect a WMS service.',
-            secondary: 'Enter a WMS URL, fetch capabilities, then check layers to preview them on the map. Use Done when finished.'
-        };
-    }
-
-    if (modalId === 'gpModal') {
-        return {
-            primary: 'Connect Geoportal layers.',
-            secondary: 'Browse and add published layers from the official Geoportal Philippines service. Change the URL only if you need another compatible Geoportal or WMS service.'
         };
     }
 

@@ -2,12 +2,14 @@ import { activateAnnotation, activateDrawing, activateMeasureArea, activateMeasu
 import { copyToClipboard, downloadMap, generateLink, renderMapPreview, restoreSharedStateFromUrl } from '../tools/export-share.js';
 import { initializeMap } from '../map/map-init.js';
 import { changeBasemapLayer } from '../map/layer-manager.js';
-import { addGPLayerFromForm, addWMSLayerFromForm, clearCsvSelection, clearFileSelection, clearGeoJSONSelection, clearKmlSelection, fetchGpLayersFromForm, fetchWmsCapabilitiesFromForm, handleCsvSelect, handleFileSelect, handleGeoJSONSelect, handleKmlSelect, initializeGpLayerForm, initializeUploadForm, initializeWmsLayerForm, prepareGpLayerDialog, resetWmsLayerFormSession, submitUpload, updateDataSection } from '../tools/upload-tool.js';
+import { clearCsvSelection, clearFileSelection, clearGeoJSONSelection, clearKmlSelection, fetchGpLayersFromForm, fetchWmsCapabilitiesFromForm, handleCsvSelect, handleFileSelect, handleGeoJSONSelect, handleKmlSelect, initializeGpLayerForm, initializeUploadForm, initializeWmsLayerForm, submitUpload, updateDataSection } from '../tools/upload-tool.js';
 import { commitLayerOpacity, removeLayer, selectLayer, updateLayerColor, updateLayerOpacity, updateLineStrokeWidth } from '../ui/layers-panel.js';
 import { bindModalEscapeDismissal, bindModalOverlayDismissal, closeModal, openModal, toggleSection } from '../ui/modal.js';
+import { initializeGeospatialDataModal, openAddGeospatialData } from '../ui/geospatial-data-modal.js';
 import { initializeLocationSearch } from '../ui/location-search.js';
 import { initializeLabelAttributeControl, openAttributeTable } from '../ui/sidebar.js';
 import { initializeLayersSidebar } from '../ui/layers-sidebar.js';
+import { initializeToolsSidebar } from '../ui/tools-sidebar.js';
 import { initializeWorkspaceStatus } from '../ui/workspace-status.js';
 import { showToast } from '../ui/toast.js';
 import { bindAnnotationPopupDismissal } from '../ui/toolbar.js';
@@ -48,11 +50,7 @@ function openModalWithHooks(modalId) {
             ? () => runOptionalStartupStep('export preview render', () => renderMapPreview())
             : modalId === 'shareModal'
                 ? () => runOptionalStartupStep('share link generation', () => generateLink({ silent: true }))
-                : modalId === 'wmsModal'
-                    ? () => runOptionalStartupStep('WMS modal reset', () => resetWmsLayerFormSession())
-                    : modalId === 'gpModal'
-                        ? () => runOptionalStartupStep('GP layer loading', () => prepareGpLayerDialog())
-                    : undefined
+                : undefined
     });
 }
 
@@ -69,6 +67,7 @@ function syncBasemapSelectTitle() {
 function bindGlobalHandlers() {
     window.showToast = showToast;
     window.openModal = openModalWithHooks;
+    window.openAddGeospatialData = openAddGeospatialData;
     window.closeModal = closeModal;
     window.toggleSection = toggleSection;
     window.handleFileSelect = handleFileSelect;
@@ -102,9 +101,7 @@ function bindGlobalHandlers() {
     window.editAnnotation = editAnnotation;
     window.deleteAnnotation = deleteAnnotation;
     window.changeBasemap = changeBasemapLayer;
-    window.addWMSLayer = addWMSLayerFromForm;
     window.fetchWMSCapabilities = fetchWmsCapabilitiesFromForm;
-    window.addGPLayer = addGPLayerFromForm;
     window.fetchGPLayers = fetchGpLayersFromForm;
     window.downloadMap = downloadMap;
     window.renderMapPreview = renderMapPreview;
@@ -125,6 +122,7 @@ export function bootstrapApp() {
         bindGlobalHandlers();
         syncBasemapSelectTitle();
         runOptionalStartupStep('layers sidebar init', () => initializeLayersSidebar());
+        runOptionalStartupStep('tools sidebar init', () => initializeToolsSidebar());
         runOptionalStartupStep('label attribute control init', () => initializeLabelAttributeControl());
 
         runOptionalStartupStep('location search init', () => initializeLocationSearch());
@@ -139,6 +137,7 @@ export function bootstrapApp() {
         runOptionalStartupStep('upload form init', () => initializeUploadForm());
         runOptionalStartupStep('WMS form init', () => initializeWmsLayerForm());
         runOptionalStartupStep('GP form init', () => initializeGpLayerForm());
+        runOptionalStartupStep('geospatial data modal init', () => initializeGeospatialDataModal());
         runOptionalStartupStep('annotation popup dismissal binding', () => bindAnnotationPopupDismissal(cancelAnnotation));
         runOptionalStartupStep('shared state restore', () => restoreSharedStateFromUrl());
     } catch (error) {

@@ -286,6 +286,7 @@
 
         <!-- RIGHT SIDEBAR -->
         <aside class="sidebar-right">
+            <div class="right-sidebar-main">
             <div class="right-sidebar-header">
                 <div class="right-sidebar-title"><i class="fas fa-toolbox"></i> Tools & Properties</div>
                 <div class="right-sidebar-subtitle">Editing, analysis, and workspace display controls</div>
@@ -517,10 +518,10 @@
                     </div>
                     <div class="tool-section-content collapsed">
                         <div class="tool-buttons">
-                            <button class="tool-btn" onclick="openModal('wmsModal')">
+                            <button class="tool-btn" onclick="openAddGeospatialData('wms')">
                                 <span><i class="fas fa-globe"></i> Add WMS Layer</span>
                             </button>
-                            <button class="tool-btn" onclick="openModal('gpModal')">
+                            <button class="tool-btn" onclick="openAddGeospatialData('geoportal')">
                                 <span><i class="fas fa-map-location-dot"></i> Add Geoportal Layer</span>
                             </button>
                             <button class="tool-btn">
@@ -570,6 +571,8 @@
                     </div>
                 </div>
             </div>
+            </div>
+            <button type="button" class="sidebar-layout-handle right-sidebar-layout-handle" aria-expanded="true" aria-label="Hide Tools &amp; Properties" title="Hide Tools &amp; Properties"><i class="fas fa-chevron-right" aria-hidden="true"></i></button>
         </aside>
     </div>
 
@@ -627,21 +630,22 @@
                 <button class="modal-close" onclick="closeModal('uploadModal')" title="Close" aria-label="Close dialog">&times;</button>
             </div>
             <div class="modal-body">
-                <div class="layer-source-actions" aria-label="Layer source options">
-                    <button type="button" class="layer-source-btn active">
+                <div class="layer-source-actions" role="tablist" aria-label="Geospatial data source">
+                    <button type="button" class="layer-source-btn active" id="uploadTab" role="tab" aria-selected="true" aria-controls="uploadPanel" data-geospatial-tab="upload">
                         <i class="fas fa-file-arrow-up"></i>
                         <span>Upload Dataset</span>
                     </button>
-                    <button type="button" class="layer-source-btn" onclick="closeModal('uploadModal'); openModal('wmsModal')">
+                    <button type="button" class="layer-source-btn" id="wmsTab" role="tab" aria-selected="false" aria-controls="wmsPanel" tabindex="-1" data-geospatial-tab="wms">
                         <i class="fas fa-globe"></i>
                         <span>WMS Layer</span>
                     </button>
-                    <button type="button" class="layer-source-btn" onclick="closeModal('uploadModal'); openModal('gpModal')">
+                    <button type="button" class="layer-source-btn" id="geoportalTab" role="tab" aria-selected="false" aria-controls="geoportalPanel" tabindex="-1" data-geospatial-tab="geoportal">
                         <i class="fas fa-map-location-dot"></i>
                         <span>Geoportal Layer</span>
                     </button>
                 </div>
 
+                <section id="uploadPanel" role="tabpanel" aria-labelledby="uploadTab" data-geospatial-panel="upload">
                 <div class="form-group">
                     <div class="form-label">Data Type</div>
                     <select class="form-input" id="dataTypeSelect" onchange="updateDataSection()">
@@ -737,13 +741,23 @@
                     </div>
                 </div>
 
-                <div class="notice-box">
+                <div class="disclaimer-box">
                     <i class="fas fa-info-circle"></i> Uploaded datasets are processed temporarily and may not be permanently stored.
                 </div>
+                </section>
+                <section id="wmsPanel" role="tabpanel" aria-labelledby="wmsTab" data-geospatial-panel="wms" hidden>
+                    <div class="form-group"><div class="form-label">WMS URL</div><div class="form-input-action-row"><input type="text" class="form-input" id="wmsUrl" value="http://192.168.8.87:8080/geoserver/wms" placeholder="e.g., http://wms.example.com/service?service=WMS&amp;version=1.1.1&amp;request=GetCapabilities"><button type="button" class="btn btn-secondary form-input-action" id="wmsFetchButton"><i class="fas fa-cloud-arrow-down"></i> Fetch</button></div><div id="wmsFetchFeedback" class="inline-feedback" aria-live="polite"></div></div>
+                    <div class="form-group"><div class="form-label">Select Layers</div><div class="wms-layer-picker" id="wmsLayerPicker"><button type="button" class="form-input wms-layer-picker-trigger" id="wmsLayerPickerTrigger" aria-expanded="false" aria-controls="wmsLayerChecklist"><span id="wmsLayerPickerSummary">Fetch layers to select</span><i class="fas fa-chevron-down"></i></button><div class="wms-layer-checklist" id="wmsLayerChecklist" hidden><div class="wms-layer-empty">Fetch WMS capabilities to show available layers.</div></div></div></div>
+                    <div class="disclaimer-box"><i class="fas fa-info-circle"></i> Connect to a compatible WMS service to browse and add map layers. The WMS server must support CORS and be publicly accessible.</div>
+                </section>
+                <section id="geoportalPanel" role="tabpanel" aria-labelledby="geoportalTab" data-geospatial-panel="geoportal" hidden>
+                    <div class="form-group"><div class="gp-layer-search-field"><input type="search" class="form-input" id="gpLayerSearch" placeholder="Search Geoportal layers..." autocomplete="off"><button type="button" class="gp-layer-search-clear" id="gpLayerSearchClear" aria-label="Clear Geoportal layer search" title="Clear search" hidden>&times;</button></div><div id="gpFetchFeedback" class="inline-feedback" aria-live="polite"></div></div>
+                    <div class="form-group"><div class="form-label">Select Layers</div><div class="wms-layer-checklist gp-layer-checklist" id="gpLayerChecklist"><div class="wms-layer-empty gp-layer-loading"><i class="fas fa-spinner fa-spin" aria-hidden="true"></i><span>Loading official Geoportal layers...</span></div></div></div>
+                </section>
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="closeModal('uploadModal')">Cancel</button>
-                <button class="btn btn-primary" id="submitBtn" onclick="submitUpload()"><i class="fas fa-upload"></i> Upload</button>
+                <button class="btn btn-primary" id="addDataPrimaryAction" type="button"><i class="fas fa-upload"></i> Upload</button>
             </div>
         </div>
     </div>
@@ -756,7 +770,7 @@
                 <button class="modal-close" onclick="closeModal('exportModal')" title="Close" aria-label="Close dialog">&times;</button>
             </div>
             <div class="modal-body export-modal-body">
-                <section class="export-preview-column" aria-labelledby="exportPreviewHeading">
+                <section class="export-preview-section" aria-labelledby="exportPreviewHeading">
                     <div class="export-section-heading" id="exportPreviewHeading">Map Preview</div>
                     <div id="mapPreviewContainer" class="export-preview-shell">
                         <div id="mapPreviewMap" class="export-preview-map" aria-label="Map preview"></div>
@@ -767,7 +781,7 @@
                     </div>
                 </section>
 
-                <section class="export-settings-column">
+                <section class="export-controls-section">
                     <div class="form-group export-format-group">
                         <label class="form-label export-format-label" for="exportFormat">Export Format</label>
                         <select class="form-input" id="exportFormat">
@@ -777,7 +791,7 @@
                         </select>
                     </div>
 
-                    <div class="warning-box export-disclaimer">
+                    <div class="disclaimer-box export-disclaimer">
                         <i class="fas fa-info-circle"></i> Uploaded datasets are processed temporarily and may not be permanently stored.
                     </div>
                 </section>
@@ -806,7 +820,7 @@
                     <div id="shareFeedback" class="inline-feedback" data-state="neutral" aria-live="polite">
                         Share link updates here when you copy or regenerate the current map state.
                     </div>
-                    <div class="notice-box">
+                    <div class="disclaimer-box">
                         <i class="fas fa-info-circle"></i> Uploaded datasets are processed temporarily and may not be permanently stored.
                     </div>
                 </div>
@@ -837,77 +851,6 @@
                         Select a layer to view attributes
                     </div>
                 </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Geoportal Layer Modal -->
-    <div class="modal-overlay" id="gpModal">
-        <div class="modal">
-            <div class="modal-header">
-                <div class="modal-title"><i class="fas fa-map-location-dot"></i> Add Geoportal Layer</div>
-                <button class="modal-close" onclick="closeModal('gpModal')" title="Close" aria-label="Close dialog">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="form-group">
-                    <div class="gp-layer-search-field">
-                        <input type="search" class="form-input" id="gpLayerSearch" placeholder="Search Geoportal layers..." autocomplete="off">
-                        <button type="button" class="gp-layer-search-clear" id="gpLayerSearchClear" aria-label="Clear Geoportal layer search" title="Clear search" hidden>&times;</button>
-                    </div>
-                    <div id="gpFetchFeedback" class="inline-feedback" aria-live="polite"></div>
-                </div>
-
-                <div class="form-group">
-                    <div class="form-label">Select Layers</div>
-                    <div class="wms-layer-checklist gp-layer-checklist" id="gpLayerChecklist">
-                        <div class="wms-layer-empty gp-layer-loading"><i class="fas fa-spinner fa-spin" aria-hidden="true"></i><span>Loading official Geoportal layers...</span></div>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="closeModal('gpModal')">Cancel</button>
-                <button class="btn btn-primary" onclick="closeModal('gpModal')"><i class="fas fa-check"></i> Done</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- WMS Layer Modal -->
-    <div class="modal-overlay" id="wmsModal">
-        <div class="modal">
-            <div class="modal-header">
-                <div class="modal-title"><i class="fas fa-globe"></i> Add WMS Layer</div>
-                <button class="modal-close" onclick="closeModal('wmsModal')" title="Close" aria-label="Close dialog">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="form-group">
-                    <div class="form-label">WMS URL</div>
-                    <div class="form-input-action-row">
-                        <input type="text" class="form-input" id="wmsUrl" value="http://192.168.8.87:8080/geoserver/wms" placeholder="e.g., http://wms.example.com/service?service=WMS&version=1.1.1&request=GetCapabilities">
-                        <button type="button" class="btn btn-secondary form-input-action" id="wmsFetchButton"><i class="fas fa-cloud-arrow-down"></i> Fetch</button>
-                    </div>
-                    <div id="wmsFetchFeedback" class="inline-feedback" aria-live="polite"></div>
-                </div>
-
-                <div class="form-group">
-                    <div class="form-label">Select Layers</div>
-                    <div class="wms-layer-picker" id="wmsLayerPicker">
-                        <button type="button" class="form-input wms-layer-picker-trigger" id="wmsLayerPickerTrigger" aria-expanded="false" aria-controls="wmsLayerChecklist">
-                            <span id="wmsLayerPickerSummary">Fetch layers to select</span>
-                            <i class="fas fa-chevron-down"></i>
-                        </button>
-                        <div class="wms-layer-checklist" id="wmsLayerChecklist" hidden>
-                            <div class="wms-layer-empty">Fetch WMS capabilities to show available layers.</div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="warning-box">
-                    <i class="fas fa-info-circle"></i> Connect to a compatible WMS service to browse and add map layers. The WMS server must support CORS and be publicly accessible.
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="closeModal('wmsModal')">Cancel</button>
-                <button class="btn btn-primary" onclick="closeModal('wmsModal')"><i class="fas fa-check"></i> Done</button>
             </div>
         </div>
     </div>

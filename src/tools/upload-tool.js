@@ -72,7 +72,7 @@ function setUploadBusyState(isBusy, label = 'Processing file...') {
     const progress = document.getElementById('uploadProgress');
     const progressFill = document.getElementById('progressFill');
     const progressLabel = progress?.querySelector('div');
-    const submitButton = document.getElementById('submitBtn');
+    const submitButton = document.getElementById('addDataPrimaryAction');
 
     if (progress) {
         progress.style.display = isBusy ? 'block' : 'none';
@@ -89,6 +89,7 @@ function setUploadBusyState(isBusy, label = 'Processing file...') {
 
     if (submitButton) {
         submitButton.disabled = isBusy;
+        submitButton.dataset.uploadBusy = String(isBusy);
         submitButton.setAttribute('aria-busy', isBusy ? 'true' : 'false');
     }
 }
@@ -231,14 +232,6 @@ export function initializeUploadForm() {
     layerNameInput.addEventListener('input', () => {
         layerNameInput.dataset.autoLayerName = layerNameInput.value.trim() ? 'false' : 'true';
     });
-}
-
-export function addWMSLayerFromForm() {
-    closeModal('wmsModal');
-}
-
-export function addGPLayerFromForm() {
-    closeModal('gpModal');
 }
 
 function getWmsFeedbackElement() {
