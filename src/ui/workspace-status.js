@@ -21,6 +21,25 @@ function isElementInSelector(element, selector) {
 function getOpenWorkflowContext() {
     const activeElement = document.activeElement;
 
+    const sectionContext = new Map([
+        ['.map-settings-section', 'mapSettings'],
+        ['.measurement-section', 'measurementTools'],
+        ['.drawing-tools-section', 'drawingTools'],
+        ['.annotation-tools-section', 'annotationTools'],
+        ['.feature-saving-section', 'featureSaving'],
+        ['.layer-information-section', 'layerInformation'],
+        ['.advanced-layers-section', 'advancedLayers']
+    ]);
+
+    const getSectionContext = (element) => {
+        for (const [selector, context] of sectionContext) {
+            if (isElementInSelector(element, selector)) {
+                return context;
+            }
+        }
+        return null;
+    };
+
     if (isElementInSelector(activeElement, '#locationSearchForm')) {
         return 'search';
     }
@@ -29,42 +48,16 @@ function getOpenWorkflowContext() {
         return 'basemap';
     }
 
-    if (isElementInSelector(activeElement, '.map-settings-section')) {
-        return 'mapSettings';
-    }
-
-    if (isElementInSelector(activeElement, '.measurement-section')) {
-        return 'measurementTools';
-    }
-
-    if (isElementInSelector(activeElement, '.drawing-tools-section')) {
-        return 'drawingTools';
-    }
-
-    if (isElementInSelector(activeElement, '.annotation-tools-section')) {
-        return 'annotationTools';
+    const focusedSectionContext = getSectionContext(activeElement);
+    if (focusedSectionContext) {
+        return focusedSectionContext;
     }
 
     const openSection = Array.from(document.querySelectorAll('.tool-section-group'))
-        .find((section) => !section.querySelector('.tool-section-content')?.classList.contains('collapsed'));
+        .filter((section) => !section.querySelector('.tool-section-content')?.classList.contains('collapsed'))
+        .sort((a, b) => Number(b.dataset.openedAt || 0) - Number(a.dataset.openedAt || 0))[0];
 
-    if (openSection?.classList.contains('map-settings-section')) {
-        return 'mapSettings';
-    }
-
-    if (openSection?.classList.contains('measurement-section')) {
-        return 'measurementTools';
-    }
-
-    if (openSection?.classList.contains('drawing-tools-section')) {
-        return 'drawingTools';
-    }
-
-    if (openSection?.classList.contains('annotation-tools-section')) {
-        return 'annotationTools';
-    }
-
-    return null;
+    return getSectionContext(openSection);
 }
 
 function getActiveLayerLabel() {
@@ -137,7 +130,7 @@ function buildSelectedFeatureHelp(feature) {
     if (kind === 'annotation') {
         return {
             primary: 'Annotation selected.',
-            secondary: 'Edit text, Move the note, Hide/Show its label or point, or Delete it. Clear All removes every annotation.'
+            secondary: 'Use Edit or Move, toggle label or point visibility, or choose Delete Selected. Clear All Annotations removes every annotation.'
         };
     }
 
@@ -256,8 +249,8 @@ function buildModalHelp(modalId) {
 
     if (modalId === 'shareModal') {
         return {
-            primary: 'Share the current map state.',
-            secondary: 'Generate or copy a link for the current view, remote layers, styling, annotations, search result, and settings.'
+            primary: 'Share the current map.',
+            secondary: 'Generate or copy a link for the current map view and its supported settings.'
         };
     }
 
@@ -303,7 +296,7 @@ function buildWorkflowHelp(context, activeLayerRecord) {
     if (context === 'mapSettings') {
         return {
             primary: 'Adjust Map Settings.',
-            secondary: 'Toggle vector labels, annotation text, the scale bar, and the north arrow for the workspace and exports.'
+            secondary: 'Toggle active labels, Show text annotations, the scale bar, and the north arrow.'
         };
     }
 
@@ -324,7 +317,35 @@ function buildWorkflowHelp(context, activeLayerRecord) {
     if (context === 'annotationTools') {
         return {
             primary: 'Annotation Tools.',
-            secondary: 'Add text on the map, then select an annotation to edit, move, hide/show, or delete it.'
+            secondary: 'Create text annotations, show or hide them, then select one to Edit, Move, change label or point visibility, or delete it.'
+        };
+    }
+
+    if (context === 'featureSaving') {
+        return {
+            primary: 'Feature Saving.',
+            secondary: 'Save selected annotations, drawings, and measurements to a local GPMapCompV2 JSON file, then load them again later.'
+        };
+    }
+
+    if (context === 'layerInformation') {
+        if (!activeLayerRecord || isRemoteLayer(activeLayerRecord)) {
+            return {
+                primary: 'Layer Information needs a vector layer.',
+                secondary: 'Select an uploaded vector layer to choose a label attribute and use its labels or attribute table.'
+            };
+        }
+
+        return {
+            primary: 'Inspect the selected vector layer.',
+            secondary: 'Choose a label attribute, toggle Show Labels, or open View Attribute Table.'
+        };
+    }
+
+    if (context === 'advancedLayers') {
+        return {
+            primary: 'Advanced Layers.',
+            secondary: 'Open Add Geospatial Data to connect a WMS service or browse Geoportal layers.'
         };
     }
 
@@ -357,10 +378,6 @@ function buildHelpContent() {
     const modalHelp = activeModalId ? buildModalHelp(activeModalId) : null;
     if (modalHelp) {
         return modalHelp;
-    }
-
-    if (!hasLayers) {
-        return buildDefaultHelp(false);
     }
 
     if (state.annotationMode === 'text') {
