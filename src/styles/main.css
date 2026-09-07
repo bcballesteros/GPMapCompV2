@@ -4756,6 +4756,96 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
     margin-top: 0;
 }
 
+.share-modal {
+    width: min(640px, 92vw);
+    max-width: min(640px, 92vw);
+    max-height: calc(100vh - 32px);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.share-modal > form {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.share-modal-body {
+    display: grid;
+    gap: var(--spacing-4);
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+}
+
+.share-preview-shell {
+    width: 100%;
+    max-width: 420px;
+    aspect-ratio: 4 / 3;
+}
+
+.share-controls-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 69fr) minmax(0, 31fr);
+    gap: var(--spacing-4);
+    align-items: start;
+}
+
+.share-recipient-group {
+    min-width: 0;
+}
+
+.share-modal #shareFeedback:empty {
+    display: none;
+}
+
+.share-format-group {
+    margin-bottom: 0;
+}
+
+.share-format-group .form-input {
+    min-height: 40px;
+}
+
+.share-select-wrapper {
+    position: relative;
+}
+
+.share-select-wrapper .form-input {
+    appearance: none;
+    padding-right: 2.25rem;
+}
+
+.share-select-chevron {
+    position: absolute;
+    top: 50%;
+    right: 0.85rem;
+    color: var(--gray-500);
+    font-size: 0.7rem;
+    line-height: 1;
+    pointer-events: none;
+    transform: translateY(-50%);
+}
+
+.share-modal .form-help {
+    margin-top: var(--spacing-2);
+    color: var(--gray-500);
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+.share-disclaimer {
+    margin-top: 0;
+}
+
+@media (max-width: 640px) {
+    .share-controls-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
 /* File Preview */
 .file-preview {
     background: linear-gradient(135deg, var(--gray-50), var(--gray-100));

@@ -1,5 +1,5 @@
 import { activateAnnotation, activateDrawing, activateMeasureArea, activateMeasureDistance, bindAnnotationControls, bindAnnotationVisibilityToggle, cancelAnnotation, clearAnnotations, clearDrawings, clearMeasurements, deleteAnnotation, deleteSelectedDrawing, deleteSelectedMeasurement, editAnnotation, getSelectedAnnotationMode, initializeAnnotationInteractions, initializeDrawingSelectionControls, initializeMeasurementControls, selectAnnotationForDeletion, submitAnnotation } from '../tools/annotation-tool.js';
-import { copyToClipboard, downloadMap, generateLink, renderMapPreview, restoreSharedStateFromUrl } from '../tools/export-share.js';
+import { copyToClipboard, downloadMap, generateLink, renderMapPreview, restoreSharedStateFromUrl, sendMap } from '../tools/export-share.js';
 import { initializeMap } from '../map/map-init.js';
 import { changeBasemapLayer } from '../map/layer-manager.js';
 import { clearCsvSelection, clearFileSelection, clearGeoJSONSelection, clearKmlSelection, fetchGpLayersFromForm, fetchWmsCapabilitiesFromForm, handleCsvSelect, handleFileSelect, handleGeoJSONSelect, handleKmlSelect, initializeGpLayerForm, initializeUploadForm, initializeWmsLayerForm, submitUpload, updateDataSection } from '../tools/upload-tool.js';
@@ -47,9 +47,9 @@ function revealAppShell() {
 function openModalWithHooks(modalId) {
     openModal(modalId, {
         onOpen: modalId === 'exportModal'
-            ? () => runOptionalStartupStep('export preview render', () => renderMapPreview())
+            ? () => runOptionalStartupStep('export preview render', () => renderMapPreview('export:open', 'export'))
             : modalId === 'shareModal'
-                ? () => runOptionalStartupStep('share link generation', () => generateLink({ silent: true }))
+                ? () => runOptionalStartupStep('share preview render', () => renderMapPreview('share:open', 'share'))
                 : undefined
     });
 }
@@ -107,6 +107,7 @@ function bindGlobalHandlers() {
     window.renderMapPreview = renderMapPreview;
     window.copyToClipboard = copyToClipboard;
     window.generateLink = generateLink;
+    window.sendMap = sendMap;
     window.openFeatureSaveDialog = openFeatureSaveDialog;
     window.saveSelectedFeatures = saveSelectedFeatures;
     window.loadFeaturesFromFile = loadFeaturesFromFile;

@@ -18,12 +18,21 @@ const SHARE_TOKEN_VERSION = 1;
 const EXPORT_LONG_EDGE_PX = 2560;
 const EXPORT_MAX_PIXEL_AREA = 12000000;
 
-let previewMap = null;
+const previewStates = {
+    export: { map: null, renderToken: 0 },
+    share: { map: null, renderToken: 0 }
+};
 let previewSyncScheduled = false;
 let previewListenersBound = false;
-let previewRenderToken = 0;
 let previewDebugSequence = 0;
 let sharedStateRestoreAttempted = false;
+const shareState = {
+    selectedFormat: 'png',
+    recipientEmail: '',
+    pending: false,
+    success: false,
+    error: null
+};
 
 function getDebugRect(element) {
     const rect = element?.getBoundingClientRect?.();
@@ -76,8 +85,12 @@ function getDebugCanvasSummary(map) {
 }
 
 function getDebugMapRole(map) {
-    if (map === previewMap) {
-        return 'preview';
+    if (map === previewStates.export.map) {
+        return 'export-preview';
+    }
+
+    if (map === previewStates.share.map) {
+        return 'share-preview';
     }
 
     if (map === getMap()) {
@@ -92,23 +105,26 @@ function debugPreview(event, details = {}) {
         return;
     }
 
-    const { target, placeholder } = getExportPreviewElements();
+    const previewKind = details.previewKind || getActivePreviewKind();
+    const { container, target, placeholder } = getPreviewElements(previewKind);
+    const previewState = previewStates[previewKind];
     const mainMap = getMap();
     const entry = {
         sequence: ++previewDebugSequence,
         time: Number(performance.now().toFixed(2)),
         event,
-        previewRenderToken,
+        previewKind,
+        previewRenderToken: previewState.renderToken,
         previewSyncScheduled,
-        ready: document.getElementById('mapPreviewContainer')?.classList.contains('ready') || false,
+        ready: container?.classList.contains('ready') || false,
         placeholderHidden: placeholder?.getAttribute('aria-hidden') || null,
         mainSize: getDebugMapSize(mainMap),
         mainTargetRect: getDebugRect(mainMap?.getTargetElement?.()),
         previewTargetRect: getDebugRect(target),
-        previewSize: getDebugMapSize(previewMap),
+        previewSize: getDebugMapSize(previewState.map),
         mainLayers: getDebugLayerSummary(mainMap),
-        previewLayers: getDebugLayerSummary(previewMap),
-        previewCanvases: getDebugCanvasSummary(previewMap),
+        previewLayers: getDebugLayerSummary(previewState.map),
+        previewCanvases: getDebugCanvasSummary(previewState.map),
         activeBasemap: getState().activeBasemap,
         ...details
     };
@@ -144,12 +160,19 @@ function setShareFeedback(message, type = 'info') {
     feedback.dataset.state = type;
 }
 
-function getExportPreviewElements() {
+function getPreviewElements(previewKind = 'export') {
+    const prefix = previewKind === 'share' ? 'share' : 'map';
     return {
-        container: document.getElementById('mapPreviewContainer'),
-        target: document.getElementById('mapPreviewMap'),
-        placeholder: document.getElementById('mapPreviewPlaceholder')
+        container: document.getElementById(`${prefix}PreviewContainer`),
+        target: document.getElementById(`${prefix}PreviewMap`),
+        placeholder: document.getElementById(`${prefix}PreviewPlaceholder`)
     };
+}
+
+function getActivePreviewKind() {
+    return document.getElementById('shareModal')?.classList.contains('active')
+        ? 'share'
+        : 'export';
 }
 
 function isRenderableCanvas(canvas) {
@@ -321,13 +344,16 @@ function clonePreviewLayer(layer, index) {
     return cloneMapLayer(layer, index);
 }
 
-function ensurePreviewMap() {
-    if (previewMap) {
+function ensurePreviewMap(previewKind = 'export', target = getPreviewElements(previewKind).target) {
+    const previewState = previewStates[previewKind];
+    if (previewState.map) {
+        if (previewState.map.getTargetElement?.() !== target && target) {
+            previewState.map.setTarget(target);
+        }
         debugPreview('ensurePreviewMap:reuse');
-        return previewMap;
+        return previewState.map;
     }
 
-    const { target } = getExportPreviewElements();
     if (!target) {
         debugPreview('ensurePreviewMap:missing-target');
         return null;
@@ -337,7 +363,7 @@ function ensurePreviewMap() {
     const projection = mainMap?.getView().getProjection();
     debugPreview('ensurePreviewMap:create:before');
 
-    previewMap = new ol.Map({
+    previewState.map = new ol.Map({
         target,
         controls: [],
         layers: [],
@@ -348,14 +374,14 @@ function ensurePreviewMap() {
         })
     });
 
-    previewMap.getInteractions().clear();
+    previewState.map.getInteractions().clear();
     debugPreview('ensurePreviewMap:create:after');
 
-    return previewMap;
+    return previewState.map;
 }
 
-function rebuildPreviewLayers(mainMapInstance) {
-    const previewInstance = ensurePreviewMap();
+function rebuildPreviewLayers(mainMapInstance, previewKind = 'export') {
+    const previewInstance = ensurePreviewMap(previewKind);
     if (!previewInstance || !mainMapInstance) {
         debugPreview('rebuildPreviewLayers:exit', {
             hasPreviewInstance: Boolean(previewInstance),
@@ -377,8 +403,8 @@ function rebuildPreviewLayers(mainMapInstance) {
     debugPreview('rebuildPreviewLayers:after');
 }
 
-function syncPreviewView(mainMapInstance) {
-    const previewInstance = ensurePreviewMap();
+function syncPreviewView(mainMapInstance, previewKind = 'export') {
+    const previewInstance = ensurePreviewMap(previewKind);
     if (!previewInstance || !mainMapInstance) {
         debugPreview('syncPreviewView:exit', {
             hasPreviewInstance: Boolean(previewInstance),
@@ -438,7 +464,10 @@ function bindPreviewSyncListeners() {
         requestAnimationFrame(() => {
             previewSyncScheduled = false;
             debugPreview('scheduleSync:invoke-render', { reason });
-            renderMapPreview(`sync:${reason}`);
+            const previewKind = getActivePreviewKind();
+            renderMapPreview(`sync:${reason}`, previewKind).catch((error) => {
+                console.warn(`[preview] ${previewKind} refresh failed`, error);
+            });
         });
     };
 
@@ -1429,8 +1458,8 @@ async function renderMapToCanvas() {
     return exportCanvas;
 }
 
-export async function renderMapPreview(reason = 'direct') {
-    const { container, target, placeholder } = getExportPreviewElements();
+export async function renderMapPreview(reason = 'direct', previewKind = 'export') {
+    const { container, target, placeholder } = getPreviewElements(previewKind);
     const mainMap = getMap();
 
     debugPreview('renderMapPreview:start', {
@@ -1446,37 +1475,39 @@ export async function renderMapPreview(reason = 'direct') {
         return;
     }
 
+    const previewState = previewStates[previewKind] || previewStates.export;
     bindPreviewSyncListeners();
-    const renderToken = ++previewRenderToken;
+    const renderToken = ++previewState.renderToken;
     debugPreview('renderMapPreview:token-created', { reason, renderToken });
 
     await waitForElementRenderedSize(target);
-    if (renderToken !== previewRenderToken) {
+    if (renderToken !== previewState.renderToken) {
         debugPreview('renderMapPreview:exit-token-after-target-size', {
             reason,
             renderToken,
-            currentToken: previewRenderToken
+            currentToken: previewState.renderToken
         });
         return;
     }
 
-    const previewInstance = ensurePreviewMap();
-    if (!previewInstance || renderToken !== previewRenderToken) {
+    const previewInstance = ensurePreviewMap(previewKind, target);
+    if (!previewInstance || renderToken !== previewState.renderToken) {
         debugPreview('renderMapPreview:exit-after-ensure-preview-map', {
             reason,
+            previewKind,
             renderToken,
-            currentToken: previewRenderToken,
+            currentToken: previewState.renderToken,
             hasPreviewInstance: Boolean(previewInstance)
         });
         return;
     }
 
     await ensureMapRenderedSize(previewInstance, target);
-    if (renderToken !== previewRenderToken) {
+    if (renderToken !== previewState.renderToken) {
         debugPreview('renderMapPreview:exit-token-after-preview-size', {
             reason,
             renderToken,
-            currentToken: previewRenderToken
+            currentToken: previewState.renderToken
         });
         return;
     }
@@ -1487,25 +1518,25 @@ export async function renderMapPreview(reason = 'direct') {
 
     await ensureMapRenderedSize(mainMap);
     await waitForMapSettledRender(mainMap, { sync: true });
-    if (renderToken !== previewRenderToken) {
+    if (renderToken !== previewState.renderToken) {
         debugPreview('renderMapPreview:exit-token-after-main-render', {
             reason,
             renderToken,
-            currentToken: previewRenderToken
+            currentToken: previewState.renderToken
         });
         return;
     }
 
-    rebuildPreviewLayers(mainMap);
+    rebuildPreviewLayers(mainMap, previewKind);
     await ensureMapRenderedSize(previewInstance, target);
-    syncPreviewView(mainMap);
+    syncPreviewView(mainMap, previewKind);
     const renderedFrame = await waitForPreviewFrame(previewInstance);
 
-    if (!renderedFrame || renderToken !== previewRenderToken) {
+    if (!renderedFrame || renderToken !== previewState.renderToken) {
         debugPreview('renderMapPreview:exit-before-ready', {
             reason,
             renderToken,
-            currentToken: previewRenderToken,
+            currentToken: previewState.renderToken,
             renderedFrame
         });
         return;
@@ -1562,6 +1593,54 @@ export async function downloadMap() {
     }
 }
 
+export function sendMap(event) {
+    event?.preventDefault();
+
+    const form = document.getElementById('shareForm');
+    const emailInput = document.getElementById('recipientEmail');
+    const formatInput = document.getElementById('shareFormat');
+    const sendButton = document.getElementById('sendShareBtn');
+
+    if (!form || !emailInput || !formatInput || !sendButton || !form.checkValidity()) {
+        form?.reportValidity();
+        return false;
+    }
+
+    shareState.recipientEmail = emailInput.value.trim();
+    shareState.selectedFormat = formatInput.value;
+    shareState.pending = false;
+    shareState.success = false;
+    shareState.error = null;
+
+    // The delivery operation is intentionally reserved for the future backend.
+    setShareFeedback('');
+    sendButton.disabled = false;
+    sendButton.setAttribute('aria-busy', 'false');
+    return false;
+}
+
+export function setSharePending(isPending) {
+    shareState.pending = Boolean(isPending);
+    const sendButton = document.getElementById('sendShareBtn');
+    if (!sendButton) {
+        return;
+    }
+
+    sendButton.disabled = shareState.pending;
+    sendButton.setAttribute('aria-busy', shareState.pending ? 'true' : 'false');
+    sendButton.innerHTML = shareState.pending
+        ? '<i class="fas fa-spinner fa-spin"></i> Sending...'
+        : '<i class="fas fa-paper-plane"></i> Send';
+}
+
+export function setShareResult({ success = false, error = null } = {}) {
+    shareState.pending = false;
+    shareState.success = Boolean(success);
+    shareState.error = error;
+    setSharePending(false);
+    setShareFeedback(success ? 'Map shared successfully.' : (error || ''), success ? 'success' : 'warning');
+}
+
 export async function copyToClipboard() {
     const input = getShareLinkInput();
     if (!input?.value) {
@@ -1591,12 +1670,6 @@ export async function copyToClipboard() {
 export function generateLink({ silent = false } = {}) {
     const link = getShareUrl();
     updateShareLinkInput(link);
-    setShareFeedback(
-        silent
-            ? 'Share link ready.'
-            : 'Share link generated.',
-        silent ? 'info' : 'success'
-    );
 
     if (!silent) {
         const input = getShareLinkInput();

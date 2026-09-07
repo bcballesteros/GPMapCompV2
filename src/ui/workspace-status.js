@@ -250,7 +250,7 @@ function buildModalHelp(modalId) {
     if (modalId === 'shareModal') {
         return {
             primary: 'Share the current map.',
-            secondary: 'Generate or copy a link for the current map view and its supported settings.'
+            secondary: 'Choose a format, enter a recipient email, then send a link to the static map output.'
         };
     }
 

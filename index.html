@@ -805,30 +805,51 @@
 
     <!-- Share Modal -->
     <div class="modal-overlay" id="shareModal">
-        <div class="modal">
+        <div class="modal share-modal">
             <div class="modal-header">
                 <div class="modal-title"><i class="fas fa-share-nodes"></i> Share Map</div>
                 <button class="modal-close" onclick="closeModal('shareModal')" title="Close" aria-label="Close dialog">&times;</button>
             </div>
-            <div class="modal-body">
-                <div class="form-group">
-                    <div class="form-label">Share Link</div>
-                    <div style="display: flex; gap: var(--spacing-2);">
-                        <input type="text" class="form-input" id="shareLinkInput" value="" readonly>
-                        <button class="btn btn-primary" onclick="copyToClipboard()" style="white-space: nowrap;"><i class="fas fa-copy"></i> Copy</button>
+            <form id="shareForm" onsubmit="sendMap(event)">
+            <div class="modal-body share-modal-body">
+                <section class="export-preview-section" aria-labelledby="sharePreviewHeading">
+                    <div class="export-section-heading" id="sharePreviewHeading">Map Preview</div>
+                    <div id="sharePreviewContainer" class="export-preview-shell share-preview-shell">
+                        <div id="sharePreviewMap" class="export-preview-map" aria-label="Map preview"></div>
+                        <div id="sharePreviewPlaceholder" class="export-preview-placeholder">
+                            <div style="font-size: 36px; margin-bottom: var(--spacing-3);"><i class="fas fa-map"></i></div>
+                            <div style="font-size: 13px; font-weight: 700;">Map Preview</div>
+                        </div>
                     </div>
-                    <div id="shareFeedback" class="inline-feedback" data-state="neutral" aria-live="polite">
-                        Share link updates here when you copy or regenerate the current map state.
+                </section>
+                <div class="share-controls-grid">
+                    <div class="form-group share-recipient-group">
+                        <label class="form-label" for="recipientEmail">Recipient Email</label>
+                        <input class="form-input" id="recipientEmail" name="recipientEmail" type="email" placeholder="recipient@example.com" autocomplete="email" required aria-describedby="recipientEmailHelp shareFeedback">
+                        <div class="form-help" id="recipientEmailHelp">The recipient will receive a link to the shared map.</div>
                     </div>
-                    <div class="disclaimer-box">
-                        <i class="fas fa-info-circle"></i> Uploaded datasets are processed temporarily and may not be permanently stored.
+                    <div class="form-group share-format-group">
+                        <label class="form-label" for="shareFormat">Share Format</label>
+                        <div class="share-select-wrapper">
+                            <select class="form-input" id="shareFormat" name="format">
+                                <option value="png">PNG</option>
+                                <option value="jpeg">JPEG</option>
+                                <option value="pdf">PDF</option>
+                            </select>
+                            <i class="fas fa-chevron-down share-select-chevron" aria-hidden="true"></i>
+                        </div>
                     </div>
+                </div>
+                <div id="shareFeedback" class="inline-feedback" data-state="neutral" aria-live="polite"></div>
+                <div class="disclaimer-box share-disclaimer">
+                    <i class="fas fa-info-circle"></i> Shared maps are static snapshots of the current map composition and cannot be edited by recipients.
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="closeModal('shareModal')">Close</button>
-                <button class="btn btn-primary" onclick="generateLink()"><i class="fas fa-refresh"></i> Generate Link</button>
+                <button class="btn btn-secondary" type="button" onclick="closeModal('shareModal')">Cancel</button>
+                <button class="btn btn-primary" id="sendShareBtn" form="shareForm" type="submit"><i class="fas fa-paper-plane"></i> Send</button>
             </div>
+            </form>
         </div>
     </div>
 
