@@ -385,6 +385,68 @@
             </div>
 
             <div class="right-sidebar-content">
+                <!-- Map Settings -->
+                <div class="tool-section-group map-settings-section">
+                    <div class="tool-section-header" onclick="toggleSection(this)">
+                        <div class="tool-icon amber"><i class="fas fa-sliders"></i></div>
+                        <div class="tool-section-info">
+                            <div class="tool-section-title">Map Settings</div>
+                            <div class="tool-section-desc">Adjust visible workspace overlays</div>
+                        </div>
+                        <div class="tool-section-chevron" aria-hidden="true">&rsaquo;</div>
+                    </div>
+                    <div class="tool-section-content collapsed">
+                        <div class="settings-list">
+                            <label class="settings-item" title="Toggle labels">
+                                <input type="checkbox" id="labelsToggle">
+                                <span>Show all active labels</span>
+                            </label>
+                            <label class="settings-item" title="Toggle text annotations">
+                                <input type="checkbox" checked id="annotationsToggle">
+                                <span>Show text annotations</span>
+                            </label>
+                            <label class="settings-item" title="Toggle scale bar">
+                                <input type="checkbox" checked id="scaleBarToggle">
+                                <span>Show scale bar</span>
+                            </label>
+                            <label class="settings-item" title="Toggle north indicator">
+                                <input type="checkbox" checked id="northArrowToggle">
+                                <span>Show north arrow</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Layer Information -->
+                <div class="tool-section-group data-analysis-section layer-information-section">
+                    <div class="tool-section-header" onclick="toggleSection(this)">
+                        <div class="tool-icon cyan"><i class="fas fa-chart-line"></i></div>
+                        <div class="tool-section-info">
+                            <div class="tool-section-title">Layer Information</div>
+                            <div class="tool-section-desc">Inspect attributes and source details</div>
+                        </div>
+                        <div class="tool-section-chevron" aria-hidden="true">&rsaquo;</div>
+                    </div>
+                    <div class="tool-section-content collapsed">
+                        <div class="tool-buttons">
+                            <div class="label-attribute-control">
+                                <label for="labelAttributeSelect">Label Attribute</label>
+                                <select id="labelAttributeSelect" class="label-attribute-select" disabled aria-describedby="labelAttributeHint">
+                                    <option>No suitable attributes</option>
+                                </select>
+                                <div id="labelAttributeHint" class="label-attribute-hint">Select a vector layer to choose its label attribute.</div>
+                            </div>
+                            <label class="settings-item feature-labels-control" title="Toggle labels for the selected layer">
+                                <input type="checkbox" id="featureLabelsToggle" onchange="activateAnnotation('labels')">
+                                <span>Show Labels</span>
+                            </label>
+                            <button class="tool-btn" onclick="openAttributeTable()">
+                                <span><i class="fas fa-table"></i> View Attribute Table</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Annotation Tools -->
                 <div class="tool-section-group annotation-tools-section">
                     <div class="tool-section-header" onclick="toggleSection(this)">
@@ -476,36 +538,6 @@
                     </div>
                 </div>
 
-                <!-- Layer Information -->
-                <div class="tool-section-group data-analysis-section layer-information-section">
-                    <div class="tool-section-header" onclick="toggleSection(this)">
-                        <div class="tool-icon cyan"><i class="fas fa-chart-line"></i></div>
-                        <div class="tool-section-info">
-                            <div class="tool-section-title">Layer Information</div>
-                            <div class="tool-section-desc">Inspect attributes and source details</div>
-                        </div>
-                        <div class="tool-section-chevron" aria-hidden="true">&rsaquo;</div>
-                    </div>
-                    <div class="tool-section-content collapsed">
-                        <div class="tool-buttons">
-                            <div class="label-attribute-control">
-                                <label for="labelAttributeSelect">Label Attribute</label>
-                                <select id="labelAttributeSelect" class="label-attribute-select" disabled aria-describedby="labelAttributeHint">
-                                    <option>No suitable attributes</option>
-                                </select>
-                                <div id="labelAttributeHint" class="label-attribute-hint">Select a vector layer to choose its label attribute.</div>
-                            </div>
-                            <label class="settings-item feature-labels-control" title="Toggle labels for the selected layer">
-                                <input type="checkbox" id="featureLabelsToggle" onchange="activateAnnotation('labels')">
-                                <span>Show Labels</span>
-                            </label>
-                            <button class="tool-btn" onclick="openAttributeTable()">
-                                <span><i class="fas fa-table"></i> View Attribute Table</span>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
                 <!-- Advanced Layers -->
                 <div class="tool-section-group advanced-layers-section">
                     <div class="tool-section-header" onclick="toggleSection(this)">
@@ -527,38 +559,6 @@
                             <button class="tool-btn">
                                 <span><i class="fas fa-image"></i> Add GeoTIFF</span>
                             </button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Map Settings -->
-                <div class="tool-section-group map-settings-section">
-                    <div class="tool-section-header" onclick="toggleSection(this)">
-                        <div class="tool-icon amber"><i class="fas fa-sliders"></i></div>
-                        <div class="tool-section-info">
-                            <div class="tool-section-title">Map Settings</div>
-                            <div class="tool-section-desc">Adjust visible workspace overlays</div>
-                        </div>
-                        <div class="tool-section-chevron" aria-hidden="true">&rsaquo;</div>
-                    </div>
-                    <div class="tool-section-content collapsed">
-                        <div class="settings-list">
-                            <label class="settings-item" title="Toggle labels">
-                                <input type="checkbox" id="labelsToggle">
-                                <span>Show all active labels</span>
-                            </label>
-                            <label class="settings-item" title="Toggle text annotations">
-                                <input type="checkbox" checked id="annotationsToggle">
-                                <span>Show text annotations</span>
-                            </label>
-                            <label class="settings-item" title="Toggle scale bar">
-                                <input type="checkbox" checked id="scaleBarToggle">
-                                <span>Show scale bar</span>
-                            </label>
-                            <label class="settings-item" title="Toggle north indicator">
-                                <input type="checkbox" checked id="northArrowToggle">
-                                <span>Show north arrow</span>
-                            </label>
                         </div>
                     </div>
                 </div>
@@ -772,7 +772,7 @@
             <div class="modal-body export-modal-body">
                 <section class="export-preview-section" aria-labelledby="exportPreviewHeading">
                     <div class="export-section-heading" id="exportPreviewHeading">Map Preview</div>
-                    <div id="mapPreviewContainer" class="export-preview-shell">
+                    <div id="mapPreviewContainer" class="export-preview-shell export-preview-shell-centered">
                         <div id="mapPreviewMap" class="export-preview-map" aria-label="Map preview"></div>
                         <div id="mapPreviewPlaceholder" class="export-preview-placeholder">
                             <div style="font-size: 36px; margin-bottom: var(--spacing-3);"><i class="fas fa-map"></i></div>
@@ -783,12 +783,22 @@
 
                 <section class="export-controls-section">
                     <div class="form-group export-format-group">
-                        <label class="form-label export-format-label" for="exportFormat">Export Format</label>
-                        <select class="form-input" id="exportFormat">
-                            <option value="png">PNG</option>
-                            <option value="jpeg">JPEG</option>
-                            <option value="pdf">PDF</option>
-                        </select>
+                        <div class="form-label export-format-label" id="exportFormatLabel">Export Format</div>
+                        <div class="export-format-selector" role="radiogroup" aria-labelledby="exportFormatLabel">
+                            <label class="export-format-option">
+                                <input type="radio" name="exportFormat" value="png" checked onchange="updateExportFormatLabel()">
+                                <span>PNG</span>
+                            </label>
+                            <label class="export-format-option">
+                                <input type="radio" name="exportFormat" value="jpeg" onchange="updateExportFormatLabel()">
+                                <span>JPEG</span>
+                            </label>
+                            <label class="export-format-option">
+                                <input type="radio" name="exportFormat" value="pdf" onchange="updateExportFormatLabel()">
+                                <span>PDF</span>
+                            </label>
+                        </div>
+                        <div class="export-format-helper" id="exportFormatHelper">Lossless image format suitable for maps and presentations.</div>
                     </div>
 
                     <div class="disclaimer-box export-disclaimer">

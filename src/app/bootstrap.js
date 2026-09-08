@@ -1,5 +1,5 @@
 import { activateAnnotation, activateDrawing, activateMeasureArea, activateMeasureDistance, bindAnnotationControls, bindAnnotationVisibilityToggle, cancelAnnotation, clearAnnotations, clearDrawings, clearMeasurements, deleteAnnotation, deleteSelectedDrawing, deleteSelectedMeasurement, editAnnotation, getSelectedAnnotationMode, initializeAnnotationInteractions, initializeDrawingSelectionControls, initializeMeasurementControls, selectAnnotationForDeletion, submitAnnotation } from '../tools/annotation-tool.js';
-import { copyToClipboard, downloadMap, generateLink, renderMapPreview, restoreSharedStateFromUrl, sendMap } from '../tools/export-share.js';
+import { copyToClipboard, downloadMap, generateLink, renderMapPreview, restoreSharedStateFromUrl, sendMap, updateExportFormatLabel } from '../tools/export-share.js';
 import { initializeMap } from '../map/map-init.js';
 import { changeBasemapLayer } from '../map/layer-manager.js';
 import { clearCsvSelection, clearFileSelection, clearGeoJSONSelection, clearKmlSelection, fetchGpLayersFromForm, fetchWmsCapabilitiesFromForm, handleCsvSelect, handleFileSelect, handleGeoJSONSelect, handleKmlSelect, initializeGpLayerForm, initializeUploadForm, initializeWmsLayerForm, submitUpload, updateDataSection } from '../tools/upload-tool.js';
@@ -104,6 +104,7 @@ function bindGlobalHandlers() {
     window.fetchWMSCapabilities = fetchWmsCapabilitiesFromForm;
     window.fetchGPLayers = fetchGpLayersFromForm;
     window.downloadMap = downloadMap;
+    window.updateExportFormatLabel = updateExportFormatLabel;
     window.renderMapPreview = renderMapPreview;
     window.copyToClipboard = copyToClipboard;
     window.generateLink = generateLink;

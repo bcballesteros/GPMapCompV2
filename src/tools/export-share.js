@@ -146,6 +146,24 @@ function setExportBusyState(isBusy) {
         : '<i class="fas fa-download"></i> Download';
 }
 
+export function updateExportFormatLabel() {
+    const button = document.getElementById('downloadBtn');
+    const format = document.querySelector('input[name="exportFormat"]:checked')?.value || 'png';
+    if (button && !button.disabled) {
+        button.innerHTML = '<i class="fas fa-download"></i> Download';
+    }
+
+    const helper = document.getElementById('exportFormatHelper');
+    const helperText = {
+        png: 'Lossless image format suitable for maps and presentations.',
+        jpeg: 'Compressed image format with a smaller file size.',
+        pdf: 'Document format suitable for viewing and printing.'
+    };
+    if (helper) {
+        helper.textContent = helperText[format] || helperText.png;
+    }
+}
+
 function getShareFeedbackElement() {
     return document.getElementById('shareFeedback');
 }
@@ -1548,7 +1566,7 @@ export async function renderMapPreview(reason = 'direct', previewKind = 'export'
                                 }
 
 export async function downloadMap() {
-    const format = document.getElementById('exportFormat')?.value || 'png';
+    const format = document.querySelector('input[name="exportFormat"]:checked')?.value || 'png';
 
     setExportBusyState(true);
 
