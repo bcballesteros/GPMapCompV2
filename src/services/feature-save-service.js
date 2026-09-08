@@ -209,8 +209,7 @@ function validateAnnotation(record, index, ids) {
     if (!isPlainObject(record.properties)
         || typeof record.properties.text !== 'string' || record.properties.text.trim() === ''
         || !Number.isFinite(record.properties.fontSize)
-        || record.properties.fontSize < 8 || record.properties.fontSize > 48
-        || typeof record.properties.fontColor !== 'string' || !/^#[0-9a-f]{6}$/i.test(record.properties.fontColor)
+        || record.properties.fontSize < 8 || record.properties.fontSize > 48        || typeof record.properties.fontColor !== 'string' || !/^#[0-9a-f]{6}$/i.test(record.properties.fontColor)
         || typeof record.properties.labelVisible !== 'boolean'
         || typeof record.properties.pointVisible !== 'boolean') {
         fail(`${path}.properties is malformed.`);

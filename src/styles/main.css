@@ -2192,8 +2192,6 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
 }
 
 .right-sidebar-content {
-    display: flex;
-    flex-direction: column;
     flex: 1;
     overflow-y: auto;
     padding: 14px;
