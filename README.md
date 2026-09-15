@@ -69,7 +69,7 @@ The application is built using modern web technologies with an emphasis on maint
 - Export to PNG
 - Export to JPEG
 - Export to PDF
-- Shareable map links
+- Email-based sharing of static PNG, JPEG, and PDF map outputs
 
 ---
 

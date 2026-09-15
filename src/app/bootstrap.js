@@ -1,5 +1,5 @@
 import { activateAnnotation, activateDrawing, activateMeasureArea, activateMeasureDistance, bindAnnotationControls, bindAnnotationVisibilityToggle, cancelAnnotation, clearAnnotations, clearDrawings, clearMeasurements, deleteAnnotation, deleteSelectedDrawing, deleteSelectedMeasurement, editAnnotation, getSelectedAnnotationMode, initializeAnnotationInteractions, initializeDrawingSelectionControls, initializeMeasurementControls, selectAnnotationForDeletion, submitAnnotation } from '../tools/annotation-tool.js';
-import { copyToClipboard, downloadMap, generateLink, renderMapPreview, restoreSharedStateFromUrl, sendMap, updateExportFormatLabel } from '../tools/export-share.js';
+import { downloadMap, renderMapPreview, sendMap, updateExportFormatLabel } from '../tools/export-share.js';
 import { initializeMap } from '../map/map-init.js';
 import { changeBasemapLayer } from '../map/layer-manager.js';
 import { clearCsvSelection, clearFileSelection, clearGeoJSONSelection, clearKmlSelection, fetchGpLayersFromForm, fetchWmsCapabilitiesFromForm, handleCsvSelect, handleFileSelect, handleGeoJSONSelect, handleKmlSelect, initializeGpLayerForm, initializeUploadForm, initializeWmsLayerForm, submitUpload, updateDataSection } from '../tools/upload-tool.js';
@@ -106,8 +106,6 @@ function bindGlobalHandlers() {
     window.downloadMap = downloadMap;
     window.updateExportFormatLabel = updateExportFormatLabel;
     window.renderMapPreview = renderMapPreview;
-    window.copyToClipboard = copyToClipboard;
-    window.generateLink = generateLink;
     window.sendMap = sendMap;
     window.openFeatureSaveDialog = openFeatureSaveDialog;
     window.saveSelectedFeatures = saveSelectedFeatures;
@@ -141,7 +139,6 @@ export function bootstrapApp() {
         runOptionalStartupStep('GP form init', () => initializeGpLayerForm());
         runOptionalStartupStep('geospatial data modal init', () => initializeGeospatialDataModal());
         runOptionalStartupStep('annotation popup dismissal binding', () => bindAnnotationPopupDismissal(cancelAnnotation));
-        runOptionalStartupStep('shared state restore', () => restoreSharedStateFromUrl());
     } catch (error) {
         console.error('[startup] critical bootstrap failure', error);
         showToast('Startup Issue', 'Some tools failed to initialize.', 'warning', 3500);

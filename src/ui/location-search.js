@@ -214,35 +214,6 @@ export function getSearchState() {
     return lastSearchResult;
 }
 
-export function restoreSearchState(searchState, options = {}) {
-    const normalizedResult = normalizeSearchResult(searchState);
-    if (!normalizedResult) {
-        clearSearchMarker();
-        return false;
-    }
-
-    const input = document.getElementById('locationSearchInput');
-    const clearButton = document.getElementById('locationSearchClear');
-
-    lastSearchResult = normalizedResult;
-    setCurrentSearchResult(normalizedResult);
-    setSearchMarker([normalizedResult.lon, normalizedResult.lat], normalizedResult.displayName);
-
-    if (input) {
-        input.value = normalizedResult.query || normalizedResult.displayName || '';
-    }
-
-    if (clearButton && input) {
-        syncClearButtonVisibility(input, clearButton);
-    }
-
-    if (options.zoom !== false) {
-        zoomToSearchResult(normalizedResult);
-    }
-
-    return true;
-}
-
 export function initializeLocationSearch() {
     const map = getMap();
     const form = document.getElementById('locationSearchForm');

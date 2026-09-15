@@ -74,10 +74,6 @@ export function getCurrentLayerName() {
     return state.currentLayerName;
 }
 
-export function getCurrentSearchResult() {
-    return state.currentSearchResult;
-}
-
 export function getUploadedLayers() {
     return state.uploadedLayers;
 }
