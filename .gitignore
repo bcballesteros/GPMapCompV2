@@ -3,3 +3,6 @@ dist/
 docs/
 vite-dev.log
 .history/
+.env
+.env.local
+.env.*.local

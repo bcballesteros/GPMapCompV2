@@ -296,7 +296,7 @@ function buildWorkflowHelp(context, activeLayerRecord) {
     if (context === 'mapSettings') {
         return {
             primary: 'Adjust Map Settings.',
-            secondary: 'Toggle active labels, Show text annotations, the scale bar, and the north arrow.'
+            secondary: 'Toggle the north arrow, scale bar, active labels, and text annotations.'
         };
     }
 
