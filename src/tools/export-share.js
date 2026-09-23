@@ -1,5 +1,5 @@
 import { createBasemapLayer } from '../config/basemaps.js';
-import { createExportCanvas, createPdfBlobFromCanvas, downloadBlob, downloadCanvas } from '../services/export-service.js';
+import { createExportCanvas, createPdfBlobFromCanvas, downloadBlob } from '../services/export-service.js';
 import { getLayerRecord, getMap, getState } from '../state/store.js';
 import { closeModal } from '../ui/modal.js';
 import { showToast } from '../ui/toast.js';
@@ -824,6 +824,38 @@ function createExportFileName(extension) {
     return `NAMRIA_GPMapComp_${getTimeStampForFileName()}.${extension}`;
 }
 
+const STATIC_OUTPUT_FORMATS = {
+    png: { mimeType: 'image/png', extension: 'png' },
+    jpeg: { mimeType: 'image/jpeg', extension: 'jpg', quality: 0.98 },
+    pdf: { mimeType: 'application/pdf', extension: 'pdf' }
+};
+
+export async function generateMapOutput(format) {
+    const outputFormat = STATIC_OUTPUT_FORMATS[format];
+    if (!outputFormat) {
+        throw new Error(`Unsupported map output format: ${format}`);
+    }
+
+    const canvas = await renderMapToCanvas();
+    let blob;
+
+    if (format === 'pdf') {
+        blob = await createPdfBlobFromCanvas(canvas);
+        if (!(blob instanceof Blob)) {
+            throw new Error('PDF creation failed');
+        }
+    } else {
+        blob = await new Promise((resolve) => {
+            canvas.toBlob(resolve, outputFormat.mimeType, outputFormat.quality);
+        });
+        if (!blob) {
+            throw new Error(`Could not convert rendered canvas to ${format.toUpperCase()} Blob`);
+        }
+    }
+
+    return { blob, format, mimeType: outputFormat.mimeType, extension: outputFormat.extension };
+}
+
 function getLocalExportDate() {
     const now = new Date();
     return [
@@ -1155,41 +1187,19 @@ export async function downloadMap() {
     setExportBusyState(true);
 
     try {
-        const canvas = await renderMapToCanvas();
-
-        if (format === 'png') {
-            downloadCanvas(canvas, 'image/png', createExportFileName('png'), undefined, (blob) => {
-                if (!blob) {
-                    showToast('Export Failed', 'Could not create the PNG export.', 'error');
-                    return;
-                }
-
-                showToast('Export Complete', 'PNG export completed.', 'success');
-                closeModal('exportModal');
-            });
-            return;
-        }
-
-        if (format === 'jpeg') {
-            downloadCanvas(canvas, 'image/jpeg', createExportFileName('jpg'), 0.98, (blob) => {
-                if (!blob) {
-                    showToast('Export Failed', 'Could not create the JPEG export.', 'error');
-                    return;
-                }
-
-                showToast('Export Complete', 'JPEG export completed.', 'success');
-                closeModal('exportModal');
-            });
-            return;
-        }
-
-        const pdfBlob = await createPdfBlobFromCanvas(canvas);
-        downloadBlob(pdfBlob, createExportFileName('pdf'));
-        showToast('Export Complete', 'PDF export completed.', 'success');
+        const output = await generateMapOutput(format);
+        downloadBlob(output.blob, createExportFileName(output.extension));
+        showToast('Export Complete', `${format.toUpperCase()} export completed.`, 'success');
         closeModal('exportModal');
     } catch (error) {
         console.error('Export error:', error);
-        showToast('Export Failed', 'The export could not be completed.', 'error');
+        const conversionFailure = error?.message?.startsWith('Could not convert rendered canvas to');
+        const failureMessage = conversionFailure && format === 'png'
+            ? 'Could not create the PNG export.'
+            : conversionFailure && format === 'jpeg'
+                ? 'Could not create the JPEG export.'
+                : 'The export could not be completed.';
+        showToast('Export Failed', failureMessage, 'error');
     } finally {
         setExportBusyState(false);
     }
