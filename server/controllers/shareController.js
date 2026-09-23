@@ -1,10 +1,17 @@
 import { processShare, ShareRequestError } from '../services/shareService.js';
+import { ShareConfigurationError } from '../services/shareTokenService.js';
 
 export async function createShare(req, res) {
   try {
     await processShare(req.body);
     return res.status(201).json({ success: true, message: 'Map stored successfully.' });
   } catch (error) {
+    if (error instanceof ShareConfigurationError) {
+      return res.status(500).json({
+        success: false,
+        error: { code: 'SHARE_CONFIGURATION_ERROR', message: 'Share service is not configured.' },
+      });
+    }
     if (error instanceof ShareRequestError) {
       return res.status(error.status).json({
         success: false,

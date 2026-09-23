@@ -1,12 +1,14 @@
 import express from 'express';
 import { env } from './config/env.js';
 import apiRouter from './routes/index.js';
+import publicShareRouter from './routes/publicShare.js';
 
 const app = express();
 
 // Map exports arrive as Base64 in JSON, so allow a modest payload above the default.
 app.use(express.json({ limit: '10mb' }));
 app.use('/api', apiRouter);
+app.use('/share', publicShareRouter);
 
 app.use('/api', (req, res) => {
   res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'API route not found.' } });

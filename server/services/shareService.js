@@ -1,5 +1,7 @@
-import { createMapComposerRecord } from '../repositories/mapComposerRepository.js';
+import { createMapComposerRecord, getMapComposerRecordById } from '../repositories/mapComposerRepository.js';
 import { SHARE_MAX_FILE_BYTES } from '../config/share.js';
+import { detectShareOutputFormat, SHARE_OUTPUT_TYPES } from './shareOutputFormat.js';
+import { buildShareUrl, createShareToken, parseShareToken, validateShareLinkConfiguration } from './shareTokenService.js';
 
 const SUPPORTED_FORMATS = new Set(['png', 'jpeg', 'pdf']);
 const BASE64_PATTERN = /^[A-Za-z0-9+/]*={0,2}$/;
@@ -62,20 +64,6 @@ function decodeBase64(value) {
   return imageData;
 }
 
-function detectFormat(imageData) {
-  if (imageData.length >= 8
-      && imageData.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) {
-    return 'png';
-  }
-  if (imageData.length >= 3 && imageData[0] === 0xff && imageData[1] === 0xd8 && imageData[2] === 0xff) {
-    return 'jpeg';
-  }
-  if (imageData.length >= 5 && imageData.subarray(0, 5).toString('ascii') === '%PDF-') {
-    return 'pdf';
-  }
-  return null;
-}
-
 export async function processShare(body) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) {
     throw invalidRequest();
@@ -84,7 +72,7 @@ export async function processShare(body) {
   const email = validateEmail(body.recipientEmail);
   const format = validateFormat(body.format);
   const imageData = decodeBase64(body.imageData);
-  const actualFormat = detectFormat(imageData);
+  const actualFormat = detectShareOutputFormat(imageData);
 
   if (!actualFormat) {
     throw new ShareRequestError(400, 'INVALID_IMAGE_DATA', 'The map output data is invalid.');
@@ -93,5 +81,30 @@ export async function processShare(body) {
     throw new ShareRequestError(400, 'FORMAT_MISMATCH', 'The map output format does not match the uploaded data.');
   }
 
-  await createMapComposerRecord({ email, imageData });
+  validateShareLinkConfiguration();
+  const record = await createMapComposerRecord({ email, imageData });
+  return { shareUrl: buildShareUrl(createShareToken(record.id)) };
+}
+
+export class SharedMapNotFoundError extends Error {
+  constructor() {
+    super('The shared map could not be found.');
+  }
+}
+
+export class ShareRetrievalError extends Error {
+  constructor() {
+    super('Unable to retrieve the shared map.');
+  }
+}
+
+export async function retrieveSharedMap(token) {
+  const id = parseShareToken(token);
+  const record = await getMapComposerRecordById(id);
+  if (!record) throw new SharedMapNotFoundError();
+
+  const format = detectShareOutputFormat(record.image_data);
+  if (!format) throw new ShareRetrievalError();
+
+  return { imageData: record.image_data, ...SHARE_OUTPUT_TYPES[format] };
 }
