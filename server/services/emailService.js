@@ -42,6 +42,10 @@ function validateConfiguration() {
   return { host: host.trim(), port, secure, user, password, from: sender };
 }
 
+export function validateEmailConfiguration() {
+  validateConfiguration();
+}
+
 function validateShareUrl(value) {
   if (typeof value !== 'string' || value.trim() === '') throw new EmailDeliveryError();
   let url;

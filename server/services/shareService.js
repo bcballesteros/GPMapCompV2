@@ -2,6 +2,7 @@ import { createMapComposerRecord, getMapComposerRecordById } from '../repositori
 import { SHARE_MAX_FILE_BYTES } from '../config/share.js';
 import { detectShareOutputFormat, SHARE_OUTPUT_TYPES } from './shareOutputFormat.js';
 import { buildShareUrl, createShareToken, parseShareToken, validateShareLinkConfiguration } from './shareTokenService.js';
+import { sendShareEmail, validateEmailConfiguration } from './emailService.js';
 
 const SUPPORTED_FORMATS = new Set(['png', 'jpeg', 'pdf']);
 const BASE64_PATTERN = /^[A-Za-z0-9+/]*={0,2}$/;
@@ -64,7 +65,7 @@ function decodeBase64(value) {
   return imageData;
 }
 
-export async function processShare(body) {
+export async function processShare(body, dependencies = {}) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) {
     throw invalidRequest();
   }
@@ -81,9 +82,18 @@ export async function processShare(body) {
     throw new ShareRequestError(400, 'FORMAT_MISMATCH', 'The map output format does not match the uploaded data.');
   }
 
-  validateShareLinkConfiguration();
-  const record = await createMapComposerRecord({ email, imageData });
-  return { shareUrl: buildShareUrl(createShareToken(record.id)) };
+  const checkShareConfiguration = dependencies.validateShareLinkConfiguration ?? validateShareLinkConfiguration;
+  const checkEmailConfiguration = dependencies.validateEmailConfiguration ?? validateEmailConfiguration;
+  const storeRecord = dependencies.createMapComposerRecord ?? createMapComposerRecord;
+  const makeToken = dependencies.createShareToken ?? createShareToken;
+  const makeUrl = dependencies.buildShareUrl ?? buildShareUrl;
+  const deliverEmail = dependencies.sendShareEmail ?? sendShareEmail;
+
+  checkShareConfiguration();
+  checkEmailConfiguration();
+  const record = await storeRecord({ email, imageData });
+  const shareUrl = makeUrl(makeToken(record.id));
+  await deliverEmail({ recipientEmail: email, shareUrl });
 }
 
 export class SharedMapNotFoundError extends Error {
