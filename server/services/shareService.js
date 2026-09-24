@@ -58,11 +58,15 @@ function decodeBase64(value) {
     throw new ShareRequestError(400, 'INVALID_IMAGE_DATA', 'The map output data is invalid.');
   }
 
+  validateDecodedFileSize(imageData);
+
+  return imageData;
+}
+
+export function validateDecodedFileSize(imageData) {
   if (imageData.length > SHARE_MAX_FILE_BYTES) {
     throw new ShareRequestError(413, 'FILE_TOO_LARGE', 'The map output exceeds the allowed size.');
   }
-
-  return imageData;
 }
 
 export async function processShare(body, dependencies = {}) {

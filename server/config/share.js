@@ -1,1 +1,2 @@
-export const SHARE_MAX_FILE_BYTES = 7 * 1024 * 1024;
+export const SHARE_MAX_FILE_BYTES = 32 * 1024 * 1024;
+export const SHARE_MAX_REQUEST_BYTES = 48 * 1024 * 1024;

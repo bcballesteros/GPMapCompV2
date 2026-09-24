@@ -1205,7 +1205,23 @@ export async function downloadMap() {
     }
 }
 
-export function sendMap(event) {
+function blobToBase64(blob) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+            const dataUrl = reader.result;
+            if (typeof dataUrl !== 'string') {
+                reject(new Error('Could not read map output'));
+                return;
+            }
+            resolve(dataUrl.slice(dataUrl.indexOf(',') + 1));
+        };
+        reader.onerror = () => reject(reader.error || new Error('Could not read map output'));
+        reader.readAsDataURL(blob);
+    });
+}
+
+export async function sendMap(event) {
     event?.preventDefault();
 
     const form = document.getElementById('shareForm');
@@ -1213,22 +1229,63 @@ export function sendMap(event) {
     const formatInput = document.getElementById('shareFormat');
     const sendButton = document.getElementById('sendShareBtn');
 
-    if (!form || !emailInput || !formatInput || !sendButton || !form.checkValidity()) {
+    if (!form || !emailInput || !formatInput || !sendButton) {
+        return false;
+    }
+
+    if (!form.checkValidity()) {
         form?.reportValidity();
+        return false;
+    }
+
+    if (shareState.pending) {
         return false;
     }
 
     shareState.recipientEmail = emailInput.value.trim();
     shareState.selectedFormat = formatInput.value;
-    shareState.pending = false;
     shareState.success = false;
     shareState.error = null;
-
-    // The delivery operation is intentionally reserved for the future backend.
     setShareFeedback('');
-    sendButton.disabled = false;
-    sendButton.setAttribute('aria-busy', 'false');
-    return false;
+    setSharePending(true);
+
+    try {
+        const format = shareState.selectedFormat;
+        const output = await generateMapOutput(format);
+        const imageData = await blobToBase64(output.blob);
+        const response = await fetch('/api/share', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                recipientEmail: shareState.recipientEmail,
+                format,
+                imageData
+            })
+        });
+
+        let result = null;
+        try {
+            result = await response.json();
+        } catch {
+            result = null;
+        }
+
+        if (!response.ok || result?.success !== true) {
+            const message = typeof result?.error?.message === 'string'
+                ? result.error.message
+                : 'Unable to share the map. Please try again.';
+            setShareResult({ error: message });
+            return false;
+        }
+
+        setShareResult({ success: true });
+        return true;
+    } catch {
+        setShareResult({ error: 'Unable to share the map. Please try again.' });
+        return false;
+    } finally {
+        setSharePending(false);
+    }
 }
 
 export function setSharePending(isPending) {
