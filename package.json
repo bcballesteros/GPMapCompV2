@@ -12,6 +12,7 @@
   "dependencies": {
     "dotenv": "^18.0.3",
     "express": "^5.2.1",
+    "nodemailer": "^10.0.10",
     "ol": "^10.6.1",
     "pg": "^8.23.0",
     "shpjs": "^6.2.0"
