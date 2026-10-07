@@ -1,0 +1,135 @@
+<!doctype html>
+<html>
+<body>
+<form id="shareForm"><input id="recipientEmail" type="email" value="recipient@example.test"><select id="shareFormat"><option value="png">PNG</option></select><button id="sendShareBtn"></button></form>
+<div id="shareFeedback"></div><button id="downloadBtn"></button><div id="toastContainer"></div>
+<script>window.fixtureReady = new Promise(resolve => { window.resolveFixture = resolve; });</script>
+<script type="module">
+import ol from '/src/lib/ol.js';
+import { createBasemapSource } from '/src/config/basemaps.js';
+import { setMap } from '/src/state/store.js';
+import { downloadMap, generateMapOutput, sendMap } from '/src/tools/export-share.js';
+
+function check(condition, message) {
+    if (!condition) throw new Error(message);
+}
+
+const tileCanvas = document.createElement('canvas');
+tileCanvas.width = tileCanvas.height = 256;
+const context = tileCanvas.getContext('2d');
+context.fillStyle = '#428060';
+context.fillRect(0, 0, 256, 256);
+const tileUrl = tileCanvas.toDataURL();
+
+async function runCase({ name, source = createBasemapSource('namria'), failures = 0, persistent = false, slow = false, format = 'png', share = false, download = false }) {
+    window.__GP_PREVIEW_DEBUG__ = [];
+    let requested = 0;
+    let failed = 0;
+    source.setTileLoadFunction((tile) => {
+        requested += 1;
+        const shouldFail = persistent || failed < failures;
+        if (shouldFail) failed += 1;
+        setTimeout(() => {
+            if (shouldFail) tile.setState(3);
+            else tile.getImage().src = tileUrl;
+        }, slow ? (requested % 8) * 30 : 0);
+    });
+    const point = new ol.Feature(new ol.geom.Point([0, 0]));
+    const vectorSource = new ol.source.Vector({ features: [point] });
+    const vector = new ol.layer.Vector({
+        source: vectorSource,
+        style: new ol.style.Style({
+            image: new ol.style.Circle({ radius: 7, fill: new ol.style.Fill({ color: '#ff0000' }) }),
+            text: new ol.style.Text({ text: 'Annotation', offsetY: -14 })
+        })
+    });
+    const map = new ol.Map({
+        layers: [new ol.layer.Tile({ source }), vector],
+        controls: [], interactions: [],
+        view: new ol.View({ center: [0, 0], zoom: 5 })
+    });
+    map.setSize([800, 600]);
+    setMap(map);
+    const initialExtent = map.getView().calculateExtent(map.getSize()).slice();
+    const originalFetch = window.fetch;
+    let shareRequests = 0;
+    // Never call the real Share backend or send email during browser verification.
+    window.fetch = async () => {
+        shareRequests += 1;
+        return { ok: true, json: async () => ({ success: true }) };
+    };
+    let error = null;
+    let output = null;
+    try {
+        if (share) {
+            check(await sendMap() === !persistent, 'Incorrect Share result');
+        } else if (download) {
+            await downloadMap();
+        } else {
+            try { output = await generateMapOutput(format); } catch (caught) { error = caught; }
+            check(Boolean(error) === persistent, `Unexpected output result: ${error?.message}`);
+        }
+        const captures = window.__GP_PREVIEW_DEBUG__.filter(entry => entry.event === 'static-output:capture');
+        const retries = window.__GP_PREVIEW_DEBUG__.filter(entry => entry.event === 'static-output:retry');
+        check(retries.length === ((failures || persistent) ? 1 : 0), 'Incorrect bounded retry count');
+        check(captures.length === (persistent ? 0 : 1), 'Captured an incomplete frame');
+        check(!captures.length || captures[0].unresolved === 0 && captures[0].failed === 0, 'Capture has unresolved or failed tiles');
+        check(!captures.length || captures[0].tileLoadStarts === captures[0].successfulTileLoads, 'Not every requested tile loaded');
+        check(!document.querySelector('[aria-hidden="true"][style*="-100000px"]'), 'Temporary target leaked');
+        check(!source.hasListener('tileloadstart') && !source.hasListener('tileloaderror'), 'Live source acquired export listeners');
+        check(vectorSource.getFeatures()[0] === point, 'Shared vector source was modified');
+        check(JSON.stringify(initialExtent) === JSON.stringify(map.getView().calculateExtent(map.getSize())), 'Live extent changed');
+        if (share) {
+            check(shareRequests === (persistent ? 0 : 1), 'Incomplete map was sent to Share');
+            if (persistent) check(document.getElementById('shareFeedback').textContent === 'Unable to share the map. Please try again.', 'Share error UI changed');
+        }
+        if (download && persistent) check(document.getElementById('toastContainer').textContent.includes('Export Failed'), 'Export failure UI missing');
+        if (output && format !== 'pdf') {
+            const bitmap = await createImageBitmap(output.blob);
+            check(bitmap.width === 2560 && bitmap.height === 1968, 'Output dimensions changed');
+            const canvas = document.createElement('canvas');
+            canvas.width = bitmap.width;
+            canvas.height = bitmap.height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(bitmap, 0, 0);
+            const pixels = ctx.getImageData(0, 0, 2560, 1920).data;
+            let missing = 0;
+            for (let i = 0; i < pixels.length; i += 4) {
+                if (pixels[i] > 245 && pixels[i + 1] > 245 && pixels[i + 2] > 245) missing += 1;
+            }
+            check(missing === 0, `${missing} blank map pixels`);
+            const center = ctx.getImageData(1280, 960, 1, 1).data;
+            check(center[0] > 240 && center[1] < 20, 'Vector point did not render');
+            bitmap.close();
+        }
+        if (output && format === 'pdf') check((await output.blob.text()).startsWith('%PDF-'), 'PDF encoding changed');
+        return { name, requested, failures: failed, retries: retries.length, captures: captures.length, tileLoads: captures[0]?.successfulTileLoads || 0 };
+    } finally {
+        window.fetch = originalFetch;
+        map.dispose();
+        map.getLayers().clear();
+        vector.dispose();
+        source.dispose();
+        vectorSource.dispose();
+    }
+}
+
+window.resolveFixture(async () => {
+    const results = [];
+    for (const name of ['namria', 'namria-orthoimage-2011', 'namria-orthoimage-2013-2014', 'namria-orthorectified-radar', 'osm', 'google', 'bing', 'arcgis-aerial']) {
+        results.push(await runCase({ name, source: createBasemapSource(name), slow: name === 'namria' }));
+    }
+    results.push(await runCase({ name: 'configured XYZ', source: new ol.source.XYZ({ tileUrlFunction: () => 'https://example.test/tiles', maxZoom: 9 }) }));
+    results.push(await runCase({ name: 'TileWMS', source: new ol.source.TileWMS({ url: 'https://example.test/wms', params: { LAYERS: 'test' } }) }));
+    results.push(await runCase({ name: 'transient failure', failures: 1 }));
+    results.push(await runCase({ name: 'persistent failure', persistent: true }));
+    results.push(await runCase({ name: 'Share success', share: true }));
+    results.push(await runCase({ name: 'Share failure prevents POST', share: true, persistent: true }));
+    results.push(await runCase({ name: 'Export failure UI', download: true, persistent: true }));
+    results.push(await runCase({ name: 'JPEG', format: 'jpeg' }));
+    results.push(await runCase({ name: 'PDF', format: 'pdf' }));
+    return results;
+});
+</script>
+</body>
+</html>

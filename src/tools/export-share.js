@@ -1,5 +1,5 @@
-import { createBasemapLayer } from '../config/basemaps.js';
 import { createExportCanvas, createPdfBlobFromCanvas, downloadBlob } from '../services/export-service.js';
+import { MapRenderError, observeMapRender } from '../services/map-render-readiness.js';
 import { getLayerRecord, getMap, getState } from '../state/store.js';
 import { closeModal } from '../ui/modal.js';
 import { showToast } from '../ui/toast.js';
@@ -273,15 +273,21 @@ function cloneWmsSource(source) {
 
     return new ol.source.TileWMS({
         url,
+        urls,
         params: { ...source.getParams() },
         serverType: source.get('serverType') || 'geoserver',
+        projection: source.getProjection(),
+        tileGrid: source.getTileGrid(),
+        wrapX: source.getWrapX(),
+        tileLoadFunction: source.getTileLoadFunction(),
+        gutter: source.getGutter(),
         crossOrigin: 'anonymous',
         transition: 0
     });
 }
 
 function cloneXyzSource(source) {
-    return new ol.source.XYZ({
+    const clonedSource = new ol.source.XYZ({
         url: source.getUrls?.()?.[0] || source.getUrl?.(),
         urls: source.getUrls?.(),
         attributions: source.getAttributions?.(),
@@ -291,11 +297,17 @@ function cloneXyzSource(source) {
         projection: source.getProjection?.(),
         tileGrid: source.getTileGrid?.(),
         wrapX: source.getWrapX?.(),
+        tileLoadFunction: source.getTileLoadFunction(),
+        tilePixelRatio: source.getTilePixelRatio(1),
+        gutter: source.getGutter(),
         transition: 0
     });
+    // Set this after URLs, which can otherwise replace a configured URL function.
+    clonedSource.setTileUrlFunction(source.getTileUrlFunction());
+    return clonedSource;
 }
 
-function cloneMapLayer(layer, index) {
+function cloneMapLayer(layer) {
     const source = layer.getSource?.();
     if (!source) {
         return null;
@@ -304,23 +316,20 @@ function cloneMapLayer(layer, index) {
     const commonOptions = {
         opacity: layer.getOpacity(),
         visible: layer.getVisible(),
-        zIndex: layer.getZIndex()
+        zIndex: layer.getZIndex(),
+        extent: layer.getExtent(),
+        minResolution: layer.getMinResolution(),
+        maxResolution: layer.getMaxResolution(),
+        minZoom: layer.getMinZoom(),
+        maxZoom: layer.getMaxZoom(),
+        properties: { basemapId: layer.get('basemapId'), name: layer.get('name') }
     };
-
-    if (index === 0) {
-        const basemapLayer = createBasemapLayer(getState().activeBasemap);
-        basemapLayer.setOpacity(commonOptions.opacity);
-        basemapLayer.setVisible(commonOptions.visible);
-        basemapLayer.setZIndex(commonOptions.zIndex);
-        return basemapLayer;
-    }
 
     if (layer instanceof ol.layer.Vector) {
         const previewLayer = new ol.layer.Vector({
+            ...commonOptions,
             source,
-            style: layer.getStyle(),
-            opacity: commonOptions.opacity,
-            visible: commonOptions.visible
+            style: layer.getStyle()
         });
         previewLayer.setZIndex(commonOptions.zIndex);
         return previewLayer;
@@ -335,9 +344,8 @@ function cloneMapLayer(layer, index) {
         }
 
         const previewLayer = new ol.layer.Tile({
-            source: tileSource,
-            opacity: commonOptions.opacity,
-            visible: commonOptions.visible
+            ...commonOptions,
+            source: tileSource
         });
         previewLayer.setZIndex(commonOptions.zIndex);
         return previewLayer;
@@ -661,7 +669,7 @@ function getVisibleLayerSources(map) {
     const sources = [];
 
     map?.getLayers?.().forEach((layer) => {
-        if (layer.getVisible?.() === false) {
+        if (!layer.isVisible(map.getView()) || layer.getOpacity() === 0) {
             return;
         }
 
@@ -698,105 +706,21 @@ function waitForMapRenderComplete(map, { sync = false } = {}) {
         return Promise.resolve();
     }
 
-    return new Promise((resolve) => {
-        const role = getDebugMapRole(map);
-        const sourceEvents = [];
-        let pendingLoads = 0;
-        let renderComplete = false;
-        let resolved = false;
-
-        debugPreview('waitForMapRenderComplete:start', {
-            role,
-            sync,
-            sourceCount: getVisibleLayerSources(map).length
-        });
-
-        const cleanup = () => {
-            sourceEvents.forEach((key) => ol.Observable.unByKey(key));
-        };
-
-        const finishIfReady = () => {
-            if (resolved || !renderComplete || pendingLoads > 0) {
-                debugPreview('waitForMapRenderComplete:not-ready', {
-                    role,
-                    sync,
-                    pendingLoads,
-                    renderComplete,
-                    resolved
-                });
-                return;
-            }
-
-            resolved = true;
-            cleanup();
-            debugPreview('waitForMapRenderComplete:resolved', {
-                role,
-                sync,
-                pendingLoads,
-                renderComplete
-            });
-            resolve();
-        };
-
-        const handleLoadStart = (eventName, source) => {
-            pendingLoads += 1;
-            renderComplete = false;
-            debugPreview('source-load:start', {
-                role,
-                eventName,
-                pendingLoads,
-                sourceType: source?.constructor?.name || null,
-                sourceState: source?.getState?.() || null
-            });
-        };
-
-        const handleLoadEnd = (eventName, source) => {
-            pendingLoads = Math.max(0, pendingLoads - 1);
-            debugPreview('source-load:end', {
-                role,
-                eventName,
-                pendingLoads,
-                sourceType: source?.constructor?.name || null,
-                sourceState: source?.getState?.() || null
-            });
-            finishIfReady();
-        };
-
-        getVisibleLayerSources(map).forEach((source) => {
-            [
-                'tileloadstart',
-                'tileloadend',
-                'tileloaderror',
-                'imageloadstart',
-                'imageloadend',
-                'imageloaderror'
-            ].forEach((eventName) => {
-                const listener = eventName.endsWith('start')
-                    ? () => handleLoadStart(eventName, source)
-                    : () => handleLoadEnd(eventName, source);
-                sourceEvents.push(source.on(eventName, listener));
-            });
-        });
-
-        map.once('rendercomplete', () => {
-            renderComplete = true;
-            debugPreview('map-rendercomplete', {
-                role,
-                sync,
-                pendingLoads
-            });
-            finishIfReady();
-        });
-
-        if (sync) {
-            debugPreview('waitForMapRenderComplete:renderSync', { role });
-            map.renderSync();
-            return;
-        }
-
-        debugPreview('waitForMapRenderComplete:render', { role });
-        map.render();
+    const observer = observeMapRender(map, {
+        sources: getVisibleLayerSources(map),
+        debug: (event, details) => debugPreview(event, { role: getDebugMapRole(map), ...details })
     });
+    try {
+        if (sync) {
+            map.renderSync();
+        } else {
+            map.render();
+        }
+    } catch (error) {
+        observer.dispose();
+        throw error;
+    }
+    return observer.ready;
 }
 
 async function waitForMapSettledRender(map, options) {
@@ -999,28 +923,43 @@ function syncExportView(exportMap, mainMap, exportSize) {
     exportView.setRotation(mainView.getRotation() || 0);
 }
 
-async function renderExportMapToCanvas(mainMap, width, height) {
+async function renderExportMapAttempt(mainMap, width, height, attempt) {
     const target = createExportMapTarget(width, height);
-    const mainView = mainMap.getView();
-    const exportMap = new ol.Map({
-        target,
-        controls: [],
-        interactions: [],
-        layers: [],
-        pixelRatio: 1,
-        view: new ol.View({
-            center: mainView.getCenter(),
-            resolution: mainView.getResolution(),
-            rotation: mainView.getRotation() || 0,
-            projection: mainView.getProjection()
-        })
-    });
+    let exportMap = null;
+    let observer = null;
+    let mainSources = new Set();
 
     try {
+        const mainView = mainMap.getView();
+        // Retain ownership information even if live layers change while waiting.
+        mainSources = new Set(mainMap.getLayers().getArray().map((layer) => layer.getSource?.()));
+        exportMap = new ol.Map({
+            controls: [],
+            interactions: [],
+            layers: [],
+            pixelRatio: 1,
+            view: new ol.View({
+                center: mainView.getCenter(),
+                resolution: mainView.getResolution(),
+                rotation: mainView.getRotation() || 0,
+                projection: mainView.getProjection()
+            })
+        });
+
+        // No target means OpenLayers cannot request tiles while layers and the
+        // final view are configured. Observe fresh sources before setTarget().
         rebuildMapLayers(exportMap, mainMap);
-        exportMap.updateSize();
+        exportMap.setSize([width, height]);
         syncExportView(exportMap, mainMap, [width, height]);
-        await waitForMapSettledRender(exportMap, { sync: true });
+        observer = observeMapRender(exportMap, {
+            sources: getVisibleLayerSources(exportMap),
+            rejectLoadErrors: true,
+            debug: (event, details) => debugPreview(event, { role: 'static-output', attempt, ...details })
+        });
+        exportMap.setTarget(target);
+        exportMap.updateSize();
+        exportMap.renderSync();
+        await observer.ready;
 
         const mapCanvas = createExportCanvas(width, height);
         const mapContext = mapCanvas.getContext('2d');
@@ -1044,10 +983,38 @@ async function renderExportMapToCanvas(mainMap, width, height) {
             throw new Error('Map renderer did not produce an exportable frame');
         }
 
+        debugPreview('static-output:capture', { attempt, ...observer.snapshot() });
         return mapCanvas;
     } finally {
-        exportMap.setTarget(null);
-        target.remove();
+        try {
+            observer?.dispose();
+            if (exportMap) {
+                const layers = exportMap.getLayers().getArray().slice();
+                const ownedSources = new Set(layers.map((layer) => layer.getSource?.())
+                    .filter((source) => source && !mainSources.has(source)));
+                exportMap.dispose();
+                exportMap.getLayers().clear();
+                layers.forEach((layer) => layer.dispose());
+                ownedSources.forEach((source) => source.dispose());
+            }
+        } finally {
+            target.remove();
+        }
+    }
+}
+
+async function renderExportMapToCanvas(mainMap, width, height) {
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
+        try {
+            return await renderExportMapAttempt(mainMap, width, height, attempt);
+        } catch (error) {
+            if (!(error instanceof MapRenderError) || attempt === 2) {
+                throw error;
+            }
+            // A new detached map and fresh tile sources discard failed tile
+            // caches without changing the live map, extent, or output quality.
+            debugPreview('static-output:retry', { attempt, nextAttempt: attempt + 1, message: error.message });
+        }
     }
 }
 
@@ -1061,7 +1028,9 @@ async function renderMapToCanvas() {
     const footerHeight = Math.max(24, Math.round(mapHeight * 0.025));
     const height = mapHeight + footerHeight;
 
-    await waitForMapSettledRender(mainMap, { sync: true });
+    // Output readiness belongs to the fresh export map. Waiting for live-map
+    // tiles here can stall retries on errors already cached in the live map.
+    await waitForViewIdle(mainMap);
 
     const mapCanvas = await renderExportMapToCanvas(mainMap, width, mapHeight);
 
