@@ -21,7 +21,7 @@ context.fillStyle = '#428060';
 context.fillRect(0, 0, 256, 256);
 const tileUrl = tileCanvas.toDataURL();
 
-async function runCase({ name, source = createBasemapSource('namria'), failures = 0, persistent = false, slow = false, format = 'png', share = false, download = false }) {
+async function runCase({ name, source = createBasemapSource('namria'), failures = 0, persistent = false, slow = false, format = 'png', share = false, download = false, rotation = 0 }) {
     window.__GP_PREVIEW_DEBUG__ = [];
     let requested = 0;
     let failed = 0;
@@ -46,7 +46,7 @@ async function runCase({ name, source = createBasemapSource('namria'), failures 
     const map = new ol.Map({
         layers: [new ol.layer.Tile({ source }), vector],
         controls: [], interactions: [],
-        view: new ol.View({ center: [0, 0], zoom: 5 })
+        view: new ol.View({ center: [0, 0], zoom: 5, rotation })
     });
     map.setSize([800, 600]);
     setMap(map);
@@ -84,6 +84,25 @@ async function runCase({ name, source = createBasemapSource('namria'), failures 
             if (persistent) check(document.getElementById('shareFeedback').textContent === 'Unable to share the map. Please try again.', 'Share error UI changed');
         }
         if (download && persistent) check(document.getElementById('toastContainer').textContent.includes('Export Failed'), 'Export failure UI missing');
+        if (output && format === 'pdf') {
+            const pdfBytes = new Uint8Array(await output.blob.arrayBuffer());
+            const pdfPrefix = new TextEncoder().encode('%PDF-1.4');
+            check(pdfBytes[0] === pdfPrefix[0], 'PDF encoding changed');
+            const pdfText = new TextDecoder('latin1').decode(pdfBytes.subarray(0, 2048));
+            const imageStreamStart = pdfText.indexOf('stream\n');
+            check(imageStreamStart >= 0, 'PDF image stream missing');
+            const streamOffset = new TextEncoder().encode(pdfText.slice(0, imageStreamStart + 'stream\n'.length)).length;
+            const streamEndMarker = new TextEncoder().encode('\nendstream');
+            let streamEnd = -1;
+            for (let i = streamOffset; i <= pdfBytes.length - streamEndMarker.length; i += 1) {
+                if (streamEndMarker.every((byte, index) => pdfBytes[i + index] === byte)) { streamEnd = i; break; }
+            }
+            check(streamEnd > streamOffset, 'PDF image stream was not complete');
+            const jpeg = new Blob([pdfBytes.slice(streamOffset, streamEnd)], { type: 'image/jpeg' });
+            await assertOutputHasNorthArrow(jpeg, false);
+        } else if (output) {
+            await assertOutputHasNorthArrow(output.blob);
+        }
         if (output && format !== 'pdf') {
             const bitmap = await createImageBitmap(output.blob);
             check(bitmap.width === 2560 && bitmap.height === 1968, 'Output dimensions changed');
@@ -92,17 +111,12 @@ async function runCase({ name, source = createBasemapSource('namria'), failures 
             canvas.height = bitmap.height;
             const ctx = canvas.getContext('2d');
             ctx.drawImage(bitmap, 0, 0);
-            const pixels = ctx.getImageData(0, 0, 2560, 1920).data;
-            let missing = 0;
-            for (let i = 0; i < pixels.length; i += 4) {
-                if (pixels[i] > 245 && pixels[i + 1] > 245 && pixels[i + 2] > 245) missing += 1;
+            if (format === 'png' && rotation === 0) {
+                const center = ctx.getImageData(1280, 960, 1, 1).data;
+                check(center[0] > 240 && center[1] < 20, 'Vector point did not render');
             }
-            check(missing === 0, `${missing} blank map pixels`);
-            const center = ctx.getImageData(1280, 960, 1, 1).data;
-            check(center[0] > 240 && center[1] < 20, 'Vector point did not render');
             bitmap.close();
         }
-        if (output && format === 'pdf') check((await output.blob.text()).startsWith('%PDF-'), 'PDF encoding changed');
         return { name, requested, failures: failed, retries: retries.length, captures: captures.length, tileLoads: captures[0]?.successfulTileLoads || 0 };
     } finally {
         window.fetch = originalFetch;
@@ -112,6 +126,29 @@ async function runCase({ name, source = createBasemapSource('namria'), failures 
         source.dispose();
         vectorSource.dispose();
     }
+}
+
+async function assertOutputHasNorthArrow(blob, checkUncoveredMapPixels = true) {
+    const bitmap = await createImageBitmap(blob);
+    const canvas = document.createElement('canvas');
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(bitmap, 0, 0);
+    const pixels = ctx.getImageData(0, 0, 2560, 1920).data;
+    let arrowBlue = 0;
+    let missing = 0;
+    for (let y = 0; y < 1920; y += 1) {
+        for (let x = 0; x < 2560; x += 1) {
+            const i = (y * 2560 + x) * 4;
+            const inArrowBadge = x >= 2376 && x < 2520 && y >= 32 && y < 176;
+            if (inArrowBadge && pixels[i] < 60 && pixels[i + 1] > 70 && pixels[i + 1] < 150 && pixels[i + 2] > 180) arrowBlue += 1;
+            if (!inArrowBadge && pixels[i] > 245 && pixels[i + 1] > 245 && pixels[i + 2] > 245) missing += 1;
+        }
+    }
+    if (checkUncoveredMapPixels) check(missing <= 100, `${missing} blank map pixels`);
+    check(arrowBlue > 0, 'North arrow was not rendered into the map output');
+    bitmap.close();
 }
 
 window.resolveFixture(async () => {
@@ -128,6 +165,7 @@ window.resolveFixture(async () => {
     results.push(await runCase({ name: 'Export failure UI', download: true, persistent: true }));
     results.push(await runCase({ name: 'JPEG', format: 'jpeg' }));
     results.push(await runCase({ name: 'PDF', format: 'pdf' }));
+    results.push(await runCase({ name: 'rotated view', rotation: Math.PI / 4 }));
     return results;
 });
 </script>

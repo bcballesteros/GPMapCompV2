@@ -4,9 +4,11 @@ import { getLayerRecord, getMap, getState } from '../state/store.js';
 import { closeModal } from '../ui/modal.js';
 import { showToast } from '../ui/toast.js';
 import ol from '../lib/ol.js';
+import northArrowUrl from '../assets/north-arrow.svg';
 
 const EXPORT_LONG_EDGE_PX = 2560;
 const EXPORT_MAX_PIXEL_AREA = 12000000;
+let northArrowImagePromise = null;
 
 const previewStates = {
     export: { map: null, renderToken: 0 },
@@ -835,6 +837,55 @@ function drawExportFooter(context, canvasWidth, canvasHeight, footerHeight) {
     context.restore();
 }
 
+function loadNorthArrowImage() {
+    if (!northArrowImagePromise) {
+        northArrowImagePromise = new Promise((resolve, reject) => {
+            const image = new Image();
+            image.onload = () => resolve(image);
+            image.onerror = () => reject(new Error('Could not load the north arrow asset'));
+            image.src = northArrowUrl;
+        });
+    }
+
+    return northArrowImagePromise;
+}
+
+async function drawExportNorthArrow(context, canvasWidth, rotation) {
+    const image = await loadNorthArrowImage();
+    const badgeSize = Math.max(80, Math.min(144, Math.round(canvasWidth * 0.05)));
+    const margin = Math.max(20, Math.round(canvasWidth * 0.0125));
+    const x = canvasWidth - margin - badgeSize;
+    const y = margin;
+
+    context.save();
+    try {
+        context.shadowColor = 'rgba(15, 23, 42, 0.16)';
+        context.shadowBlur = Math.max(4, Math.round(badgeSize * 0.08));
+        context.shadowOffsetY = Math.max(1, Math.round(badgeSize * 0.025));
+        context.fillStyle = 'rgba(255, 255, 255, 0.94)';
+        context.strokeStyle = 'rgba(226, 232, 240, 0.95)';
+        context.lineWidth = Math.max(1, badgeSize * 0.025);
+        const radius = badgeSize * 0.25;
+        context.beginPath();
+        context.roundRect(x, y, badgeSize, badgeSize, radius);
+        context.fill();
+        context.shadowColor = 'transparent';
+        context.stroke();
+
+        const inset = badgeSize * 0.1;
+        const symbolSize = badgeSize - inset * 2;
+        context.translate(x + badgeSize / 2, y + badgeSize / 2);
+        // OpenLayers view rotation is clockwise, matching the screen direction
+        // of geographic north as the map rotates.
+        context.rotate(rotation || 0);
+        context.drawImage(image, -symbolSize / 2, -symbolSize / 2, symbolSize, symbolSize);
+    } catch (error) {
+        throw new Error(`Could not render the north arrow: ${error?.message || error}`);
+    } finally {
+        context.restore();
+    }
+}
+
 function getMapProjectionLabel() {
     const projection = getMap()?.getView?.()?.getProjection?.();
     const projectionCode = projection?.getCode?.();
@@ -1054,6 +1105,12 @@ async function renderMapToCanvas() {
         0,
         width,
         mapHeight
+    );
+
+    await drawExportNorthArrow(
+        context,
+        width,
+        mainMap.getView()?.getRotation?.() || 0
     );
 
     drawExportFooter(context, width, height, footerHeight);

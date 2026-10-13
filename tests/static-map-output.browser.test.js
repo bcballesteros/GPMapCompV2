@@ -79,7 +79,7 @@ test('static output renders complete tiles, preserves composition, retries, and 
             expression: 'window.fixtureReady.then(run => run())', awaitPromise: true, returnByValue: true
         });
         const result = evaluation.result.value;
-        assert.equal(result.length, 17);
+        assert.equal(result.length, 18);
         for (const entry of result) t.diagnostic(JSON.stringify(entry));
     } finally {
         socket?.close();
