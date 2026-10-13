@@ -49,9 +49,16 @@ async function withSmtpCapture(run) {
     await run(() => {
       const normalized = captured.replace(/=\r\n/g, '');
       const decodeQuotedPrintable = (value) => value.replace(/=([0-9A-F]{2})/gi, (_, hex) => String.fromCharCode(Number.parseInt(hex, 16)));
-      const parts = normalized.split(/(?=Content-Type: text\/(?:plain|html);)/);
-      const decoded = parts.map((part) => decodeQuotedPrintable(part));
-      return { raw: captured, text: decoded.find((part) => part.includes('Content-Type: text/plain;')) ?? '', html: decoded.find((part) => part.includes('Content-Type: text/html;')) ?? '' };
+      const decoded = decodeQuotedPrintable(normalized);
+      const textStart = decoded.indexOf('Content-Type: text/plain;');
+      const htmlStart = decoded.indexOf('Content-Type: text/html;');
+      const imageStart = decoded.indexOf('Content-Type: image/png;');
+      return {
+        raw: decoded,
+        text: decoded.slice(textStart, htmlStart),
+        html: decoded.slice(htmlStart, imageStart),
+        related: decoded.slice(htmlStart),
+      };
     });
   }
   finally {
@@ -60,7 +67,7 @@ async function withSmtpCapture(run) {
   }
 }
 
-test('share email has branded sender, transactional HTML, and complete plain text', async () => {
+test('share email has branded sender, CID logo, one secure HTML link, and concise plain text', async () => {
   const shareUrl = 'https://maps.example.test/share/opaque-token';
   await withSmtpCapture(async (getCaptured) => {
     await sendShareEmail({ recipientEmail: 'recipient@example.test', shareUrl });
@@ -68,11 +75,26 @@ test('share email has branded sender, transactional HTML, and complete plain tex
     assert.match(message.raw, /From: Geoportal Philippines Map Composer <sender@example\.test>/);
     assert.match(message.raw, /Subject: Geoportal Philippines Map Composer - Shared Map/);
     assert.match(message.html, /View Shared Map/);
-    assert.match(message.html, new RegExp(shareUrl));
+    assert.match(message.html, /src="cid:geoportal-philippines-logo"/);
+    assert.match(message.html, /bgcolor="#0B1421" style="padding:10px 24px;background-color:#0B1421;/);
+    assert.doesNotMatch(message.html, /height="6" bgcolor="#0B1421"|padding:10px 24px;background-color:#ffffff/);
+    assert.match(message.html, /width="34" alt="Geoportal Philippines logo" style="display:block;width:34px;height:auto;border:0;"/);
+    assert.match(message.html, /color:#ffffff;font-size:15px;line-height:1\.3;font-weight:600;">Geoportal Philippines Map Composer<\/td>/);
+    assert.doesNotMatch(message.html, /<div[^>]*>Geoportal Philippines<\/div><div[^>]*>Map Composer<\/div>/);
+    assert.match(message.raw, /Content-ID: <geoportal-philippines-logo>/i);
+    assert.match(message.raw, /filename="?gplogo\.png"?/i);
+    assert.match(message.html, /alt="Geoportal Philippines logo"/);
+    assert.equal((message.html.match(/href="/g) ?? []).length, 1);
+    assert.match(message.html, new RegExp(`href="${shareUrl}"`));
+    assert.doesNotMatch(message.html, /If the button does not work|open this link/i);
+    assert.match(message.html, /A map output has been shared with you through Geoportal Philippines Map Composer\./);
+    assert.doesNotMatch(message.html, /A static map output has been shared/);
     assert.match(message.html, /Shared maps are static snapshots of the current map composition and cannot be edited by recipients\./);
     assert.match(message.text, /Geoportal Philippines Map Composer/);
     assert.match(message.text, /A map has been shared with you/);
-    assert.match(message.text, new RegExp(shareUrl));
+    assert.match(message.text, /A map output has been shared with you through Geoportal Philippines Map Composer\./);
+    assert.doesNotMatch(message.text, /https?:\/\/|View Shared Map:/);
+    assert.doesNotMatch(message.text, /A static map output has been shared/);
     assert.match(message.text, /Shared maps are static snapshots of the current map composition and cannot be edited by recipients\./);
     assert.match(message.text, /Geoportal Philippines[\s\S]*National Mapping and Resource Information Authority \(NAMRIA\)/);
     assert.match(message.html, /Geoportal Philippines[\s\S]*National Mapping and Resource Information Authority \(NAMRIA\)/);
@@ -85,7 +107,7 @@ test('HTML escapes the validated URL before inserting it into markup', async () 
     await sendShareEmail({ recipientEmail: 'recipient@example.test', shareUrl });
     const message = getCaptured();
     assert.match(message.html, /x=1&amp;y=2/);
-    assert.match(message.text, /x=1&y=2/);
+    assert.match(message.related, /href="https:\/\/maps\.example\.test\/share\/token\?x=1&amp;y=2"/);
   });
 });
 

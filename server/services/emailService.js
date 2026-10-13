@@ -1,5 +1,10 @@
 import nodemailer from 'nodemailer';
+import { fileURLToPath } from 'node:url';
+import { dirname, resolve } from 'node:path';
 import { env } from '../config/env.js';
+
+const EMAIL_LOGO_PATH = resolve(dirname(fileURLToPath(import.meta.url)), '../../assets/images/gplogo.png');
+const EMAIL_LOGO_CID = 'geoportal-philippines-logo';
 
 const EMAIL_PATTERN = /^[^\s<>@]+@[^\s<>@]+\.[^\s<>@]{2,}$/;
 
@@ -90,18 +95,21 @@ export async function sendShareEmail({ recipientEmail, shareUrl } = {}) {
     auth: { user: configuration.user, pass: configuration.password },
   });
 
-  const text = `Geoportal Philippines Map Composer\n\nA map has been shared with you\n\nA static map output has been shared with you through Geoportal Philippines Map Composer.\n\nView Shared Map:\n${safeShareUrl}\n\nShared maps are static snapshots of the current map composition and cannot be edited by recipients.\n\nGeoportal Philippines\nNational Mapping and Resource Information Authority (NAMRIA)`;
+  const text = `Geoportal Philippines Map Composer\n\nA map has been shared with you\n\nA map output has been shared with you through Geoportal Philippines Map Composer.\n\nView Shared Map\n\nShared maps are static snapshots of the current map composition and cannot be edited by recipients.\n\nGeoportal Philippines\nNational Mapping and Resource Information Authority (NAMRIA)`;
   const htmlUrl = escapeHtml(safeShareUrl);
   const html = `<!doctype html><html><body style="margin:0;padding:0;background-color:#f3f5f7;font-family:Arial,Helvetica,sans-serif;color:#24313d;">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f3f5f7;padding:32px 12px;"><tr><td align="center">
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background-color:#ffffff;border:1px solid #dce2e7;">
-        <tr><td style="padding:24px 32px;border-bottom:1px solid #e5e9ed;font-size:16px;font-weight:bold;color:#174a68;">Geoportal Philippines Map Composer</td></tr>
+        <tr><td bgcolor="#0B1421" style="padding:10px 24px;background-color:#0B1421;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width:100%;"><tr>
+            <td width="44" style="width:44px;padding:0 10px 0 0;vertical-align:middle;"><img src="cid:${EMAIL_LOGO_CID}" width="34" alt="Geoportal Philippines logo" style="display:block;width:34px;height:auto;border:0;"></td>
+            <td style="vertical-align:middle;font-family:Arial,Helvetica,sans-serif;color:#ffffff;font-size:15px;line-height:1.3;font-weight:600;">Geoportal Philippines Map Composer</td>
+          </tr></table>
+        </td></tr>
         <tr><td style="padding:32px;font-size:15px;line-height:1.6;">
-          <h1 style="margin:0 0 16px;font-size:22px;line-height:1.3;color:#183b50;">A map has been shared with you</h1>
-          <p style="margin:0 0 24px;">A static map output has been shared with you through Geoportal Philippines Map Composer.</p>
-          <p style="margin:0 0 24px;"><a href="${htmlUrl}" style="display:inline-block;padding:12px 22px;background-color:#176b87;color:#ffffff;text-decoration:none;font-weight:bold;border-radius:4px;">View Shared Map</a></p>
-          <p style="margin:0 0 8px;font-size:13px;color:#465663;">If the button does not work, open this link:</p>
-          <p style="margin:0 0 24px;font-size:13px;overflow-wrap:anywhere;"><a href="${htmlUrl}" style="color:#145d78;text-decoration:underline;">${htmlUrl}</a></p>
+          <h1 style="margin:0 0 16px;font-size:22px;line-height:1.3;color:#172554;">A map has been shared with you</h1>
+          <p style="margin:0 0 24px;">A map output has been shared with you through Geoportal Philippines Map Composer.</p>
+          <p style="margin:0 0 24px;"><a href="${htmlUrl}" style="display:inline-block;padding:12px 22px;background-color:#2563eb;color:#ffffff;text-decoration:none;font-weight:bold;border-radius:5px;">View Shared Map</a></p>
           <p style="margin:0;font-size:13px;line-height:1.5;color:#465663;">Shared maps are static snapshots of the current map composition and cannot be edited by recipients.</p>
         </td></tr>
         <tr><td style="padding:20px 32px;background-color:#f7f9fa;font-size:13px;line-height:1.5;color:#465663;">Geoportal Philippines<br>National Mapping and Resource Information Authority (NAMRIA)</td></tr>
@@ -116,6 +124,7 @@ export async function sendShareEmail({ recipientEmail, shareUrl } = {}) {
       subject: 'Geoportal Philippines Map Composer - Shared Map',
       text,
       html,
+      attachments: [{ filename: 'gplogo.png', path: EMAIL_LOGO_PATH, cid: EMAIL_LOGO_CID }],
     });
   } catch {
     throw new EmailDeliveryError();
