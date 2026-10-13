@@ -1,0 +1,126 @@
+<!doctype html>
+<html><head><link rel="stylesheet" href="/src/styles/main.css"></head>
+<body><div id="layerList" style="width:248px"></div><button id="outside">Outside</button>
+<div id="mapContainer"></div><div id="annotationPopup" class="active"><textarea id="annotationInput" data-x="1" data-y="2">Keep this annotation</textarea><button id="annotationFontColor" data-vector-color="annotationFontColor" value="#000000" title="Font Color"></button></div>
+<script type="module">
+import { addLayerItem } from '/src/ui/layers-panel.js';
+import { setLayerRecord } from '/src/state/store.js';
+import { bindVectorColorPickers } from '/src/ui/vector-color-picker.js';
+import { bindAnnotationPopupDismissal } from '/src/ui/toolbar.js';
+import ol from '/src/lib/ol.js';
+
+const assert = (condition, message) => { if (!condition) throw new Error(message); };
+const tick = () => new Promise(resolve => setTimeout(resolve, 0));
+window.fixtureReady = Promise.resolve(async () => {
+    let dismissals = 0;
+    bindAnnotationPopupDismissal(() => { dismissals++; document.getElementById('annotationPopup').classList.remove('active'); });
+    bindVectorColorPickers(document, { getColor: trigger => trigger.value, onChange: () => {} });
+    const annotationTrigger = document.getElementById('annotationFontColor');
+    annotationTrigger.click();
+    let annotationPicker = document.querySelector('.vector-color-popup');
+    const annotationHex = annotationPicker.querySelector('.vector-color-hex');
+    annotationHex.value = '#12AB34';
+    annotationHex.dispatchEvent(new Event('input', { bubbles: true }));
+    assert(annotationTrigger.value === '#12AB34', 'HEX selection updates annotation color');
+    annotationPicker.querySelector('.vector-color-hue').dispatchEvent(new Event('input', { bubbles: true }));
+    annotationPicker.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    assert(document.getElementById('annotationPopup').classList.contains('active'), 'Annotation popup stays open while picker popup receives clicks');
+    assert(document.getElementById('annotationInput').value === 'Keep this annotation', 'Annotation text is preserved');
+    assert(document.getElementById('annotationInput').dataset.x === '1' && document.getElementById('annotationInput').dataset.y === '2', 'Placement is preserved');
+    assert(dismissals === 0 && annotationTrigger.value !== '#000000', 'Picker applies color without dismissing parent');
+    document.querySelector('.vector-color-close').click();
+    assert(document.getElementById('annotationPopup').classList.contains('active'), 'Closing picker leaves annotation popup open');
+    const records = {};
+    for (const [name, flag] of [['Point', 'isPointLayer'], ['Polygon', 'isPolygonLayer'], ['Line', 'isLineLayer']]) {
+        const record = { [flag]: true, color: '#2563eb', markerStrokeColor: '#112233', polygonFillColor: '#2563eb', polygonStrokeColor: '#445566', markerStrokeEnabled: true, markerStrokeWidth: 2, polygonStrokeWidth: 3, lineStrokeWidth: 4, pointSize: 8, opacity: 0.6, markerPresetType: 'square', features: [] };
+        record.layer = new ol.layer.Vector({ source: new ol.source.Vector() });
+        records[name] = record;
+        setLayerRecord(name, record);
+        addLayerItem(name, '#FFFFFF', 0);
+    }
+    document.querySelectorAll('.layer-item').forEach(item => item.classList.remove('collapsed'));
+    const triggers = [...document.querySelectorAll('#layerList [data-vector-color]')];
+    assert(triggers.length === 5, 'All five vector controls exist');
+    assert(!document.querySelector('input[type="color"]'), 'No native color picker');
+    assert(!document.querySelector('.vector-color-hex'), 'HEX field only exists in popup');
+    const results = [];
+    for (const [index, trigger] of triggers.entries()) {
+        const name = trigger.closest('.layer-item').querySelector('.layer-name').textContent;
+        const record = records[name];
+        const key = trigger.dataset.vectorColor;
+        const before = { ...record };
+        const revision = record.layer.getRevision();
+        trigger.click();
+        let popup = document.querySelector('.vector-color-popup');
+        const input = popup.querySelector('.vector-color-hex');
+        assert(document.activeElement !== input, 'Opening picker does not force focus into HEX');
+        assert(input.selectionStart === input.selectionEnd, 'HEX is not automatically selected');
+        assert(popup.querySelector('.vector-color-eyedropper + .vector-color-preview + .vector-color-hue'), 'Eyedropper, preview, and hue slider share one row');
+        assert(input.value.toLowerCase() === record[key].toLowerCase(), 'Current record color shown');
+        input.value = 'bad!';
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        assert(input.getAttribute('aria-invalid') === 'true' && record[key] === before[key], 'Invalid HEX cannot change state');
+        const color = `#A${index}B${index}C${index}`;
+        input.value = color;
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        assert(record[key] === color && trigger.value === color, 'Color updates immediately');
+        assert(record.layer.getRevision() > revision && typeof record.layer.getStyle() === 'function', 'Existing map style handler ran');
+        for (const field of ['markerStrokeColor', 'polygonFillColor', 'polygonStrokeColor', 'opacity', 'pointSize', 'markerPresetType', 'markerStrokeWidth', 'polygonStrokeWidth', 'lineStrokeWidth']) {
+            if (field !== key) assert(record[field] === before[field], `Unrelated ${field} preserved`);
+        }
+        popup.querySelector('.vector-color-hue').value = '120';
+        popup.querySelector('.vector-color-hue').dispatchEvent(new Event('input', { bubbles: true }));
+        assert(record[key] !== color, 'Visual slider updates state');
+        const saved = record[key];
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        assert(!document.querySelector('.vector-color-popup') && document.activeElement === trigger, 'Escape closes and restores focus');
+        trigger.click();
+        assert(document.querySelector('.vector-color-hex').value === saved, 'Reopen defaults to current HEX');
+        results.push({ control: `${name} ${key}`, passed: true });
+    }
+    triggers[0].click();
+    assert(document.querySelectorAll('.vector-color-popup').length === 1, 'Only one popup');
+    document.getElementById('outside').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+    assert(!document.querySelector('.vector-color-popup'), 'Outside click closes');
+    triggers[0].click();
+    triggers[0].closest('.layer-item').remove();
+    await tick();
+    assert(!document.querySelector('.vector-color-popup'), 'Removed card cleans up picker');
+    addLayerItem('Point', '#FFFFFF', 0);
+    const refreshed = [...document.querySelectorAll('.layer-item')].find(item => item.querySelector('.layer-name').textContent === 'Point');
+    refreshed.classList.remove('collapsed');
+    const refreshedTrigger = refreshed.querySelector('[data-vector-color="color"]');
+    assert(refreshedTrigger.value === records.Point.color, 'Refreshed card preserves record color');
+    refreshed.querySelector('.marker-stroke-controls').remove();
+    const strokeToggle = refreshed.querySelector('.marker-stroke-enabled');
+    strokeToggle.checked = true;
+    strokeToggle.dispatchEvent(new Event('change', { bubbles: true }));
+    const rebuiltStroke = refreshed.querySelector('[data-vector-color="markerStrokeColor"]');
+    assert(rebuiltStroke.value === records.Point.markerStrokeColor, 'Rebuilt point stroke preserves color');
+    rebuiltStroke.click();
+    const rebuiltInput = document.querySelector('.vector-color-hex');
+    rebuiltInput.value = '#123ABC';
+    rebuiltInput.dispatchEvent(new Event('input', { bubbles: true }));
+    assert(records.Point.markerStrokeColor === '#123ABC', 'Dynamically rebuilt stroke uses shared picker');
+    refreshedTrigger.click();
+    assert(document.querySelectorAll('.vector-color-popup').length === 1, 'Repeated binding has one listener');
+    refreshed.classList.add('collapsed');
+    await tick();
+    assert(!document.querySelector('.vector-color-popup'), 'Hidden card cleans up picker');
+    const root = document.getElementById('layerList');
+    let changes = 0;
+    const handlers = { getColor: trigger => trigger.value, onChange: () => changes++ };
+    bindVectorColorPickers(root, handlers);
+    bindVectorColorPickers(root, handlers);
+    refreshed.classList.remove('collapsed');
+    refreshedTrigger.click();
+    const input = document.querySelector('.vector-color-hex');
+    input.value = '#123abc';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    assert(changes === 1 && refreshedTrigger.value === '#123ABC', 'No duplicate callbacks; valid six digit HEX accepted');
+    root.remove();
+    await tick();
+    assert(!document.querySelector('.vector-color-popup'), 'Removed layer list cleans up picker');
+    return results;
+});
+</script></body></html>

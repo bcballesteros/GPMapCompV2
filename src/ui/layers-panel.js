@@ -3,6 +3,7 @@ import { canZoomToLayer, fitLayerToView, removeManagedLayer, updateManagedLayerS
 import { getLayerRecord, renameLayerRecord, setCurrentLayerName } from '../state/store.js';
 import { syncLabelsToggle } from '../tools/labels-tool.js';
 import { commitLayerOpacity as commitLayerOpacityValue, updateLayerOpacity as updateLayerOpacityValue } from '../tools/transparency-tool.js';
+import { bindVectorColorPickers, colorSwatchMarkup } from './vector-color-picker.js';
 import { showToast } from './toast.js';
 import { syncLabelAttributeControl } from './sidebar.js';
 import { confirmDestructiveAction } from './confirmation-dialog.js';
@@ -815,7 +816,22 @@ export function addLayerItem(name, color, featureCount, options = {}) {
         document._layerGroupToggleListenerAdded = true;
     }
 
+    bindVectorColorPickers(layerList, {
+        getColor: (trigger) => {
+            const record = getLayerRecord(getLayerItemName(trigger.closest('.layer-item')));
+            return record?.[trigger.dataset.vectorColor] || record?.color || trigger.value;
+        },
+        onChange: (trigger) => {
+            const key = trigger.dataset.vectorColor;
+            if (key === 'polygonFillColor') updatePolygonFillColor(trigger);
+            else if (key === 'polygonStrokeColor') updatePolygonStrokeColor(trigger);
+            else if (key === 'markerStrokeColor') updateMarkerStrokeColor(trigger, getLayerItemName(trigger.closest('.layer-item')));
+            else updateLayerColor(trigger);
+        }
+    });
+
     const record = getLayerRecord(name);
+    color = record?.color || color;
     const isWms = Boolean(record?.isWMS) || Boolean(options.isWMS);
     const isGp = Boolean(options.isGP || record?.isGP);
     const isPointLayer = Boolean(record?.isPointLayer);
@@ -851,7 +867,7 @@ export function addLayerItem(name, color, featureCount, options = {}) {
             <div class="control-row">
                 <label>
                     <span>Point Color</span>
-                    <input type="color" class="color-picker" value="${color}" onchange="updateLayerColor(this)">
+                    ${colorSwatchMarkup('color', 'Point Color', color, 'color-picker')}
                 </label>
             </div>
         `;
@@ -931,7 +947,7 @@ export function addLayerItem(name, color, featureCount, options = {}) {
                         <div class="marker-stroke-color-row">
                             <label>
                                 <span class="marker-stroke-color-label">Stroke Color</span>
-                                <input type="color" class="marker-stroke-color-picker" value="${markerStrokeColor}">
+                                ${colorSwatchMarkup('markerStrokeColor', 'Stroke Color', markerStrokeColor, 'marker-stroke-color-picker')}
                             </label>
                         </div>
                         <div class="marker-stroke-width-row">
@@ -962,7 +978,7 @@ export function addLayerItem(name, color, featureCount, options = {}) {
             <div class="control-row">
                 <label>
                     <span>Line Color</span>
-                    <input type="color" class="color-picker" value="${color}" onchange="updateLayerColor(this)">
+                    ${colorSwatchMarkup('color', 'Line Color', color, 'color-picker')}
                 </label>
             </div>
         `;
@@ -992,13 +1008,13 @@ export function addLayerItem(name, color, featureCount, options = {}) {
             <div class="control-row">
                 <label>
                     <span>Fill Color</span>
-                    <input type="color" class="color-picker polygon-fill-picker" value="${polygonFillColor}">
+                    ${colorSwatchMarkup('polygonFillColor', 'Fill Color', polygonFillColor, 'color-picker polygon-fill-picker')}
                 </label>
             </div>
             <div class="control-row">
                 <label>
                     <span>Stroke Color</span>
-                    <input type="color" class="color-picker polygon-stroke-picker" value="${polygonStrokeColor}">
+                    ${colorSwatchMarkup('polygonStrokeColor', 'Stroke Color', polygonStrokeColor, 'color-picker polygon-stroke-picker')}
                 </label>
             </div>
             <div class="control-row control-row-stack polygon-width-row">
@@ -1138,9 +1154,6 @@ export function addLayerItem(name, color, featureCount, options = {}) {
         });
     }
     const checkbox = newItem.querySelector('.layer-toggle');
-    const colorPicker = newItem.querySelector('.color-picker:not(.polygon-fill-picker):not(.polygon-stroke-picker)');
-    const polygonFillPicker = newItem.querySelector('.polygon-fill-picker');
-    const polygonStrokePicker = newItem.querySelector('.polygon-stroke-picker');
     const opacitySlider = newItem.querySelector('.transparency-slider');
     const pointSizeSlider = newItem.querySelector('.point-size-slider');
     const lineWidthSlider = newItem.querySelector('.line-width-slider');
@@ -1149,7 +1162,6 @@ export function addLayerItem(name, color, featureCount, options = {}) {
     const svgMarkerUploadButton = newItem.querySelector('.svg-marker-upload-button');
     const markerPresetButtons = newItem.querySelectorAll('.marker-preset-btn');
     const markerStrokeEnabledCheckbox = newItem.querySelector('.marker-stroke-enabled');
-    const markerStrokeColorPicker = newItem.querySelector('.marker-stroke-color-picker');
     const markerStrokeWidthSlider = newItem.querySelector('.marker-stroke-width-slider');
     const layerActionsMenu = newItem.querySelector('.layer-actions-menu');
     const layerActionsTrigger = newItem.querySelector('.layer-actions-trigger');
@@ -1164,24 +1176,6 @@ export function addLayerItem(name, color, featureCount, options = {}) {
             record.layer.setVisible(event.target.checked);
         }
     });
-
-    if (colorPicker) {
-        colorPicker.addEventListener('pointerdown', (event) => event.stopPropagation());
-        colorPicker.addEventListener('click', (event) => event.stopPropagation());
-        colorPicker.addEventListener('input', () => updateLayerColor(colorPicker));
-    }
-
-    if (polygonFillPicker) {
-        polygonFillPicker.addEventListener('pointerdown', (event) => event.stopPropagation());
-        polygonFillPicker.addEventListener('click', (event) => event.stopPropagation());
-        polygonFillPicker.addEventListener('input', () => updatePolygonFillColor(polygonFillPicker));
-    }
-
-    if (polygonStrokePicker) {
-        polygonStrokePicker.addEventListener('pointerdown', (event) => event.stopPropagation());
-        polygonStrokePicker.addEventListener('click', (event) => event.stopPropagation());
-        polygonStrokePicker.addEventListener('input', () => updatePolygonStrokeColor(polygonStrokePicker));
-    }
 
     if (opacitySlider) {
         const commitOpacity = () => commitLayerOpacityValue(opacitySlider);
@@ -1382,13 +1376,6 @@ export function addLayerItem(name, color, featureCount, options = {}) {
         markerStrokeEnabledCheckbox.addEventListener('pointerdown', (event) => event.stopPropagation());
         markerStrokeEnabledCheckbox.addEventListener('click', (event) => event.stopPropagation());
         markerStrokeEnabledCheckbox.addEventListener('change', () => updateMarkerStrokeEnabled(markerStrokeEnabledCheckbox, name, newItem));
-    }
-
-    // Marker stroke color picker
-    if (markerStrokeColorPicker) {
-        markerStrokeColorPicker.addEventListener('pointerdown', (event) => event.stopPropagation());
-        markerStrokeColorPicker.addEventListener('click', (event) => event.stopPropagation());
-        markerStrokeColorPicker.addEventListener('input', () => updateMarkerStrokeColor(markerStrokeColorPicker, name));
     }
 
     // Marker stroke width slider
@@ -1648,7 +1635,7 @@ function updateMarkerStrokeEnabled(checkbox, layerName, layerItem) {
                     <div class="marker-stroke-color-row">
                         <label>
                             <span class="marker-stroke-color-label">Stroke Color</span>
-                            <input type="color" class="marker-stroke-color-picker" value="${record.markerStrokeColor}">
+                            ${colorSwatchMarkup('markerStrokeColor', 'Stroke Color', record.markerStrokeColor || record.color, 'marker-stroke-color-picker')}
                         </label>
                     </div>
                     <div class="marker-stroke-width-row">
@@ -1674,19 +1661,12 @@ function updateMarkerStrokeEnabled(checkbox, layerName, layerItem) {
 
             // Re-attach event listeners for the new elements
             const newCheckbox = strokeSection.querySelector('.marker-stroke-enabled');
-            const newColorPicker = strokeSection.querySelector('.marker-stroke-color-picker');
             const newWidthSlider = strokeSection.querySelector('.marker-stroke-width-slider');
 
             if (newCheckbox) {
                 newCheckbox.addEventListener('pointerdown', (event) => event.stopPropagation());
                 newCheckbox.addEventListener('click', (event) => event.stopPropagation());
                 newCheckbox.addEventListener('change', () => updateMarkerStrokeEnabled(newCheckbox, layerName, layerItem));
-            }
-
-            if (newColorPicker) {
-                newColorPicker.addEventListener('pointerdown', (event) => event.stopPropagation());
-                newColorPicker.addEventListener('click', (event) => event.stopPropagation());
-                newColorPicker.addEventListener('input', () => updateMarkerStrokeColor(newColorPicker, layerName));
             }
 
             if (newWidthSlider) {

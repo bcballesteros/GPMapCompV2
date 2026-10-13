@@ -5,6 +5,9 @@ import { getLayerRecord, getMap, getState, removeLayerRecord, setAnnotationMode,
 import { toggleSelectedLayerLabels } from './labels-tool.js';
 import { showToast } from '../ui/toast.js';
 import { confirmDestructiveAction } from '../ui/confirmation-dialog.js';
+import { bindVectorColorPickers, normalizeHex } from '../ui/vector-color-picker.js';
+
+bindVectorColorPickers(document, { getColor: (trigger) => trigger.value, onChange: () => {} });
 
 let annotationMode = false;
 let annotationClickListener = null;
@@ -2093,7 +2096,7 @@ export function editAnnotation(feature) {
             </div>
             <div class="annotation-edit-field">
                 <label class="annotation-edit-label" for="editAnnotationFontColor">Color</label>
-                <input type="color" id="editAnnotationFontColor" class="annotation-edit-color" value="${fontColor}">
+                <button type="button" id="editAnnotationFontColor" class="vector-color-swatch color-picker annotation-edit-color" data-vector-color="editAnnotationFontColor" value="${normalizeHex(fontColor) || '#000000'}" style="background-color:${normalizeHex(fontColor) || '#000000'}" aria-label="Font color, ${normalizeHex(fontColor) || '#000000'}" aria-haspopup="dialog" aria-expanded="false" title="Font Color"></button>
             </div>
         </div>
         <div class="annotation-edit-actions">
@@ -2112,7 +2115,7 @@ export function editAnnotation(feature) {
     document.getElementById('editSaveBtn').onclick = () => {
         const newText = document.getElementById('editAnnotationText').value.trim();
         const newFontSize = parseInt(document.getElementById('editAnnotationFontSize').value, 10) || 12;
-        const newFontColor = document.getElementById('editAnnotationFontColor').value;
+        const newFontColor = document.getElementById('editAnnotationFontColor').value || '#000000';
 
         if (!newText) {
             showToast('Annotation Required', 'Enter some text for the annotation.', 'warning');
@@ -2133,6 +2136,11 @@ export function editAnnotation(feature) {
         backdrop.remove();
         editPopup.remove();
     };
+
+    backdrop.addEventListener('click', () => {
+        backdrop.remove();
+        editPopup.remove();
+    }, { once: true });
 }
 
 export async function deleteAnnotation(feature) {

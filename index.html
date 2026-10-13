@@ -612,7 +612,7 @@
             </div>
             <div style="display: flex; align-items: center; gap: 8px;">
                 <label style="font-size: 12px; font-weight: 600; color: var(--gray-600);">Color:</label>
-                <input type="color" id="annotationFontColor" class="form-input" value="#000000" style="width: 50px; height: 36px; padding: 2px; cursor: pointer;">
+                <button type="button" id="annotationFontColor" class="vector-color-swatch color-picker" data-vector-color="annotationFontColor" value="#000000" style="background-color: #000000" aria-label="Font color, #000000" aria-haspopup="dialog" aria-expanded="false" title="Font Color"></button>
             </div>
         </div>
         <textarea id="annotationInput" class="annotation-input" placeholder="Enter your annotation text..."></textarea>
@@ -731,7 +731,7 @@
 
                 <div class="form-group">
                     <div class="form-label">Layer Color</div>
-                    <input type="color" class="form-input" value="#2563eb" id="layerColor" style="height: 44px; cursor: pointer;">
+                    <button type="button" class="vector-color-swatch color-picker" value="#2563eb" id="layerColor" data-vector-color="layerColor" style="background-color: #2563eb" aria-label="Layer color, #2563eb" aria-haspopup="dialog" aria-expanded="false" title="Layer Color"></button>
                 </div>
 
                 <div id="uploadProgress" style="display: none;">
