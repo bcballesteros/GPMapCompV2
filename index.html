@@ -834,9 +834,11 @@
                 </section>
                 <div class="share-controls-grid">
                     <div class="form-group share-recipient-group">
-                        <label class="form-label" for="recipientEmail">Recipient Email</label>
-                        <input class="form-input" id="recipientEmail" name="recipientEmail" type="email" placeholder="recipient@example.com" autocomplete="email" required aria-describedby="recipientEmailHelp shareFeedback">
-                        <div class="form-help" id="recipientEmailHelp">The recipient will receive a link to the shared map.</div>
+                        <label class="form-label" for="recipientEmail">Recipient Emails</label>
+                        <div class="form-input recipient-chips" id="recipientChips" role="group" aria-label="Recipient Emails">
+                            <input id="recipientEmail" type="text" inputmode="email" placeholder="recipient@example.com" autocomplete="email" aria-describedby="recipientEmailHelp shareFeedback">
+                        </div>
+                        <div class="form-help" id="recipientEmailHelp">Press Enter or comma to add. Double-click a chip to edit. Use × to remove. Each recipient receives an individual link.</div>
                     </div>
                     <div class="form-group share-format-group">
                         <label class="form-label" for="shareFormat">Share Format</label>
@@ -850,7 +852,7 @@
                         </div>
                     </div>
                 </div>
-                <div id="shareFeedback" class="inline-feedback" data-state="neutral" aria-live="polite"></div>
+                <div id="shareFeedback" class="inline-feedback" data-state="neutral" role="status" aria-live="polite" aria-atomic="true"></div>
                 <div class="disclaimer-box share-disclaimer">
                     <i class="fas fa-info-circle"></i> Shared maps are static snapshots of the current map composition and cannot be edited by recipients.
                 </div>

@@ -142,6 +142,7 @@ test('invalid SMTP port and sender address fail configuration validation', () =>
 
 test('recipient and share URL are rejected before SMTP delivery', async () => {
   await assert.rejects(sendShareEmail({ recipientEmail: 'bad', shareUrl: 'https://example.test/share/x' }), EmailDeliveryError);
+  await assert.rejects(sendShareEmail({ recipientEmail: 'a..b@example.com', shareUrl: 'https://example.test/share/x' }), EmailDeliveryError);
   for (const shareUrl of ['bad-url', 'javascript:alert(1)', 'data:text/plain,x', 'file:///tmp/map']) {
     await assert.rejects(sendShareEmail({ recipientEmail: 'recipient@example.test', shareUrl }), EmailDeliveryError);
   }

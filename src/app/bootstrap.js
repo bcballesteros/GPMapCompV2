@@ -1,5 +1,5 @@
 import { activateAnnotation, activateDrawing, activateMeasureArea, activateMeasureDistance, bindAnnotationControls, bindAnnotationVisibilityToggle, cancelAnnotation, clearAnnotations, clearDrawings, clearMeasurements, deleteAnnotation, deleteSelectedDrawing, deleteSelectedMeasurement, editAnnotation, getSelectedAnnotationMode, initializeAnnotationInteractions, initializeDrawingSelectionControls, initializeMeasurementControls, selectAnnotationForDeletion, submitAnnotation } from '../tools/annotation-tool.js';
-import { downloadMap, renderMapPreview, sendMap, updateExportFormatLabel } from '../tools/export-share.js';
+import { downloadMap, initializeShareRecipients, renderMapPreview, sendMap, updateExportFormatLabel } from '../tools/export-share.js';
 import { initializeMap } from '../map/map-init.js';
 import { changeBasemapLayer } from '../map/layer-manager.js';
 import { clearCsvSelection, clearFileSelection, clearGeoJSONSelection, clearKmlSelection, fetchGpLayersFromForm, fetchWmsCapabilitiesFromForm, handleCsvSelect, handleFileSelect, handleGeoJSONSelect, handleKmlSelect, initializeGpLayerForm, initializeUploadForm, initializeWmsLayerForm, submitUpload, updateDataSection } from '../tools/upload-tool.js';
@@ -107,6 +107,7 @@ function bindGlobalHandlers() {
     window.updateExportFormatLabel = updateExportFormatLabel;
     window.renderMapPreview = renderMapPreview;
     window.sendMap = sendMap;
+    initializeShareRecipients();
     window.openFeatureSaveDialog = openFeatureSaveDialog;
     window.saveSelectedFeatures = saveSelectedFeatures;
     window.loadFeaturesFromFile = loadFeaturesFromFile;

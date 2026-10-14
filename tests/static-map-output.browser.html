@@ -1,7 +1,7 @@
 <!doctype html>
 <html>
 <body>
-<form id="shareForm"><input id="recipientEmail" type="email" value="recipient@example.test"><select id="shareFormat"><option value="png">PNG</option></select><button id="sendShareBtn"></button></form>
+<form id="shareForm"><div id="recipientChips"><input id="recipientEmail" type="text" value="recipient@example.test"></div><select id="shareFormat"><option value="png">PNG</option></select><button id="sendShareBtn"></button></form>
 <div id="shareFeedback"></div><button id="downloadBtn"></button><div id="toastContainer"></div>
 <script>window.fixtureReady = new Promise(resolve => { window.resolveFixture = resolve; });</script>
 <script type="module">
@@ -62,6 +62,7 @@ async function runCase({ name, source = createBasemapSource('namria'), failures 
     let output = null;
     try {
         if (share) {
+            document.getElementById('recipientEmail').value = 'recipient@example.test';
             check(await sendMap() === !persistent, 'Incorrect Share result');
         } else if (download) {
             await downloadMap();

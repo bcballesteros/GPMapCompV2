@@ -1,10 +1,16 @@
-import { processShare, ShareRequestError } from '../services/shareService.js';
+import { processShare, ShareDeliveryFailureError, ShareRequestError } from '../services/shareService.js';
 import { ShareConfigurationError } from '../services/shareTokenService.js';
 import { EmailConfigurationError, EmailDeliveryError } from '../services/emailService.js';
 
 export async function handleCreateShare(req, res, shareProcessor) {
   try {
-    await shareProcessor(req.body);
+    const result = await shareProcessor(req.body);
+    if (result) {
+      if (result.failedCount > 0) {
+        return res.status(207).json({ success: false, partial: true, ...result });
+      }
+      return res.status(201).json({ success: true, ...result });
+    }
     return res.status(201).json({ success: true, message: 'Map shared successfully.' });
   } catch (error) {
     if (error instanceof ShareConfigurationError) {
@@ -31,6 +37,16 @@ export async function handleCreateShare(req, res, shareProcessor) {
       return res.status(500).json({
         success: false,
         error: { code: 'EMAIL_DELIVERY_FAILED', message: 'Unable to send the shared map.' },
+      });
+    }
+    if (error instanceof ShareDeliveryFailureError) {
+      console.error('Share email delivery failed.');
+      return res.status(500).json({
+        success: false,
+        error: { code: 'EMAIL_DELIVERY_FAILED', message: 'Unable to send the shared map.' },
+        sentCount: 0,
+        failedCount: error.results.length,
+        results: error.results,
       });
     }
 

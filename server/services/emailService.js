@@ -2,11 +2,11 @@ import nodemailer from 'nodemailer';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { env } from '../config/env.js';
+import { normalizeAndValidateEmail } from '../../src/services/email-validation.js';
 
 const EMAIL_LOGO_PATH = resolve(dirname(fileURLToPath(import.meta.url)), '../../assets/images/gplogo.png');
 const EMAIL_LOGO_CID = 'geoportal-philippines-logo';
 
-const EMAIL_PATTERN = /^[^\s<>@]+@[^\s<>@]+\.[^\s<>@]{2,}$/;
 
 export class EmailConfigurationError extends Error {
   constructor() {
@@ -24,8 +24,8 @@ export class EmailDeliveryError extends Error {
 
 function requireEmail(value, ErrorType = EmailConfigurationError) {
   if (typeof value !== 'string') throw new ErrorType();
-  const email = value.trim();
-  if (email.length > 254 || !EMAIL_PATTERN.test(email)) throw new ErrorType();
+  const email = normalizeAndValidateEmail(value);
+  if (email === null) throw new ErrorType();
   return email;
 }
 

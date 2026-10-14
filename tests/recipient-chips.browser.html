@@ -1,0 +1,130 @@
+<!doctype html>
+<html><head><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="/src/styles/main.css"></head><body>
+<script>window.fixtureReady = new Promise(resolve => { window.resolveFixture = resolve; });</script>
+<script type="module">
+import { createRecipientChips } from '/src/ui/recipient-chips.js';
+import { initializeShareRecipients, sendMap } from '/src/tools/export-share.js';
+import { setMap } from '/src/state/store.js';
+import ol from '/src/lib/ol.js';
+
+const results = [];
+function check(value, message) { if (!value) throw new Error(message); }
+function pass(name) { results.push(name); }
+function key(input, value) {
+    const event = new KeyboardEvent('keydown', { key: value, bubbles: true, cancelable: true });
+    input.dispatchEvent(event);
+    return event;
+}
+function setup() {
+    const container = document.createElement('div');
+    container.className = 'recipient-chips form-input';
+    const input = document.createElement('input');
+    container.append(input); document.body.append(container);
+    let feedback = '';
+    const api = createRecipientChips({ container, input, onFeedback: message => { feedback = message; } });
+    const add = (email, delimiter = 'Enter') => { input.value = email; return key(input, delimiter); };
+    const paste = text => {
+        const data = new DataTransfer(); data.setData('text', text);
+        input.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }));
+    };
+    return { container, input, api, add, paste, feedback: () => feedback,
+        chips: () => container.querySelectorAll('.recipient-chip'),
+        edit: () => { container.querySelector('.recipient-chip-label').dispatchEvent(new MouseEvent('dblclick', { bubbles: true })); return container.querySelector('.recipient-chip-editor'); }
+    };
+}
+
+window.resolveFixture(async () => {
+    let f = setup();
+    check(f.input.placeholder === 'recipient@example.com', 'Empty placeholder');
+    check(f.add('a@example.com').defaultPrevented && f.chips().length === 1, 'Enter must add without submitting'); pass('Enter');
+    check(f.input.placeholder === '', 'Placeholder hidden with recipient'); pass('Placeholder after one');
+    f.add('b@example.com', ','); check(f.chips().length === 2, 'Comma'); pass('Comma');
+    check(f.input.placeholder === '', 'Placeholder stays hidden with multiple'); pass('Placeholder after multiple');
+    f.paste('c@example.com; d@example.com\ne@example.com'); check(f.chips().length === 5, 'Paste separators');
+    check(f.input.placeholder === '', 'Placeholder stays hidden after paste'); pass('Paste and five recipients');
+    f.add('six@example.com'); check(f.chips().length === 5 && f.feedback().includes('up to 5'), 'Sixth recipient'); pass('Sixth rejected');
+    f.input.value = ''; f.container.querySelector('.recipient-chip-remove').click(); check(f.chips().length === 4, 'Remove'); pass('Remove');
+    f.add('B@example.com'); check(f.feedback().includes('Duplicate') && f.chips().length === 4, 'Duplicate'); pass('Case insensitive duplicate');
+    f.input.value = ''; key(f.input, 'Backspace'); check(f.chips().length === 3, 'Backspace'); pass('Backspace');
+    let editor = f.edit(); editor.value = 'edited@example.com'; key(editor, 'Enter');
+    check(f.api.getRecipients()[0] === 'edited@example.com', 'Edit Enter'); pass('Edit Enter');
+    editor = f.edit(); editor.value = 'discard@example.com'; key(editor, 'Escape');
+    check(f.api.getRecipients()[0] === 'edited@example.com', 'Escape'); pass('Escape');
+    editor = f.edit(); editor.value = 'blur@example.com'; f.input.focus();
+    check(f.api.getRecipients()[0] === 'blur@example.com', 'Blur edit'); pass('Blur edit');
+    editor = f.edit(); editor.value = 'bad'; f.input.focus();
+    check(f.api.getRecipients() === null && f.container.querySelector('.recipient-chip-editor').value === 'bad', 'Invalid edit retained'); pass('Invalid edit');
+    key(editor, 'Escape');
+    editor = f.edit(); editor.value = 'C@example.com'; key(editor, 'Enter'); check(f.feedback().includes('Duplicate'), 'Duplicate edit'); key(editor, 'Escape'); pass('Duplicate edit');
+    f.container.remove(); f = setup();
+    f.add('only@example.com'); f.container.querySelector('.recipient-chip-remove').click();
+    check(f.chips().length === 0 && f.input.placeholder === 'recipient@example.com', 'Placeholder restored after all removed'); pass('Placeholder restored');
+    f.paste('good@example.com bad'); check(f.chips().length === 0 && f.input.value.includes('bad') && f.api.getRecipients() === null, 'Atomic invalid paste'); pass('Atomic invalid paste');
+    f.input.value = ''; f.paste(Array.from({ length: 6 }, (_, i) => `a${i}@example.com`).join(' '));
+    check(f.chips().length === 0 && f.input.value.includes('a5@') && f.feedback().includes('up to 5'), 'Atomic excessive paste'); pass('Atomic excessive paste');
+    f.input.value = ''; f.paste('a@example.com A@example.com'); check(f.chips().length === 0 && f.feedback().includes('Duplicate'), 'Atomic duplicate paste'); pass('Atomic duplicate paste');
+    f.input.value = ''; check(f.api.getRecipients() === null, 'Empty'); pass('Empty');
+    f.input.value = ' unfinished@example.com '; check(f.api.getRecipients()[0] === 'unfinished@example.com', 'Unfinished'); pass('Unfinished address');
+    check(f.container.querySelector('button').getAttribute('aria-label').includes('unfinished@example.com'), 'Accessible remove'); pass('Accessible remove');
+    f.container.remove();
+
+    // Use the production modal markup and renderer; mock only the Share HTTP request.
+    const html = new DOMParser().parseFromString(await (await fetch('/index.html')).text(), 'text/html');
+    const modal = html.getElementById('shareModal'); document.body.append(modal); modal.classList.add('active', 'visible');
+    const api = initializeShareRecipients();
+    const input = document.getElementById('recipientEmail');
+    const format = document.getElementById('shareFormat');
+    const feedback = () => document.getElementById('shareFeedback').textContent;
+    const map = new ol.Map({ controls: [], interactions: [], layers: [new ol.layer.Vector({
+        source: new ol.source.Vector({ features: [new ol.Feature(new ol.geom.Point([0, 0]))] })
+    })], view: new ol.View({ center: [0, 0], zoom: 5 }) });
+    map.setSize([800, 600]); setMap(map);
+    const originalFetch = window.fetch;
+    const requests = [];
+    let status = 207;
+    window.fetch = async (url, options) => {
+        check(url === '/api/share', 'Unexpected request');
+        const body = JSON.parse(options.body); requests.push(body);
+        check(!('recipientEmail' in body) && body.imageData.length > 100, 'Array API and generated output');
+        const results = body.recipientEmails.map((email, i) => ({ email, status: status === 500 || status === 207 && i === 1 ? 'failed' : 'sent' }));
+        return { ok: status < 400, status, json: async () => ({ success: status === 201, partial: status === 207,
+            sentCount: results.filter(r => r.status === 'sent').length, failedCount: results.filter(r => r.status === 'failed').length, results }) };
+    };
+    try {
+        input.value = 'a@example.com b@example.com c@example.com';
+        window.__GP_PREVIEW_DEBUG__ = [];
+        const pending = sendMap(); check(await sendMap() === false, 'Duplicate pending');
+        check(input.disabled && format.disabled, 'Pending lock');
+        check(await pending === false && requests.length === 1, 'Partial result');
+        check(feedback() === 'Map shared with 2 of 3 recipients. Failed: b@example.com.', 'Partial feedback');
+        check(JSON.stringify(api.getRecipients()) === JSON.stringify(['b@example.com']), 'Only failures retained');
+        check(window.__GP_PREVIEW_DEBUG__.filter(e => e.event === 'static-output:capture').length === 1, 'Generate once');
+        pass('Partial delivery, generate once, pending lock, duplicate submission');
+        status = 201; format.value = 'jpeg';
+        check(await sendMap() && requests[1].recipientEmails.length === 1 && requests[1].recipientEmails[0] === 'b@example.com', 'Retry only failure');
+        check(feedback() === 'Map shared successfully with 1 recipient.' && requests[1].format === 'jpeg', 'Single JPEG success'); pass('Manual retry and JPEG');
+        status = 500; input.value = 'failed@example.com'; format.value = 'pdf';
+        check(await sendMap() === false && feedback().includes('Unable to share'), 'Complete failure');
+        check(api.getRecipients()[0] === 'failed@example.com' && requests[2].format === 'pdf', 'PDF failure retained'); pass('Complete failure and PDF');
+        status = 201; input.value = 'second@example.com';
+        check(await sendMap() && feedback() === 'Map shared successfully with 2 recipients.', 'Multiple full success'); pass('Full multiple success');
+        check(await sendMap() === false && requests.length === 4 && feedback().includes('at least one'), 'Empty prevents request'); pass('Empty prevents request');
+
+        for (const width of [640, 320, 260]) {
+            modal.querySelector('.modal').style.width = `${width}px`;
+            const grid = modal.querySelector('.share-controls-grid');
+            const recipient = modal.querySelector('.share-recipient-group').getBoundingClientRect();
+            const select = modal.querySelector('.share-format-group').getBoundingClientRect();
+            check(Math.abs(recipient.top - select.top) < 1 && select.left > recipient.left, 'Two top-aligned columns');
+            check(getComputedStyle(grid).gridTemplateColumns.split(' ').length === 2, 'Two responsive columns');
+        }
+        pass('Responsive layout');
+        input.value = Array.from({ length: 5 }, (_, i) => `${'long'.repeat(15)}${i}@example.com`).join(' ');
+        check(api.getRecipients()?.length === 5, 'Long addresses');
+        const field = document.getElementById('recipientChips');
+        check(field.clientHeight <= 132 && field.scrollHeight > field.clientHeight, 'Bounded scrolling');
+        check(field.scrollWidth <= field.clientWidth + 1, 'No horizontal overflow'); pass('Chip overflow');
+    } finally { window.fetch = originalFetch; map.dispose(); }
+    return results;
+});
+</script></body></html>

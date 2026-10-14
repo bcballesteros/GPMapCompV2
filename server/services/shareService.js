@@ -1,17 +1,26 @@
-import { createMapComposerRecord, getMapComposerRecordById } from '../repositories/mapComposerRepository.js';
+import { createMapComposerRecord, createMapComposerRecords, getMapComposerRecordById } from '../repositories/mapComposerRepository.js';
 import { SHARE_MAX_FILE_BYTES } from '../config/share.js';
 import { detectShareOutputFormat, SHARE_OUTPUT_TYPES } from './shareOutputFormat.js';
 import { buildShareUrl, createShareToken, parseShareToken, validateShareLinkConfiguration } from './shareTokenService.js';
 import { sendShareEmail, validateEmailConfiguration } from './emailService.js';
+import { normalizeAndValidateEmail } from '../../src/services/email-validation.js';
 
 const SUPPORTED_FORMATS = new Set(['png', 'jpeg', 'pdf']);
 const BASE64_PATTERN = /^[A-Za-z0-9+/]*={0,2}$/;
+const MAX_RECIPIENTS = 5;
 
 export class ShareRequestError extends Error {
   constructor(status, code, message) {
     super(message);
     this.status = status;
     this.code = code;
+  }
+}
+
+export class ShareDeliveryFailureError extends Error {
+  constructor(results) {
+    super('Unable to send the shared map.');
+    this.results = results;
   }
 }
 
@@ -24,9 +33,8 @@ function validateEmail(value) {
     throw invalidRequest();
   }
 
-  const email = value.trim();
-  const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
-  if (email.length > 255 || !emailPattern.test(email)) {
+  const email = normalizeAndValidateEmail(value);
+  if (email === null) {
     throw new ShareRequestError(400, 'INVALID_EMAIL', 'Enter a valid recipient email address.');
   }
 
@@ -74,7 +82,32 @@ export async function processShare(body, dependencies = {}) {
     throw invalidRequest();
   }
 
-  const email = validateEmail(body.recipientEmail);
+  const hasSingle = Object.hasOwn(body, 'recipientEmail');
+  const hasMultiple = Object.hasOwn(body, 'recipientEmails');
+  if (hasSingle && hasMultiple) throw invalidRequest();
+  const multiple = hasMultiple;
+  let recipients;
+  if (multiple) {
+    if (!Array.isArray(body.recipientEmails)) throw invalidRequest();
+    if (body.recipientEmails.length > MAX_RECIPIENTS) {
+      throw new ShareRequestError(400, 'TOO_MANY_RECIPIENTS', 'You can share a map with up to 5 recipients at a time.');
+    }
+    if (body.recipientEmails.length === 0) {
+      throw new ShareRequestError(400, 'INVALID_EMAIL', 'Enter at least one recipient email address.');
+    }
+    recipients = body.recipientEmails.map(validateEmail);
+    const seen = new Set();
+    for (const email of recipients) {
+      const normalized = email.toLowerCase();
+      if (seen.has(normalized)) {
+        throw new ShareRequestError(400, 'DUPLICATE_RECIPIENT', 'Recipient email addresses must be unique.');
+      }
+      seen.add(normalized);
+    }
+  } else {
+    recipients = [validateEmail(body.recipientEmail)];
+  }
+  const email = recipients[0];
   const format = validateFormat(body.format);
   const imageData = decodeBase64(body.imageData);
   const actualFormat = detectShareOutputFormat(imageData);
@@ -89,15 +122,36 @@ export async function processShare(body, dependencies = {}) {
   const checkShareConfiguration = dependencies.validateShareLinkConfiguration ?? validateShareLinkConfiguration;
   const checkEmailConfiguration = dependencies.validateEmailConfiguration ?? validateEmailConfiguration;
   const storeRecord = dependencies.createMapComposerRecord ?? createMapComposerRecord;
+  const storeRecords = dependencies.createMapComposerRecords ?? createMapComposerRecords;
   const makeToken = dependencies.createShareToken ?? createShareToken;
   const makeUrl = dependencies.buildShareUrl ?? buildShareUrl;
   const deliverEmail = dependencies.sendShareEmail ?? sendShareEmail;
 
   checkShareConfiguration();
   checkEmailConfiguration();
-  const record = await storeRecord({ email, imageData });
-  const shareUrl = makeUrl(makeToken(record.id));
-  await deliverEmail({ recipientEmail: email, shareUrl });
+  if (!multiple) {
+    const record = await storeRecord({ email, imageData });
+    const shareUrl = makeUrl(makeToken(record.id));
+    await deliverEmail({ recipientEmail: email, shareUrl });
+    return;
+  }
+
+  const records = await storeRecords(recipients.map((recipientEmail) => ({ email: recipientEmail, imageData })));
+  const results = [];
+  // A timeout or disconnect can leave SMTP acceptance uncertain; this flow never retries automatically.
+  for (let index = 0; index < recipients.length; index += 1) {
+    try {
+      const shareUrl = makeUrl(makeToken(records[index].id));
+      await deliverEmail({ recipientEmail: recipients[index], shareUrl });
+      results.push({ email: recipients[index], status: 'sent' });
+    } catch {
+      results.push({ email: recipients[index], status: 'failed' });
+    }
+  }
+  const sentCount = results.filter((item) => item.status === 'sent').length;
+  const result = { sentCount, failedCount: results.length - sentCount, results };
+  if (sentCount === 0) throw new ShareDeliveryFailureError(results);
+  return result;
 }
 
 export class SharedMapNotFoundError extends Error {

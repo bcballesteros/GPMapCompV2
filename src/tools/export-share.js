@@ -5,6 +5,8 @@ import { closeModal } from '../ui/modal.js';
 import { showToast } from '../ui/toast.js';
 import ol from '../lib/ol.js';
 import northArrowUrl from '../assets/north-arrow.svg';
+import { createRecipientChips } from '../ui/recipient-chips.js';
+import { getShareDeliveryResult } from '../services/share-delivery-result.js';
 
 const EXPORT_LONG_EDGE_PX = 2560;
 const EXPORT_MAX_PIXEL_AREA = 12000000;
@@ -19,7 +21,7 @@ let previewListenersBound = false;
 let previewDebugSequence = 0;
 const shareState = {
     selectedFormat: 'png',
-    recipientEmail: '',
+    recipientEmails: [],
     pending: false,
     success: false,
     error: null
@@ -1247,28 +1249,34 @@ function blobToBase64(blob) {
     });
 }
 
+let shareRecipients = null;
+export function initializeShareRecipients() {
+    if (shareRecipients) return shareRecipients;
+    const input = document.getElementById('recipientEmail');
+    const container = document.getElementById('recipientChips');
+    if (!input || !container) return null;
+    shareRecipients = createRecipientChips({
+        container, input,
+        onFeedback: message => setShareFeedback(message, message ? 'warning' : 'neutral')
+    });
+    return shareRecipients;
+}
+
 export async function sendMap(event) {
     event?.preventDefault();
 
-    const form = document.getElementById('shareForm');
-    const emailInput = document.getElementById('recipientEmail');
+    if (shareState.pending) return false;
+    const recipients = initializeShareRecipients();
     const formatInput = document.getElementById('shareFormat');
     const sendButton = document.getElementById('sendShareBtn');
 
-    if (!form || !emailInput || !formatInput || !sendButton) {
+    if (!recipients || !formatInput || !sendButton) {
         return false;
     }
 
-    if (!form.checkValidity()) {
-        form?.reportValidity();
-        return false;
-    }
-
-    if (shareState.pending) {
-        return false;
-    }
-
-    shareState.recipientEmail = emailInput.value.trim();
+    const recipientEmails = recipients.getRecipients();
+    if (!recipientEmails) return false;
+    shareState.recipientEmails = recipientEmails;
     shareState.selectedFormat = formatInput.value;
     shareState.success = false;
     shareState.error = null;
@@ -1283,7 +1291,7 @@ export async function sendMap(event) {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                recipientEmail: shareState.recipientEmail,
+                recipientEmails,
                 format,
                 imageData
             })
@@ -1296,16 +1304,10 @@ export async function sendMap(event) {
             result = null;
         }
 
-        if (!response.ok || result?.success !== true) {
-            const message = typeof result?.error?.message === 'string'
-                ? result.error.message
-                : 'Unable to share the map. Please try again.';
-            setShareResult({ error: message });
-            return false;
-        }
-
-        setShareResult({ success: true });
-        return true;
+        const delivery = getShareDeliveryResult(response, result, recipientEmails);
+        recipients.removeDelivered(delivery.delivered);
+        setShareResult({ success: delivery.success, message: delivery.message });
+        return delivery.success;
     } catch {
         setShareResult({ error: 'Unable to share the map. Please try again.' });
         return false;
@@ -1316,6 +1318,9 @@ export async function sendMap(event) {
 
 export function setSharePending(isPending) {
     shareState.pending = Boolean(isPending);
+    shareRecipients?.setDisabled(shareState.pending);
+    const formatInput = document.getElementById('shareFormat');
+    if (formatInput) formatInput.disabled = shareState.pending;
     const sendButton = document.getElementById('sendShareBtn');
     if (!sendButton) {
         return;
@@ -1328,10 +1333,10 @@ export function setSharePending(isPending) {
         : '<i class="fas fa-paper-plane"></i> Send';
 }
 
-export function setShareResult({ success = false, error = null } = {}) {
+export function setShareResult({ success = false, error = null, message = null } = {}) {
     shareState.pending = false;
     shareState.success = Boolean(success);
     shareState.error = error;
     setSharePending(false);
-    setShareFeedback(success ? 'Map shared successfully.' : (error || ''), success ? 'success' : 'warning');
+    setShareFeedback(message || (success ? 'Map shared successfully.' : (error || '')), success ? 'success' : 'warning');
 }
