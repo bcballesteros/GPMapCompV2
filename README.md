@@ -199,6 +199,10 @@ GPMapCompV2/
 
 ## Application Workflow
 
+Export and Share automatically include legends for visible supported uploaded
+vector layers. See [Output legends](OUTPUT_LEGENDS.md) for inclusion rules,
+layout, resource limits, verification and visual fidelity notes.
+
 A typical workflow in GPMapCompV2 consists of the following steps:
 
 1. Upload one or more geospatial datasets.

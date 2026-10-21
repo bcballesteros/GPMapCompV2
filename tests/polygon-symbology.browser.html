@@ -1,0 +1,106 @@
+<!doctype html>
+<html><head><link rel="stylesheet" href="/src/styles/main.css"><link rel="stylesheet" href="/src/styles/components.css"></head>
+<body><div id="layerList" style="width:248px"></div>
+<script type="module">
+import { addLayerItem, updatePolygonFillColor } from '/src/ui/layers-panel.js';
+import { setLayerRecord, renameLayerRecord } from '/src/state/store.js';
+import { getManagedLayerLegendDescriptors, updateManagedLayerStyle } from '/src/map/layer-manager.js';
+import { createManagedFeatureStyles } from '/src/map/style-factory.js';
+import ol from '/src/lib/ol.js';
+const assert = (condition, message) => { if (!condition) throw new Error(message); };
+const change = (element, value, event = 'change') => { element.value = value; element.dispatchEvent(new Event(event, { bubbles: true })); };
+const toggle = (element, checked) => { element.checked = checked; element.dispatchEvent(new Event('change', { bubbles: true })); };
+window.fixtureReady = Promise.resolve(async () => {
+    const unsafeLabel = '<img src=x onerror="window.unsafe=true">';
+    const features = ['Forest', 'Water', null, unsafeLabel].map((kind, i) => new ol.Feature({ kind, second: i % 2 === 0 }));
+    const record = { features, isPolygonLayer: true, color: '#2563eb', polygonFillColor: '#2563eb', polygonStrokeColor: '#123456', polygonStrokeWidth: 2, opacity: 0.6 };
+    record.source = new ol.source.Vector({ features });
+    record.layer = new ol.layer.Vector({ source: record.source });
+    setLayerRecord('Example', record); addLayerItem('Example', record.color, features.length);
+    const item = document.querySelector('.layer-item'); item.classList.remove('collapsed');
+    const mode = item.querySelector('.polygon-style-mode');
+    const field = item.querySelector('.polygon-classification-field');
+    const strokeToggle = item.querySelector('.polygon-stroke-enabled');
+    const legend = item.querySelector('.polygon-legend-entries');
+    assert(strokeToggle.checked && record.symbology.stroke.enabled, 'Show Stroke defaults to enabled');
+    for (const control of [mode]) {
+        const panel = item.querySelector('.layer-controls-wrapper').getBoundingClientRect();
+        const bounds = control.getBoundingClientRect();
+        assert(bounds.width > 0 && bounds.right <= panel.right + 1, `${control.className} fits the expanded panel`);
+    }
+    assert(legend.children.length === 1, 'Single legend entry initially');
+    assert(item.querySelector('.polygon-legend').previousElementSibling.querySelector('.transparency-slider'), 'Legend follows opacity');
+    change(mode, 'categorized'); change(field, 'kind');
+    {
+        const panel = item.querySelector('.layer-controls-wrapper').getBoundingClientRect();
+        const bounds = field.getBoundingClientRect();
+        assert(bounds.width > 0 && bounds.right <= panel.right + 1, 'classification selector fits the expanded panel');
+    }
+    assert(record.symbology.attribute === 'kind' && record.symbology.categories.length === 3, 'Selected attribute classified');
+    assert(legend.children.length === 5 && !legend.querySelector('img') && !window.unsafe, 'Safe labels and all fallback entries');
+    const fill = item.querySelector('.polygon-fill-picker');
+    assert(fill.disabled && fill.closest('.control-row').hidden, 'Single fill disabled');
+    fill.value = '#FFFFFF'; updatePolygonFillColor(fill);
+    assert(record.polygonFillColor === '#2563eb', 'Global fill cannot override category colors');
+    const trigger = legend.querySelector('[data-vector-color="polygonCategory"]');
+    let row = trigger.parentElement;
+    trigger.click();
+    const hex = document.querySelector('.vector-color-hex');
+    assert(hex, 'Existing picker opens on category');
+    change(hex, '#ABCDEF', 'input');
+    assert(row === legend.firstElementChild && trigger === row.firstElementChild, 'Color updates retain DOM and picker trigger');
+    assert(row.querySelector('polygon').getAttribute('fill') === '#ABCDEF', 'Legend updates immediately');
+    assert(document.querySelector('.vector-color-popup'), 'Picker stays open during update');
+    const descriptor = getManagedLayerLegendDescriptors('Example')[0];
+    const feature = features.find(f => f.get('kind') === record.symbology.categories[0].value);
+    assert(createManagedFeatureStyles(record, feature)[0].getFill().getColor() === 'rgba(171, 205, 239, 0.6)', 'Map uses edited category');
+    assert(descriptor.symbol.fillColor === '#ABCDEF', 'Reusable descriptors updated');
+    toggle(strokeToggle, false);
+    assert(record.symbology.stroke.enabled === false && createManagedFeatureStyles(record, feature)[0].getStroke() === null, 'Disabled stroke is absent from categorized map styles');
+    assert(row.querySelector('polygon').getAttribute('stroke') === 'none', 'Categorized legend removes its outline');
+    assert(item.querySelector('.polygon-stroke-picker').disabled && item.querySelector('.polygon-width-slider').disabled, 'Stroke editors are inactive while disabled');
+    change(mode, 'single'); change(mode, 'categorized');
+    row = [...legend.children].find(entry => entry.dataset.categoryId === row.dataset.categoryId);
+    change(item.querySelector('.transparency-slider'), '35', 'input');
+    assert(record.symbology.stroke.enabled === false && createManagedFeatureStyles(record, feature)[0].getStroke() === null, 'Mode and opacity updates preserve disabled stroke');
+    toggle(strokeToggle, true);
+    assert(createManagedFeatureStyles(record, feature)[0].getStroke()?.getWidth() === 2, 'Re-enabling restores configured width');
+    assert(row.querySelector('polygon').getAttribute('stroke') !== 'none', `Legend restores configured outline: ${record.symbology.stroke.enabled}/${row.querySelector('polygon').getAttribute('stroke')}`);
+    document.querySelector('.vector-color-close').click();
+    change(item.querySelector('.transparency-slider'), '35', 'input');
+    change(item.querySelector('.polygon-width-slider'), '5', 'input');
+    assert(row.querySelector('polygon').getAttribute('fill-opacity') === '0.35', 'Opacity updates legend');
+    assert(row.querySelector('polygon').getAttribute('stroke-width') === '5', 'Stroke updates legend');
+    change(field, 'second'); assert(record.symbology.categories.length === 2 && legend.children.length === 4, 'Field replacement refreshes legend');
+    change(mode, 'single');
+    assert(legend.children.length === 1 && !fill.disabled && !fill.closest('.control-row').hidden, 'Single mode restored');
+    assert(createManagedFeatureStyles(record, features[0])[0].getFill().getColor() === 'rgba(37, 99, 235, 0.35)', 'Original single fill preserved');
+    change(mode, 'categorized');
+    assert(legend.children.length === 4 && record.symbology.attribute === 'second', 'Switching back retains classification');
+    // Confirmation is exercised through the real UI; cancellation preserves prior config.
+    features.forEach((f, i) => f.set('many', i));
+    for (let i = 4; i < 105; i++) record.source.addFeature(new ol.Feature({ many: i }));
+    field.appendChild(new Option('many', 'many'));
+    let confirmations = 0;
+    window.confirm = () => { confirmations++; return false; };
+    change(field, 'many');
+    assert(confirmations === 1 && record.symbology.attribute === 'second', 'Large classification cancellation preserves config');
+    window.confirm = () => true; change(field, 'many');
+    assert(record.symbology.categories.length === 105 && legend.children.length === 107, 'Confirmation retains every category');
+    assert(legend.scrollHeight > legend.clientHeight && getComputedStyle(legend).overflowY === 'auto', 'Large legend scrolls');
+    renameLayerRecord('Example', 'Renamed'); item.dataset.layerName = 'Renamed'; item.querySelector('.layer-name').textContent = 'Renamed';
+    record.opacity = 0.2; updateManagedLayerStyle('Renamed');
+    assert(legend.querySelector('polygon').getAttribute('fill-opacity') === '0.2', 'Rename retains legend synchronization');
+    const pointRecord = { features: [new ol.Feature()], isPointLayer: true, geometryType: 'MultiPoint', color: '#123456', opacity: 1, pointSize: 6, markerStrokeEnabled: false };
+    setLayerRecord('Points', pointRecord); addLayerItem('Points', pointRecord.color, 1);
+    const pointItem = [...document.querySelectorAll('.layer-item')].find(entry => entry.dataset.layerName === 'Points');
+    const pointLegend = pointItem.querySelector('.vector-legend .polygon-legend-entries');
+    assert(pointLegend.children.length === 1, 'Initial MultiPoint legend is present before style interaction');
+    assert(pointLegend.querySelector('img').style.width === '28px' && pointLegend.querySelector('img').style.height === '24px', 'Point preview uses readable fixed viewport');
+    const lineRecord = { features: [new ol.Feature()], isLineLayer: true, geometryType: 'LineString', color: '#654321', opacity: 1, lineStrokeWidth: 2 };
+    setLayerRecord('Lines', lineRecord); addLayerItem('Lines', lineRecord.color, 1);
+    const lineItem = [...document.querySelectorAll('.layer-item')].find(entry => entry.dataset.layerName === 'Lines');
+    assert(lineItem.querySelectorAll('.vector-legend .polygon-legend-entry').length === 1, 'Initial LineString legend is present before style interaction');
+    return [{ control: 'categorized polygon and initial point/line legends', passed: true }];
+});
+</script></body></html>

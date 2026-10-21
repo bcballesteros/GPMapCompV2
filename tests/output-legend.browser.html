@@ -1,0 +1,349 @@
+<!doctype html><html><head><link rel="stylesheet" href="/src/styles/main.css"></head><body style="display:block">
+<div id="mapHost" style="width:800px;height:600px"></div>
+<div id="exportModal"><div id="mapPreviewContainer" class="export-preview-shell export-preview-shell-centered" style="width:600px;height:400px"><div id="mapPreviewMap" class="export-preview-map"></div><div id="mapPreviewPlaceholder"></div></div></div>
+<div id="shareModal"><div id="sharePreviewContainer" class="export-preview-shell share-preview-shell"><div id="sharePreviewMap" class="export-preview-map"></div><div id="sharePreviewPlaceholder"></div></div></div>
+<div id="recipientChips"><input id="recipientEmail"></div><select id="shareFormat"><option>png</option><option>jpeg</option><option>pdf</option></select><button id="sendShareBtn"></button><div id="shareFeedback"></div><div id="toastContainer"></div>
+<script>window.fixtureReady = new Promise(resolve => { window.resolveFixture = resolve; });</script>
+<script type="module">
+import ol from '/src/lib/ol.js';
+import { setMap, getState, renameLayerRecord } from '/src/state/store.js';
+import { addVectorLayer, addWmsLayer, updateManagedLayerStyle, removeManagedLayer } from '/src/map/layer-manager.js';
+import { applyImportedPolygonStyle, classifyPolygonLayer } from '/src/map/polygon-symbology.js';
+import { applyImportedVectorStyle, switchVectorStyleMode } from '/src/map/vector-sld-symbology.js';
+import { parseSld } from '/src/map/sld-importer.js';
+import { generateMapOutput, renderMapToCanvas, renderMapPreview, sendMap, downloadMap } from '/src/tools/export-share.js';
+import { captureOutputLegend, drawOutputLegend, legendFont } from '/src/services/output-legend.js';
+import { layoutOutputLegend } from '/src/services/output-legend-layout.js';
+import { openModal, closeModal } from '/src/ui/modal.js';
+
+const check = (condition, message) => { if (!condition) throw Error(message); };
+const reports = [];
+const report = name => reports.push({ name, passed: true });
+const fixture = async name => parseSld(await (await fetch(`/tests/fixtures/${name}.sld`)).text());
+const map = new ol.Map({ target: 'mapHost', controls: [], interactions: [], layers: [], view: new ol.View({ center: [0,0], resolution: 1 }) });
+setMap(map);
+const tile = document.createElement('canvas'); tile.width = tile.height = 256;
+const tc = tile.getContext('2d'); tc.fillStyle = '#428060'; tc.fillRect(0,0,256,256);
+const source = new ol.source.TileWMS({ url:'https://example.invalid/wms', params:{LAYERS:'local-test'}, tileLoadFunction: tile => setTimeout(() => { tile.getImage().src = tileUrl; }, 10) });
+const tileUrl = tile.toDataURL();
+addWmsLayer('WMS', source, new ol.layer.Tile({source}));
+
+function add(name, type, properties = {kind:'primary'}) {
+    const coords = { Point:[0,0], MultiPoint:[[0,0],[30,20]], LineString:[[-100,0],[100,0]], MultiLineString:[[[-100,20],[100,20]]], Polygon:[[[-90,-90],[90,-90],[90,90],[-90,90],[-90,-90]]], MultiPolygon:[[[[-80,-80],[80,-80],[80,80],[-80,80],[-80,-80]]]] };
+    const data = {type:'FeatureCollection', features:[{type:'Feature',geometry:{type,coordinates:coords[type]},properties}]};
+    return addVectorLayer(name, '#e63946', data, new ol.format.GeoJSON().readFeatures(data));
+}
+const groups = () => captureOutputLegend(map, getState().uploadedLayers);
+function layout(data) {
+    const c = document.createElement('canvas').getContext('2d');
+    return layoutOutputLegend(data,2560,1920,48,(text,bold)=>{ c.font=legendFont(bold);return c.measureText(text).width; });
+}
+function ink(ctx,x,y,w,h, predicate = p => p[0]<210 || p[1]<210 || p[2]<210) {
+    const p=ctx.getImageData(x,y,w,h).data;let count=0;
+    for(let i=0;i<p.length;i+=4) if(predicate(p.subarray(i,i+4))) count++;
+    return count;
+}
+async function verifyCanvas(canvas, data) {
+    const l=layout(data),ctx=canvas.getContext('2d');
+    check(canvas.width===l.width && canvas.height===l.height, 'Deterministic full composition dimensions');
+    check(ink(ctx,2560,20,200,40)>20,'Legend heading is painted');
+    for(const [columnIndex,column] of l.columns.entries()) for(const row of column) if(row.type==='entry') {
+        check(ink(ctx,2560+columnIndex*l.columnWidth+20,row.y,48,40)>0,`Symbol rendered: ${row.label}`);
+        check(ink(ctx,2560+columnIndex*l.columnWidth+88,row.y,l.columnWidth-108,row.height)>0,`Label rendered: ${row.label}`);
+    }
+    check(ink(ctx,2376,32,144,144,p=>p[0]<60&&p[2]>180)>0,'North arrow retained inside map');
+    check(ink(ctx,0,canvas.height-48,canvas.width,48)>20,'Footer retained');
+    const pixel=ctx.getImageData(100,100,1,1).data;
+    check([66,128,96].every((value,i)=>Math.abs(pixel[i]-value)<=4),'WMS still painted on map');
+}
+const digest = async blob => [...new Uint8Array(await crypto.subtle.digest('SHA-256',await blob.arrayBuffer()))].map(v=>v.toString(16).padStart(2,'0')).join('');
+async function decodeOutput(blob, format) {
+    if(format==='pdf') {
+        const bytes=new Uint8Array(await blob.arrayBuffer());
+        const text=new TextDecoder('latin1').decode(bytes);
+        check(text.startsWith('%PDF-1.4')&&text.includes('/Count 1'),'PDF contains full single composition');
+        const xrefOffset=Number(text.match(/startxref\n(\d+)\n%%EOF$/)[1]);
+        const xref=text.slice(xrefOffset).split('\n');
+        check(xref[0]==='xref','PDF cross-reference offset');
+        const objectCount=Number(xref[1].split(' ')[1]);
+        for(let id=1;id<objectCount;id++) {
+            const offset=Number(xref[id+2].slice(0,10));
+            check(text.slice(offset).startsWith(`${id} 0 obj\n`),`PDF cross-reference points to object ${id}`);
+        }
+        const page=text.match(/\/MediaBox \[0 0 (\d+) (\d+)\]/),image=text.match(/\/Subtype \/Image \/Width (\d+) \/Height (\d+)/);
+        check(page[1]===image[1]&&page[2]===image[2],'PDF page retains complete image aspect ratio');
+        check(text.includes(`${page[1]} 0 0 ${page[2]} 0 0 cm\n/Im0 Do`),'PDF image fits complete page without clipping');
+        const start=text.indexOf('stream\n')+7, length=Number(text.slice(0,start).match(/\/Length (\d+) >>\nstream\n$/)[1]);
+        blob=new Blob([bytes.slice(start,start+length)],{type:'image/jpeg'});
+    }
+    const bitmap=await createImageBitmap(blob),canvas=document.createElement('canvas');canvas.width=bitmap.width;canvas.height=bitmap.height;
+    canvas.getContext('2d').drawImage(bitmap,0,0);bitmap.close();return canvas;
+}
+
+window.resolveFixture(async () => {
+    const records=[];
+    try {
+        check(groups().length===0,'WMS has no legend');
+        let canvas=await renderMapToCanvas(); check(canvas.width===2560&&canvas.height===1968,'No empty panel');
+        for(const type of ['Point','MultiPoint','LineString','MultiLineString','Polygon','MultiPolygon']) {
+            const r=add(type,type); records.push(r);
+            check(groups().length===1&&groups()[0].entries[0].geometryType===type,`Eligible ${type}`);
+            await verifyCanvas(await renderMapToCanvas(),groups());
+            r.layer.setVisible(false);check(groups().length===0,'Hidden vector excluded');
+        }
+        const gated=records[0];gated.layer.setVisible(true);
+        gated.layer.setMinResolution(0.5);gated.layer.setMaxResolution(2);
+        canvas=await renderMapToCanvas();
+        check(canvas.getContext('2d').getImageData(1280,960,1,1).data[0]>150,'Live resolution eligibility survives higher output resolution');
+        gated.layer.setMinResolution(0);gated.layer.setMaxResolution(Infinity);
+        gated.features[0].getGeometry().setCoordinates([120,60]);map.getView().setRotation(0.4);map.renderSync();
+        const expected=map.getPixelFromCoordinate([120,60]).map(value=>Math.round(value*3.2));
+        const extent=map.getView().calculateExtent(map.getSize()).slice();
+        canvas=await renderMapToCanvas();
+        const rotatedPixel=canvas.getContext('2d').getImageData(...expected,1,1).data;
+        check(rotatedPixel[0]>150&&rotatedPixel[1]<100,`Rotated map preserves geographic screen position and uniform scale (${expected}: ${rotatedPixel})`);
+        check(JSON.stringify(extent)===JSON.stringify(map.getView().calculateExtent(map.getSize())),'Live geographic extent remains unchanged');
+        gated.features[0].getGeometry().setCoordinates([0,0]);map.getView().setRotation(0);gated.layer.setVisible(false);
+        report('All six geometry types; hidden vectors, WMS exclusion and map retention; no empty panel');
+        const originalView=map.getView(),originalSize=map.getSize().slice();
+        gated.layer.setVisible(true);
+        for(const scenario of [
+            {projection:'EPSG:3857',center:[1000,2000],resolution:2,size:[800,600],rotation:0},
+            {projection:'EPSG:3857',center:[-1500,500],resolution:0.5,size:[600,800],rotation:0.4},
+            {projection:'EPSG:4326',center:[121,14],resolution:0.05,size:[1000,400],rotation:Math.PI/2},
+            {projection:'EPSG:4326',center:[10,20],resolution:0.1,size:[400,1000],rotation:-0.6}
+        ]) {
+            const host=document.getElementById('mapHost');host.style.width=`${scenario.size[0]}px`;host.style.height=`${scenario.size[1]}px`;
+            map.setSize(scenario.size);map.setView(new ol.View({...scenario}));
+            const position=[scenario.center[0]+50*scenario.resolution,scenario.center[1]+30*scenario.resolution];
+            gated.features[0].getGeometry().setCoordinates(position);map.renderSync();
+            const before=map.getView().calculateExtent(map.getSize()).slice(),scale=2560/Math.max(...scenario.size);
+            const expected=map.getPixelFromCoordinate(position).map(v=>Math.round(v*scale));
+            const output=await renderMapToCanvas(),ctx=output.getContext('2d');
+            const pixel=ctx.getImageData(...expected,1,1).data;
+            check(pixel[0]>150&&pixel[1]<100,`${scenario.projection} landmark retains position at ${scenario.size}`);
+            check(JSON.stringify(before)===JSON.stringify(map.getView().calculateExtent(map.getSize())),'Projection/aspect output preserves live extent');
+            const mapWidth=Math.round(scenario.size[0]*scale),badge=Math.max(80,Math.min(144,Math.round(mapWidth*0.05))),margin=Math.max(20,Math.round(mapWidth*0.0125));
+            const center=[mapWidth-margin-badge/2,margin+badge/2],tipOffset=-badge*0.8/3;
+            const tip=[Math.round(center[0]-Math.sin(scenario.rotation)*tipOffset),Math.round(center[1]+Math.cos(scenario.rotation)*tipOffset)];
+            check(ink(ctx,tip[0]-3,tip[1]-3,6,6,p=>p[0]<60&&p[1]<150&&p[2]>180)>0,'North arrow tip follows captured rotation');
+            check(ink(ctx,0,output.height-24,output.width,24)>20,'Footer retained for each aspect ratio');
+            output.width=output.height=0;
+        }
+        const host=document.getElementById('mapHost');host.style.width='800px';host.style.height='600px';
+        map.setSize(originalSize);map.setView(originalView);gated.features[0].getGeometry().setCoordinates([0,0]);gated.layer.setVisible(false);
+        report('Two projections, four centers/resolutions/aspect ratios, signed rotations and north arrow direction');
+        const point=records[0],line=records[2],polygon=records[4];
+        point.layer.setVisible(true);line.layer.setVisible(true);polygon.layer.setVisible(true);
+        applyImportedVectorStyle(point,await fixture('categorized-point')); updateManagedLayerStyle('Point');
+        applyImportedVectorStyle(line,await fixture('categorized-line')); updateManagedLayerStyle('LineString');
+        polygon.features[0].set('kind','Water');applyImportedPolygonStyle(polygon,await fixture('layered-polygon')); updateManagedLayerStyle('Polygon');
+        check(groups().map(g=>g.identity).join()==='Point,LineString,Polygon','Map collection layer order');
+        check(groups()[0].entries.map(e=>e.label).join()==='Primary station,Secondary station,unused','Unused and out-of-view rules preserved');
+        check(groups()[1].entries[0].symbols.length===2,'Ordered line casings');
+        polygon.symbology.importedStrokeEnabled=false;polygon.opacity=0.65;updateManagedLayerStyle('Polygon');
+        check(groups()[2].entries.every(e=>e.symbols.every(s=>!s.stroke.enabled)),'Stroke toggle does not remove patterns');
+        const mixed=groups();canvas=await renderMapToCanvas();await verifyCanvas(canvas,mixed);
+        window.legendReviewCanvas=canvas;
+        report('Mixed layers, imported points/lines, layered hatch/times polygons, rule order and opacity');
+        for(const record of [point,line,polygon]) {
+            const before=groups();record.layer.setVisible(false);
+            check(JSON.stringify(groups())===JSON.stringify(before.filter(group=>group.identity!==before.find(group=>getState().uploadedLayers[group.identity]===record).identity)),'Hiding a layer changes only its own group');
+            record.layer.setVisible(true);check(JSON.stringify(groups())===JSON.stringify(before),'Re-enabling restores unchanged descriptors');
+        }
+        line.layer.setZIndex(-1);check(groups()[0].identity==='LineString','Configured z-index precedes collection order');line.layer.setZIndex(undefined);
+        report('Independent polygon/point/line visibility toggles and configured layer order');
+        const initialPixels=canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height).data;
+        const pending=renderMapToCanvas();
+        point.layer.setVisible(false);polygon.opacity=0.1;updateManagedLayerStyle('Polygon');
+        const captured=await pending;
+        const capturedPixels=captured.getContext('2d').getImageData(0,0,captured.width,captured.height).data;
+        check(initialPixels.every((v,i)=>v===capturedPixels[i]),'Async changes preserve identical snapshot pixels');
+        point.layer.setVisible(true);polygon.opacity=0.65;updateManagedLayerStyle('Polygon');
+        report('Appearance and legend snapshot survive styling and visibility changes during tile loading');
+        const replacement=await fixture('categorized-point'),priorStyle=structuredClone(point.symbology);
+        replacement.rules[0].label='Replacement rule';
+        replacement.rules[0].symbolizers[0].fill.color='#00ff00';
+        const beforeReplacement=renderMapToCanvas();
+        applyImportedVectorStyle(point,replacement);updateManagedLayerStyle('Point');
+        const stable=await beforeReplacement,stablePixels=stable.getContext('2d').getImageData(0,0,stable.width,stable.height).data;
+        check(initialPixels.every((value,i)=>value===stablePixels[i]),'SLD replacement cannot alter in-flight map or legend');
+        point.symbology=priorStyle;updateManagedLayerStyle('Point');stable.width=stable.height=0;
+        report('SLD replacement during generation retains the captured appearance and legends');
+        const exportedHashes=new Map();
+        for(const format of ['png','jpeg','pdf']) {
+            const output=await generateMapOutput(format);const decoded=await decodeOutput(output.blob,format);
+            check(decoded.width===canvas.width&&decoded.height===canvas.height,`${format} full legend dimensions`);
+            await verifyCanvas(decoded,mixed);exportedHashes.set(format,await digest(output.blob));
+            decoded.width=decoded.height=0;
+        }
+        report('Export PNG, JPEG and PDF encode the complete common composition');
+        const originalFetch=window.fetch;let requests=0;
+        try {
+            window.fetch=async(url,options)=>{
+                check(url==='/api/share','Only Share API intercepted');const body=JSON.parse(options.body);
+                check(body.recipientEmails.length===2,'Multiple recipients retained');
+                const bytes=Uint8Array.from(atob(body.imageData),c=>c.charCodeAt(0));
+                const blob=new Blob([bytes]),decoded=await decodeOutput(blob,body.format);
+                check(await digest(blob)===exportedHashes.get(body.format),'Share artifact bytes match equivalent Export');
+                await verifyCanvas(decoded,mixed);decoded.width=decoded.height=0;requests++;
+                return {ok:true,status:201,json:async()=>({success:true,results:body.recipientEmails.map(email=>({email,status:'sent'}))})};
+            };
+            for(const format of ['png','jpeg','pdf']) {
+                document.getElementById('recipientEmail').value='first@example.test;second@example.test';
+                document.getElementById('shareFormat').value=format;check(await sendMap(),`Share ${format}`);
+            }
+            check(requests===3,'All Share formats sent');
+        } finally {window.fetch=originalFetch;}
+        report('Share PNG, JPEG and PDF with multiple recipients (mocked API; no emails sent)');
+        await renderMapPreview('test');
+        check(document.querySelector('#mapPreviewMap canvas').width===canvas.width,'Preview same full composition');
+        line.layer.setVisible(false);await renderMapPreview('hidden');
+        check(document.querySelector('#mapPreviewMap canvas').width===layout(groups()).width,'Preview visibility refresh');
+        await renderMapPreview('share','share');
+        check(document.querySelector('#sharePreviewMap canvas').height===layout(groups()).height,'Share preview full composition');
+        const expectedPreview=await renderMapToCanvas();
+        for(const selector of ['#mapPreviewMap canvas','#sharePreviewMap canvas']) {
+            const preview=document.querySelector(selector),actual=preview.getContext('2d').getImageData(0,0,preview.width,preview.height).data;
+            check(expectedPreview.getContext('2d').getImageData(0,0,preview.width,preview.height).data.every((value,i)=>value===actual[i]),'Preview pixels equal final composition');
+        }
+        expectedPreview.width=expectedPreview.height=0;
+        report('Both previews use the complete output composition and current visibility');
+        renameLayerRecord('Point','Renamed point dataset');
+        check(groups()[0].name==='Renamed point dataset','Renamed group heading');
+        map.getLayers().remove(point.layer);map.getLayers().push(point.layer);
+        check(groups().at(-1).identity==='Renamed point dataset','Reordered layers follow collection order');
+        renameLayerRecord('Renamed point dataset','Point');
+        point.layer.setVisible(false);polygon.layer.setVisible(false);
+        const manual=records[1];manual.layer.setVisible(true);
+        for(const shape of ['circle','square','triangle','star','diamond']) {
+            manual.markerPresetType=shape; updateManagedLayerStyle('MultiPoint');await verifyCanvas(await renderMapToCanvas(),groups());
+        }
+        manual.markerPresetType=null;manual.svgMarkerDataUrl='data:image/svg+xml;utf8,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="60" height="20" viewBox="0 0 60 20"><rect width="60" height="20" fill="#ff0000"/></svg>');
+        updateManagedLayerStyle('MultiPoint');await verifyCanvas(await renderMapToCanvas(),groups());
+        report('Preset point shapes and embedded custom SVG marker loading');
+        manual.layer.setVisible(false);polygon.layer.setVisible(true);
+        polygon.symbology.mode='single';classifyPolygonLayer(polygon,'kind'); updateManagedLayerStyle('Polygon');
+        check(groups()[0].entries.length===3,'Generated categories plus missing/unmapped');await verifyCanvas(await renderMapToCanvas(),groups());
+        const many=groups();many[0].name='Long layer name '.repeat(8);
+        many[0].entries=Array.from({length:155},(_,i)=>({...many[0].entries[0],label:`${i} A long category description with wrapping across measured lines`}));
+        const measured=layout(many);check(measured.contentHeight>1920&&measured.columns.length===3,'Adaptive columns and height');
+        const large=document.createElement('canvas');large.width=measured.width;large.height=measured.height;
+        await drawOutputLegend(large.getContext('2d'),measured,2560,many);
+        check(measured.columns.flat().filter(row=>row.type==='entry').length===155,'No truncated long entries');
+        check(measured.columns.every(column=>column.every(row=>row.type!=='entry'||row.y+row.height<=measured.contentHeight-24)),'No clipped rows');
+        report('Generated categories, long names, long labels, 155 entries, adaptive columns and extra height');
+        const unavailable=structuredClone(many);unavailable[0].entries=[{symbolType:'point',symbol:{src:'https://example.invalid/untrusted.svg',opacity:1},label:'Unavailable marker'}];
+        const unavailableLayout=layout(unavailable);
+        const fallback=document.createElement('canvas');fallback.width=unavailableLayout.width;fallback.height=unavailableLayout.height;
+        await drawOutputLegend(fallback.getContext('2d'),unavailableLayout,2560,unavailable);
+        check(ink(fallback.getContext('2d'),2580,unavailableLayout.columns[0].find(row=>row.type==='entry').y,64,40)>0,'Unavailable asset gets explicit label');
+        large.width=large.height=0;fallback.width=fallback.height=0;
+        const longStyle=await fixture('layered-polygon');
+        longStyle.rules=Array.from({length:155},(_,i)=>({...structuredClone(longStyle.rules[0]),name:`rule-${i}`,literal:i===0?'Water':`unused-${i}`,label:`${i} A long category description with wrapping across measured lines`}));
+        applyImportedPolygonStyle(polygon,longStyle);updateManagedLayerStyle('Polygon');
+        const longGroups=groups(),longLayout=layout(longGroups);
+        check(longGroups[0].entries.length===155&&longLayout.columns.length===3&&longLayout.contentHeight>1920,'Actual imported layer spans three columns and grows');
+        const longOutput=await renderMapToCanvas();await verifyCanvas(longOutput,longGroups);window.legendLongReviewCanvas=longOutput;
+        const longHashes=new Map();
+        for(const format of ['png','jpeg','pdf']) {
+            const output=await generateMapOutput(format),decoded=await decodeOutput(output.blob,format);
+            longHashes.set(format,await digest(output.blob));
+            await verifyCanvas(decoded,longGroups);
+            const pixel=decoded.getContext('2d').getImageData(10,2000,1,1).data;
+            check(pixel[0]>250&&pixel[1]>250&&pixel[2]>250&&pixel[3]===255,'Extra height below map is opaque white, without preview gray margins');
+            decoded.width=decoded.height=0;
+        }
+        const fetchBeforeLongShare=window.fetch;let longShares=0;
+        try {
+            window.fetch=async(url,options)=>{
+                check(url==='/api/share','Only mocked Share API is used');
+                const body=JSON.parse(options.body),bytes=Uint8Array.from(atob(body.imageData),c=>c.charCodeAt(0));
+                check(await digest(new Blob([bytes]))===longHashes.get(body.format),'Single-layer Share bytes match complete long Export');longShares++;
+                return {ok:true,status:201,json:async()=>({success:true})};
+            };
+            for(const format of ['png','jpeg','pdf']) {
+                document.getElementById('recipientEmail').value='first@example.test';document.getElementById('shareFormat').value=format;
+                check(await sendMap(),`Long single-layer Share ${format}`);
+            }
+            check(longShares===3,'All single-layer Share formats retained');
+        } finally {window.fetch=fetchBeforeLongShare;}
+        await renderMapPreview('long-export');await renderMapPreview('long-share','share');
+        for(const selector of ['#mapPreviewMap canvas','#sharePreviewMap canvas']) {
+            const preview=document.querySelector(selector);
+            check(preview.width===longLayout.width&&preview.height===longLayout.height,'Long preview retains full bitmap dimensions');
+            check(preview.style.objectFit==='contain'&&preview.style.maxHeight==='100%','Preview fits without changing raster geometry');
+            const rect=preview.getBoundingClientRect(),parent=preview.parentElement.getBoundingClientRect();
+            check(rect.width<=parent.width+0.5&&rect.height<=parent.height+0.5,'Styled preview shows complete image inside container');
+            check(Math.abs(rect.width/rect.height-preview.width/preview.height)<0.01,'Styled preview preserves bitmap aspect ratio');
+        }
+        report('155-rule single-layer Export/Share PNG/JPEG/PDF and both previews retain all three columns and extended height');
+        const longCategories=polygon.symbology.categories;
+        polygon.symbology.categories=Array.from({length:435},(_,i)=>({...longCategories[0],id:i===0?longCategories[0].id:`near-${i}`,label:`Category ${i}`}));
+        updateManagedLayerStyle('Polygon');
+        const nearLimit=await renderMapToCanvas();
+        check(nearLimit.width===3790&&nearLimit.height===6288,'Near-limit output contains 23,831,520 pixels');
+        await verifyCanvas(nearLimit,groups());nearLimit.width=nearLimit.height=0;
+        polygon.symbology.categories=longCategories;updateManagedLayerStyle('Polygon');
+        report('Near-limit 435-category output renders every entry at 23,831,520 pixels');
+        const priorCategories=polygon.symbology.categories;
+        polygon.symbology.categories=Array.from({length:5000},(_,i)=>({...polygon.symbology.categories[0],id:String(i),label:`Category ${i}`}));
+        updateManagedLayerStyle('Polygon');
+        let tooLarge=false;try {await renderMapToCanvas();} catch(error) {tooLarge=error.name==='OutputSizeError';}
+        check(tooLarge,'Oversize output fails clearly');
+        const fetchBeforeLimit=window.fetch;let limitRequests=0;
+        window.fetch=async()=>{limitRequests++;return {ok:true,status:201,json:async()=>({success:true})};};
+        try {
+            document.getElementById('recipientEmail').value='first@example.test';
+            check(!await sendMap()&&document.getElementById('shareFeedback').textContent.includes('Hide some layers'),'Share reports actionable output limit');
+            check(limitRequests===0,'Oversize Share never submits incomplete output');
+        } finally {window.fetch=fetchBeforeLimit;}
+        await downloadMap();check(document.getElementById('toastContainer').textContent.includes('Hide some layers'),'Export reports actionable output limit');
+        for(const kind of ['export','share']) {
+            await renderMapPreview('oversize',kind);
+            check(document.getElementById(kind==='export'?'mapPreviewPlaceholder':'sharePreviewPlaceholder').textContent.includes('Hide some layers'),'Preview reports size limit');
+        }
+        report('Renaming, reordering, unavailable marker fallback and actionable Export/Share resource limits');
+        polygon.symbology.categories=priorCategories;updateManagedLayerStyle('Polygon');
+        // Recover on the same live map; this must not rely on constructing a new map.
+        for(const format of ['png','jpeg','pdf']) {
+            const decoded=await decodeOutput((await generateMapOutput(format)).blob,format);
+            await verifyCanvas(decoded,groups());decoded.width=decoded.height=0;
+        }
+        for(const kind of ['export','share']) {
+            await renderMapPreview('recovery',kind);
+            check(document.getElementById(kind==='export'?'mapPreviewContainer':'sharePreviewContainer').classList.contains('ready'),'Preview recovers after output failure');
+        }
+        for(const kind of ['export','share','export','share']) {
+            const modalId=`${kind}Modal`,target=document.getElementById(kind==='export'?'mapPreviewMap':'sharePreviewMap');
+            const previous=target.firstElementChild;
+            const ready=new Promise(resolve=>{
+                const observer=new MutationObserver(()=>{if(target.firstElementChild!==previous){observer.disconnect();resolve();}});
+                observer.observe(target,{childList:true});
+            });
+            openModal(modalId,{onOpen:()=>renderMapPreview('reopened',kind)});await ready;
+            check(target.firstElementChild.width===longLayout.width&&target.firstElementChild.height===longLayout.height,'Reopening refreshes complete preview');
+            const closed=new Promise(resolve=>{
+                const listener=event=>{if(event.detail.modalId===modalId&&!event.detail.isOpen){window.removeEventListener('gpmap:modalchange',listener);resolve();}};
+                window.addEventListener('gpmap:modalchange',listener);
+            });
+            closeModal(modalId);await closed;
+        }
+        const originalToBlob=HTMLCanvasElement.prototype.toBlob;
+        try {
+            HTMLCanvasElement.prototype.toBlob=function(callback){callback(null);};
+            for(const format of ['png','jpeg','pdf']) {
+                let failed=false;try {await generateMapOutput(format);} catch(error) {failed=/encode|convert/.test(error.message);}
+                check(failed,'Encoding failure never returns an incomplete artifact');
+            }
+        } finally {HTMLCanvasElement.prototype.toBlob=originalToBlob;}
+        await verifyCanvas(await renderMapToCanvas(),groups());
+        report('Consecutive outputs and both previews recover after size-limit and encoder failures on the same map');
+        check(!document.querySelector('[aria-hidden="true"][style*="-100000px"]'),'Temporary map targets cleaned');
+        report('Temporary rendering resource cleanup');
+        return reports;
+    } finally {
+        Object.keys(getState().uploadedLayers).forEach(removeManagedLayer);map.dispose();source.dispose();
+    }
+});
+</script></body></html>
