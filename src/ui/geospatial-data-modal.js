@@ -53,6 +53,8 @@ export function openAddGeospatialData(tab = 'upload') {
     const nextTab = TAB_NAMES.includes(tab) ? tab : 'upload';
     if (isModalOpen('uploadModal')) {
         activateTab(nextTab);
+        // A reopen during the closing animation must cancel the pending close.
+        document.getElementById('uploadModal').classList.add('visible');
         return;
     }
 

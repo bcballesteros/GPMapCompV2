@@ -50,3 +50,21 @@
 .polygon-sld-status { font-size: 11px; color: var(--gray-600); overflow-wrap: anywhere; }
 .polygon-sld-status:empty { display: none; }
 .polygon-sld-status[data-error="true"] { color: #b91c1c; }
+.gpkg-table-checklist {
+    max-height: 210px;
+    overflow-y: auto;
+    margin-top: 10px;
+}
+
+.gpkg-table-option {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px;
+    border-bottom: 1px solid var(--gray-200);
+    font-size: 12px;
+    overflow-wrap: anywhere;
+    cursor: pointer;
+}
+
+.gpkg-table-option input { margin-top: 2px; flex-shrink: 0; }

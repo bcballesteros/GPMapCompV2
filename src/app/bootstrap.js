@@ -14,6 +14,7 @@ import { initializeWorkspaceStatus } from '../ui/workspace-status.js';
 import { showToast } from '../ui/toast.js';
 import { bindAnnotationPopupDismissal } from '../ui/toolbar.js';
 import { initializeFeatureSaving, loadFeaturesFromFile, openFeatureSaveDialog, saveSelectedFeatures } from '../ui/feature-saving.js';
+import { handleGeoPackageSelect, clearGeoPackageSelection } from '../tools/upload-tool.js';
 
 function runOptionalStartupStep(label, callback) {
     try {
@@ -74,6 +75,8 @@ function bindGlobalHandlers() {
     window.handleGeoJSONSelect = handleGeoJSONSelect;
     window.handleKmlSelect = handleKmlSelect;
     window.handleCsvSelect = handleCsvSelect;
+    window.handleGeoPackageSelect = handleGeoPackageSelect;
+    window.clearGeoPackageSelection = clearGeoPackageSelection;
     window.clearFileSelection = clearFileSelection;
     window.clearGeoJSONSelection = clearGeoJSONSelection;
     window.clearKmlSelection = clearKmlSelection;

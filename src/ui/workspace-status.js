@@ -236,7 +236,7 @@ function buildModalHelp(modalId) {
 
         return {
             primary: 'Upload Dataset.',
-            secondary: 'Choose Shapefile ZIP, GeoJSON, KML, or CSV. Confirm the layer name and color, then upload.'
+            secondary: 'Choose Shapefile ZIP, GeoJSON, KML, CSV, or vector GeoPackage. Select GeoPackage tables when prompted, then upload.'
         };
     }
 

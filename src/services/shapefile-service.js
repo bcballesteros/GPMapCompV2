@@ -2,6 +2,7 @@ import shp from 'shpjs';
 import { iter } from 'but-unzip';
 import ol from '../lib/ol.js';
 import { geojsonToOpenLayers } from '../utils/geo.js';
+import { normalizeDeclaredGeojson } from './vector-crs.js';
 
 export async function readShapefile(file) {
     const arrayBuffer = await file.arrayBuffer();
@@ -233,6 +234,7 @@ export async function parseUploadFile(layerData) {
     case 'geojson':
         raw = await readGeoJSON(layerData.file);
         sourceCrsMetadata = detectGeojsonCrs(raw);
+        sourceCrsMetadata.sourceCrs = normalizeDeclaredGeojson(raw);
         break;
     case 'kml':
         raw = await readKml(layerData.file);
@@ -252,6 +254,8 @@ export async function parseUploadFile(layerData) {
         geojson,
         features: geojsonToOpenLayers(geojson),
         sourceCrs: sourceCrsMetadata?.sourceCrs || 'Unknown CRS',
-        sourceCrsDetected: Boolean(sourceCrsMetadata?.sourceCrsDetected)
+        sourceCrsDetected: Boolean(sourceCrsMetadata?.sourceCrsDetected),
+        normalizedCrs: 'EPSG:4326',
+        mapCrs: 'EPSG:3857'
     };
 }

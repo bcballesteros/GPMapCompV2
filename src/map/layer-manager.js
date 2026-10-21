@@ -93,6 +93,13 @@ export function addVectorLayer(layerName, layerColor, geojson, features, metadat
         zoomUnavailableReason: '',
         sourceCrs: metadata.sourceCrs || 'Unknown CRS',
         sourceCrsDetected: Boolean(metadata.sourceCrsDetected),
+        sourceFormat: metadata.sourceFormat || '',
+        sourceFileName: metadata.sourceFileName || '',
+        sourceTableName: metadata.tableName || '',
+        sourceSrsId: metadata.sourceSrsId ?? null,
+        sourceCrsDefinition: metadata.sourceCrsDefinition || '',
+        normalizedCrs: metadata.normalizedCrs || 'EPSG:4326',
+        mapCrs: metadata.mapCrs || 'EPSG:3857',
         labelsVisible: false,
         labelField: pickDefaultLabelField(features)
     };
@@ -103,9 +110,22 @@ export function addVectorLayer(layerName, layerColor, geojson, features, metadat
     });
     layerRecord.layer = layer;
 
-    getMap().addLayer(layer);
-    setLayerRecord(layerName, layerRecord);
-    setCurrentLayerName(layerName);
+    const map = getMap();
+    const previousRecord = getLayerRecord(layerName);
+    const previousName = getState().currentLayerName;
+    try {
+        map.addLayer(layer);
+        setLayerRecord(layerName, layerRecord);
+        setCurrentLayerName(layerName);
+    } catch (error) {
+        map.removeLayer(layer);
+        if (previousRecord) setLayerRecord(layerName, previousRecord);
+        else removeLayerRecord(layerName);
+        setCurrentLayerName(previousName);
+        layer.dispose();
+        source.dispose();
+        throw error;
+    }
 
     return getLayerRecord(layerName);
 }
@@ -140,7 +160,7 @@ export function addWmsLayer(layerName, source, layer, metadata = {}) {
     return getLayerRecord(layerName);
 }
 
-function normalizeExtent(extent) {
+function normalizeExtent(extent, allowDegenerate = false) {
     if (!Array.isArray(extent) || extent.length !== 4) {
         return null;
     }
@@ -151,7 +171,7 @@ function normalizeExtent(extent) {
     }
 
     const [minX, minY, maxX, maxY] = normalized;
-    if (minX >= maxX || minY >= maxY) {
+    if (allowDegenerate ? minX > maxX || minY > maxY : minX >= maxX || minY >= maxY) {
         return null;
     }
 
@@ -204,7 +224,7 @@ export function getZoomExtent(target) {
     }
 
     if (typeof target?.getExtent === 'function') {
-        const sourceExtent = normalizeExtent(target.getExtent());
+        const sourceExtent = normalizeExtent(target.getExtent(), true);
         if (sourceExtent && !ol.extent.isEmpty(sourceExtent)) {
             return sourceExtent;
         }
