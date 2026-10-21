@@ -1,0 +1,140 @@
+<!doctype html>
+<html><head><link rel="stylesheet" href="/src/styles/main.css"><link rel="stylesheet" href="/src/styles/components.css"></head>
+<body style="display:flex;gap:20px;align-items:flex-start"><div id="layerList" style="width:248px;flex-shrink:0"></div><div id="map" style="width:300px;height:200px"></div>
+<script type="module">
+import { parseSld, SLD_LIMITS } from '/src/map/sld-importer.js';
+import { addLayerItem } from '/src/ui/layers-panel.js';
+import { setLayerRecord } from '/src/state/store.js';
+import { classifyPolygonLayer } from '/src/map/polygon-symbology.js';
+import { createManagedFeatureStyles } from '/src/map/style-factory.js';
+import { getManagedLayerLegendDescriptors, updateManagedLayerStyle } from '/src/map/layer-manager.js';
+import ol from '/src/lib/ol.js';
+import { verifyAdvancedPolygonSld } from '/tests/sld-patterns.browser.js';
+import { verifyVectorSld } from '/tests/vector-sld.browser.js';
+const assert = (condition, message) => { if (!condition) throw new Error(message); };
+const change = (element, v, event = 'change') => { element.value = v; element.dispatchEvent(new Event(event, { bubbles: true })); };
+const reject = (xml, message) => {
+    let error;
+    try { parseSld(xml); } catch (caught) { error = caught; }
+    assert(error && (!message || message.test(error.message)), `Expected ${message}: ${error?.message || 'accepted invalid style'}`);
+};
+window.fixtureReady = Promise.resolve(async () => {
+    const basic = await (await fetch('/tests/fixtures/basic-polygon.sld')).text();
+    const pattern = await (await fetch('/tests/fixtures/patterned-polygon.sld')).text();
+    const parsed = parseSld(basic);
+    assert(parsed.attribute === 'kind' && parsed.rules.length === 2, 'Namespaced equality filters');
+    assert(parsed.rules[0].label === 'Open water' && parsed.rules[1].label === 'Woodland', 'Titles take precedence over names');
+    assert(parsed.rules[1].symbolizers[0].fill.color === '#00AA00' && !parsed.rules[1].symbolizers[0].stroke.enabled, 'Short hex and absent stroke');
+    const prefixed = basic.replace(/xmlns="http:\/\/www.opengis.net\/sld"/, 'xmlns:s="http://www.opengis.net/sld"').replace(/(<\/?)([A-Z][a-zA-Z]*)(?=[\s>])/g, '$1s:$2');
+    assert(parseSld(prefixed).rules[0].label === 'Open water', 'SLD prefix independent');
+    assert(parseSld(basic.replaceAll('NamedLayer', 'UserLayer')).rules.length === 2, 'Applicable UserLayer');
+    reject(pattern, /Unsupported pattern mark/);
+    reject('<StyledLayerDescriptor>', /Malformed/);
+    reject(basic.replace('1.0.0', '1.1.0'), /version/);
+    reject(basic.replaceAll('http://www.opengis.net/sld', 'https://wrong.invalid/sld'), /root/);
+    reject(basic.replaceAll('http://www.opengis.net/ogc', 'https://wrong.invalid/ogc'), /Filter/);
+    reject('<!DOCTYPE StyledLayerDescriptor SYSTEM "https://example.invalid/x">' + basic, /DOCTYPE/);
+    reject('<!ENTITY evil "script">' + basic, /entity/);
+    reject(basic.replace('<NamedLayer>', '<?xml-stylesheet href="https://example.invalid/x"?><NamedLayer>'), /processing/);
+    reject(basic.replace('kind</f:PropertyName>', '__proto__</f:PropertyName>'), /unsafe/);
+    reject(basic.replace('#123456', 'url(https://example.invalid/x)'), /color/);
+    reject(basic.replace('>0.5<', '>NaN<'), /fill-opacity/);
+    reject(basic.replace('>0.25<', '>1.1<'), /stroke-opacity/);
+    reject(basic.replace('>2.5<', '>-1<'), /stroke-width/);
+    reject(basic.replace('<CssParameter name="fill">', '<CssParameter name="fill" onload="alert(1)">'), /attribute/);
+    reject(basic.replace('<Fill>', '<Fill><CssParameter name="fill">#FFFFFF</CssParameter>'), /Duplicate/);
+    reject(basic.replaceAll('PropertyIsEqualTo', 'PropertyIsLike'), /PropertyIsLike/);
+    reject(basic.replace('<f:PropertyIsEqualTo>', '<f:PropertyIsEqualTo matchCase="false">'), /matchCase/);
+    reject(basic.replace('<Rule>', '<Rule><ElseFilter/>'), /ElseFilter/);
+    reject(basic.replace('<Rule>', '<Rule><MinScaleDenominator>1</MinScaleDenominator>'), /MinScale/);
+    reject(basic.replace('<Rule>', '<Rule><VendorOption name="x">y</VendorOption>'), /VendorOption/);
+    reject(basic.replace('<Fill>', '<Geometry><f:PropertyName>shape</f:PropertyName></Geometry><Fill>'), /Geometry/);
+    reject(basic.replaceAll('PolygonSymbolizer', 'PointSymbolizer'), /PointSymbolizer/);
+    reject(basic.replaceAll('PolygonSymbolizer', 'LineSymbolizer'), /LineSymbolizer/);
+    reject(basic.replace('<Fill>', '<Fill><ExternalGraphic/>'), /ExternalGraphic/);
+    assert(parseSld(basic.replace('<Rule>', '<Rule><PolygonSymbolizer><Fill/></PolygonSymbolizer>')).rules[0].symbolizers.length === 2, 'Ordered polygon symbolizers accepted');
+    reject(basic.replace('<FeatureTypeStyle>', '<FeatureTypeStyle/><FeatureTypeStyle>'), /FeatureTypeStyle/);
+    reject(basic.replace('<UserStyle>', '<UserStyle/><UserStyle>'), /UserStyle/);
+    reject(basic.replace('<NamedLayer>', '<NamedLayer/><NamedLayer>'), /one SLD layer/);
+    reject(basic.replace('>kind<', '>other<'), /common classification/);
+    reject(basic.replace('<Fill>', '<Fill>unexpected'), /Unexpected text/);
+    reject(basic.replace('<Title>Land classes</Title>', '<Title><script>alert(1)<\/script></Title>'), /script/);
+    const rule = basic.match(/<Rule>[\s\S]*?<\/Rule>/)[0];
+    const wrapper = content => `<StyledLayerDescriptor xmlns="http://www.opengis.net/sld" xmlns:f="http://www.opengis.net/ogc" version="1.0.0"><NamedLayer><UserStyle><FeatureTypeStyle>${content}</FeatureTypeStyle></UserStyle></NamedLayer></StyledLayerDescriptor>`;
+    reject(wrapper(rule.repeat(SLD_LIMITS.rules + 1)), /rules/);
+    reject(wrapper('<Rule>'.repeat(SLD_LIMITS.depth + 1)), /Malformed/);
+    reject(wrapper('<Rule>'.repeat(SLD_LIMITS.depth + 1) + '</Rule>'.repeat(SLD_LIMITS.depth + 1)), /complexity/);
+    reject(wrapper('<Name/>'.repeat(SLD_LIMITS.elements)), /complexity/);
+    const uniform = parseSld(wrapper('<Rule><Title>Outline</Title><PolygonSymbolizer><Stroke/></PolygonSymbolizer></Rule>'));
+    assert(uniform.attribute === null && !uniform.rules[0].symbolizers[0].fill.enabled, 'Unfiltered uniform outline supported');
+
+    const geojson = { type: 'FeatureCollection', features: ['Forest', 'Water', null, 'Other'].map((kind, i) => ({ type: 'Feature', properties: { kind, second: i % 2 === 0 },
+        geometry: { type: i % 2 ? 'MultiPolygon' : 'Polygon', coordinates: i % 2 ? [[[[i,0],[i+0.8,0],[i+0.8,0.8],[i,0.8],[i,0]]]] : [[[i,0],[i+0.8,0],[i+0.8,0.8],[i,0.8],[i,0]]] } })) };
+    const features = new ol.format.GeoJSON().readFeatures(geojson);
+    const r = { features, isPolygonLayer: true, color: '#2563eb', polygonFillColor: '#2563eb', polygonStrokeColor: '#123456', polygonStrokeWidth: 2, opacity: 0.6, labelsVisible: true, labelField: 'kind' };
+    r.source = new ol.source.Vector({ features }); r.layer = new ol.layer.Vector({ source: r.source });
+    const map = new ol.Map({ target: 'map', layers: [r.layer], view: new ol.View({ center: [2, 0.4], resolution: 0.02 }) });
+    setLayerRecord('Example', r); classifyPolygonLayer(r, 'kind'); addLayerItem('Example', r.color, features.length);
+    const beforeGenerated = JSON.stringify(r.symbology.categories);
+    const item = document.querySelector('.layer-item'); item.classList.remove('collapsed');
+    const input = item.querySelector('.polygon-sld-input'), status = item.querySelector('.polygon-sld-status');
+    const mode = item.querySelector('.polygon-style-mode'), field = item.querySelector('.polygon-classification-field');
+    const legend = item.querySelector('.polygon-legend-entries');
+    const importFile = async (text, name = 'example.sld') => {
+        const transfer = new DataTransfer(); transfer.items.add(new File([text], name, { type: 'application/vnd.ogc.sld+xml' }));
+        input.files = transfer.files; input.dispatchEvent(new Event('change', { bubbles: true }));
+        const deadline = Date.now() + 5000;
+        while (item.querySelector('.polygon-sld-import').disabled && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 10));
+        assert(!item.querySelector('.polygon-sld-import').disabled, 'Import completed');
+    };
+    let opened = false;
+    input.addEventListener('click', e => { e.preventDefault(); opened = true; });
+    item.querySelector('.polygon-sld-import').click(); assert(opened && input.accept === '.sld', 'Optional button opens .sld file picker');
+    await importFile(basic);
+    assert(status.dataset.error === 'false' && status.textContent.includes('2 unmatched feature'), 'Useful import success and unmatched information');
+    assert(mode.value === 'imported' && field.value === 'kind' && field.disabled, 'Imported mode and SLD field selected');
+    assert(legend.children.length === 2 && legend.firstElementChild.textContent === 'Open water', 'Ordered rule labels rendered');
+    let polygon = legend.firstElementChild.querySelector('polygon');
+    assert(polygon.getAttribute('fill') === '#123456' && polygon.getAttribute('stroke') === '#ABCDEF', 'Imported colors in legend');
+    assert(polygon.getAttribute('fill-opacity') === '0.3' && polygon.getAttribute('stroke-opacity') === '0.15' && !polygon.hasAttribute('opacity'), 'Separate paint opacities multiplied by layer opacity');
+    const mapStyle = r.layer.getStyleFunction()(features[1])[0];
+    assert(mapStyle.getFill().getColor() === 'rgba(18, 52, 86, 0.3)' && mapStyle.getStroke().getWidth() === 2.5, 'Managed OL layer uses imported style immediately');
+    assert(createManagedFeatureStyles(r, features[0])[0].getStroke() === null, 'Absent stroke remains absent');
+    assert(r.labelsVisible && r.labelField === 'kind' && createManagedFeatureStyles(r, features[1])[1].getText().getText() === 'Water', 'Labels preserved');
+    map.renderSync();
+    assert(map.getViewport().querySelector('canvas'), 'Polygon and MultiPolygon rendered to canvas');
+    const snapshot = JSON.stringify(r.symbology), legendSnapshot = legend.innerHTML;
+    for (const [xml, name] of [[pattern, 'pattern.sld'], [basic.replace('</FeatureTypeStyle>', '<Rule><PointSymbolizer/></Rule></FeatureTypeStyle>'), 'later-unsupported.sld'], [basic.replaceAll('>kind<', '>missing<'), 'missing.sld'],
+        [basic.replaceAll('>Water<', '>never<').replaceAll('>Forest<', '>none<'), 'unmatched.sld'], ['<broken>', 'bad.sld'], [basic, 'wrong.xml']]) {
+        await importFile(xml, name);
+        assert(status.dataset.error === 'true' && JSON.stringify(r.symbology) === snapshot && legend.innerHTML === legendSnapshot, 'Failed import preserves configuration and legend');
+    }
+    change(mode, 'single'); assert(legend.children.length === 1 && !field.closest('.control-row').checkVisibility(), 'Single color mode retains independent fill');
+    change(mode, 'categorized'); assert(JSON.stringify(r.symbology.categories) === beforeGenerated && !field.disabled, 'Generated classification restored');
+    change(field, 'second'); assert(r.symbology.categories.length === 2, 'Automatic classification still works');
+    change(mode, 'imported'); assert(r.symbology.attribute === 'kind' && legend.children.length === 2, 'Imported style restored');
+    const strokeToggle = item.querySelector('.polygon-stroke-enabled'); strokeToggle.checked = false; strokeToggle.dispatchEvent(new Event('change'));
+    assert(legend.firstElementChild.querySelector('polygon').getAttribute('stroke') === 'none' && r.layer.getStyleFunction()(features[1])[0].getStroke() === null, 'Master Show Stroke affects map and legend');
+    strokeToggle.checked = true; strokeToggle.dispatchEvent(new Event('change'));
+    change(item.querySelector('.transparency-slider'), '40', 'input');
+    assert(r.layer.getStyleFunction()(features[1])[0].getStroke().getColor() === 'rgba(171, 205, 239, 0.1)', 'Opacity control multiplies imported paint opacity');
+    await importFile(basic.replace('#123456', '#FF0000').replace('<Title>Open water</Title>', '<Title>&lt;img src=x onerror="window.unsafe=true"&gt;</Title>'));
+    assert(legend.firstElementChild.querySelector('polygon').getAttribute('fill') === '#FF0000', 'Second import replaces style');
+    assert(legend.firstElementChild.textContent.includes('<img') && !legend.querySelector('img') && !window.unsafe, 'Rule label rendered as safe text');
+    assert(item.querySelector('.polygon-legend').previousElementSibling.querySelector('.transparency-slider'), 'Legend remains after opacity');
+    const panel = item.querySelector('.layer-controls-wrapper').getBoundingClientRect();
+    assert(item.querySelector('.polygon-sld-row').getBoundingClientRect().right <= panel.right + 1, 'Import UI fits panel');
+    for (const [name, properties] of [['Points', { isPointLayer: true, geometryType: 'Point', pointSize: 6 }], ['Lines', { isLineLayer: true, geometryType: 'LineString', lineStrokeWidth: 2 }]]) {
+        const other = { ...properties, color: '#654321', opacity: 0.8, features: [] };
+        setLayerRecord(name, other); addLayerItem(name, other.color, 0);
+        const otherItem = [...document.querySelectorAll('.layer-item')].find(node => node.dataset.layerName === name);
+        assert(otherItem.querySelector('.vector-sld-import') && otherItem.querySelectorAll('.vector-legend .polygon-legend-entry').length === 1, 'Point/line manual legend retained with optional SLD controls');
+        assert(getManagedLayerLegendDescriptors(name).length === 1, 'Point/line descriptors unaffected');
+    }
+    updateManagedLayerStyle('Example');
+    map.renderSync();
+    await verifyAdvancedPolygonSld({ r, map, item, importFile, change, assert, reject });
+    await verifyVectorSld({ assert, reject, change });
+    return [{ control: 'SLD parser, validation, local file import, map, legends and mode switching', passed: true }];
+});
+</script></body></html>

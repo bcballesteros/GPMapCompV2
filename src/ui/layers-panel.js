@@ -1,3 +1,6 @@
+import { bindPolygonControls, polygonModeMarkup, polygonLegendMarkup } from './polygon-controls.js';
+import { bindVectorSldControls, vectorSldMarkup } from './vector-sld-controls.js';
+import { ensurePolygonSymbology, setPolygonCategoryColor } from '../map/polygon-symbology.js';
 import { DEFAULT_LINE_STROKE_WIDTH, DEFAULT_POINT_SIZE } from '../config/constants.js';
 import { canZoomToLayer, fitLayerToView, removeManagedLayer, updateManagedLayerStyle } from '../map/layer-manager.js';
 import { getLayerRecord, renameLayerRecord, setCurrentLayerName } from '../state/store.js';
@@ -7,6 +10,7 @@ import { bindVectorColorPickers, colorSwatchMarkup } from './vector-color-picker
 import { showToast } from './toast.js';
 import { syncLabelAttributeControl } from './sidebar.js';
 import { confirmDestructiveAction } from './confirmation-dialog.js';
+import { syncVectorLegend, vectorLegendMarkup } from './vector-legend.js';
 
 let layerNameTooltipElement = null;
 let layerNameTooltipListenersBound = false;
@@ -819,11 +823,17 @@ export function addLayerItem(name, color, featureCount, options = {}) {
     bindVectorColorPickers(layerList, {
         getColor: (trigger) => {
             const record = getLayerRecord(getLayerItemName(trigger.closest('.layer-item')));
+            if (trigger.dataset.vectorColor === 'polygonCategory') return trigger.value;
             return record?.[trigger.dataset.vectorColor] || record?.color || trigger.value;
         },
         onChange: (trigger) => {
             const key = trigger.dataset.vectorColor;
-            if (key === 'polygonFillColor') updatePolygonFillColor(trigger);
+            if (key === 'polygonCategory') {
+                const name = getLayerItemName(trigger.closest('.layer-item'));
+                const record = getLayerRecord(name);
+                if (record && setPolygonCategoryColor(record, trigger.dataset.categoryId, trigger.value)) updateManagedLayerStyle(name);
+            }
+            else if (key === 'polygonFillColor') updatePolygonFillColor(trigger);
             else if (key === 'polygonStrokeColor') updatePolygonStrokeColor(trigger);
             else if (key === 'markerStrokeColor') updateMarkerStrokeColor(trigger, getLayerItemName(trigger.closest('.layer-item')));
             else updateLayerColor(trigger);
@@ -1004,7 +1014,8 @@ export function addLayerItem(name, color, featureCount, options = {}) {
         `;
         opacityLabel = 'Line Opacity';
     } else if (isPolygonLayer) {
-        polygonStyleControls = `
+        polygonStyleControls = `${polygonModeMarkup}
+            <div class="control-row polygon-stroke-toggle-row"><label><span>Show Stroke</span><input type="checkbox" class="polygon-stroke-enabled" aria-label="Show Stroke" checked></label></div>
             <div class="control-row">
                 <label>
                     <span>Fill Color</span>
@@ -1065,11 +1076,13 @@ export function addLayerItem(name, color, featureCount, options = {}) {
                 </div>
             </div>
             <div class="layer-controls-wrapper">
-                <div class="layer-controls">
+                <div class="layer-controls ${isPolygonLayer ? 'polygon-layer-controls' : ''}">
+                    ${(isPointLayer || isLineLayer) ? `${vectorSldMarkup}<fieldset class="vector-manual-controls" aria-label="Manual symbol settings">` : ''}
                     ${colorControl}
                     ${polygonStyleControls}
                     ${lineWidthControl}
                     ${pointSizeControl}
+                    ${(isPointLayer || isLineLayer) ? '</fieldset>' : ''}
                     <div class="control-row control-row-stack">
                         <div class="transparency-header">
                             <span class="control-label">${opacityLabel}</span>
@@ -1087,6 +1100,7 @@ export function addLayerItem(name, color, featureCount, options = {}) {
                             >
                         </div>
                     </div>
+                    ${isPolygonLayer ? polygonLegendMarkup : (isPointLayer || isLineLayer) ? vectorLegendMarkup : ''}
                     <div class="control-row control-row-action">
                         <button class="layer-action-btn danger layer-action-btn-full" onclick="removeLayer(event)" title="Remove Layer"><i class="fas fa-trash"></i> Remove</button>
                     </div>
@@ -1102,6 +1116,9 @@ export function addLayerItem(name, color, featureCount, options = {}) {
     const tmp = document.createElement('div');
     tmp.innerHTML = layerHTML.trim();
     const newItem = tmp.firstElementChild;
+    if (isPolygonLayer) bindPolygonControls(newItem, record);
+    if (isPointLayer || isLineLayer) bindVectorSldControls(newItem, record);
+    if (isPointLayer || isLineLayer) syncVectorLegend(newItem, name);
     if (newItem) {
         newItem.setAttribute('data-group', groupKey);
 
@@ -1427,6 +1444,7 @@ export function updatePolygonFillColor(colorPicker) {
         return;
     }
 
+    if (ensurePolygonSymbology(record).mode === 'categorized') return;
     record.color = newColor;
     record.polygonFillColor = newColor;
     updateManagedLayerStyle(layerName);

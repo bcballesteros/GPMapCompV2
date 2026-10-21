@@ -1,1 +1,52 @@
 /* Reserved for component-level styles as the UI grows. */
+.polygon-mode-row select,
+.polygon-field-row select {
+    box-sizing: border-box;
+    width: 0;
+    flex: 1 1 0;
+    max-width: 100%;
+    min-width: 0;
+    height: 34px;
+    padding: 6px 30px 6px 10px;
+    border: 1px solid var(--gray-200);
+    border-radius: 6px;
+    background-color: #fff;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%2364748b' d='m1.4 1.2 4.6 4.6 4.6-4.6L12 2.6 6 8 0 2.6z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    color: var(--gray-700);
+    font: inherit;
+    font-size: 12px;
+    appearance: none;
+    -webkit-appearance: none;
+    text-overflow: ellipsis;
+}
+.polygon-mode-row label,
+.polygon-field-row label { min-width: 0; }
+.polygon-mode-row select:hover,
+.polygon-field-row select:hover { border-color: var(--gray-300); }
+.polygon-mode-row select:focus-visible,
+.polygon-field-row select:focus-visible { outline: 2px solid rgba(37, 99, 235, .35); outline-offset: 1px; border-color: var(--accent); }
+.polygon-stroke-toggle-row label { min-height: 32px; }
+.polygon-stroke-toggle-row input { margin: 0 4px 0 auto; accent-color: var(--accent); }
+.polygon-stroke-picker:disabled { opacity: .5; cursor: not-allowed; }
+.polygon-width-row input:disabled { opacity: .5; cursor: not-allowed; }
+.polygon-width-row { margin-top: 0; }
+.polygon-mode-row + .polygon-stroke-toggle-row,
+.polygon-stroke-toggle-row + .control-row { margin-top: 0; }
+.polygon-field-row select option { max-width: 100%; }
+.polygon-field-row[hidden], .control-row[hidden] { display: none; }
+.polygon-layer-controls { gap: var(--spacing-2); }
+.polygon-legend-entries { width: 100%; max-height: 240px; overflow-y: auto; }
+.polygon-legend-entry { display: flex; align-items: center; gap: 8px; padding: 3px 0; }
+.polygon-legend-symbol { display: inline-flex; flex: 0 0 32px; width: 32px; height: 26px; }
+.polygon-legend-symbol.vector-color-swatch { background: transparent !important; border: 0; border-radius: 3px; }
+.polygon-legend-symbol svg { width: 32px; height: 24px; overflow: hidden; flex-shrink: 0; }
+.polygon-legend-label { min-width: 0; overflow-wrap: anywhere; font-size: 12px; }
+.polygon-sld-import { align-self: flex-start; }
+.vector-sld-import { align-self: flex-start; }
+.vector-manual-controls { border: 0; padding: 0; margin: 0; min-width: 0; display: contents; }
+.vector-manual-controls:disabled > .control-row { opacity: 0.55; }
+.polygon-sld-status { font-size: 11px; color: var(--gray-600); overflow-wrap: anywhere; }
+.polygon-sld-status:empty { display: none; }
+.polygon-sld-status[data-error="true"] { color: #b91c1c; }

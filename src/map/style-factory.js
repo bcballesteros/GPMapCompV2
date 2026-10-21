@@ -1,3 +1,7 @@
+import { getPolygonRuntime, resolvePolygonCategory, resolvePolygonSymbols } from './polygon-symbology.js';
+import { getImportedVectorStyles, isImportedVectorStyle } from './vector-sld-symbology.js';
+import { createImportedVectorStyle } from './vector-sld-style.js';
+import { getPolygonPatternDescriptor, polygonPaintColor } from './polygon-patterns.js';
 import { DEFAULT_LINE_STROKE_WIDTH, DEFAULT_POINT_SIZE, DEFAULT_STYLE_OPACITY, DEFAULT_SVG_BASE_SIZE, DEFAULT_SVG_BASE_SCALE } from '../config/constants.js';
 import ol from '../lib/ol.js';
 
@@ -89,15 +93,15 @@ export function createFeatureStyle(
 ) {
     const fillHex = options.fillColor || color;
     const strokeHex = options.strokeColor || color;
-    const fillColor = hexToRgba(fillHex, opacity);
-    const strokeColor = isHighlight ? 'rgba(255, 223, 0, 0.9)' : hexToRgba(strokeHex, opacity);
+    const fillColor = hexToRgba(fillHex, opacity * (options.fillOpacity ?? 1));
+    const strokeColor = isHighlight ? 'rgba(255, 223, 0, 0.9)' : hexToRgba(strokeHex, opacity * (options.strokeOpacity ?? 1));
     const safeStrokeWidth = Number.isFinite(strokeWidth) ? strokeWidth : DEFAULT_LINE_STROKE_WIDTH;
     const renderedStrokeWidth = isHighlight ? Math.max(safeStrokeWidth + 2, 4) : safeStrokeWidth;
     const safePointSize = Number.isFinite(pointSize) ? pointSize : DEFAULT_POINT_SIZE;
 
     return new ol.style.Style({
-        fill: new ol.style.Fill({ color: fillColor }),
-        stroke: new ol.style.Stroke({ color: strokeColor, width: renderedStrokeWidth }),
+        fill: options.omitFill ? null : new ol.style.Fill({ color: fillColor }),
+        stroke: options.omitStroke ? null : new ol.style.Stroke({ color: strokeColor, width: renderedStrokeWidth }),
         image: new ol.style.Circle({
             radius: isHighlight ? Math.max(safePointSize + 3, 8) : safePointSize,
             fill: new ol.style.Fill({ color: fillColor }),
@@ -236,7 +240,7 @@ function normalizeSvgText(svgText, basePx) {
     return svgText.replace(/<svg\b[^>]*>/i, `<svg${svgAttrs}>`);
 }
 
-function normalizeSvgDataUrl(src, basePx) {
+export function normalizeSvgDataUrl(src, basePx = DEFAULT_SVG_BASE_SIZE || 24) {
     if (typeof src !== 'string') {
         return src;
     }
@@ -347,7 +351,9 @@ export function createManagedFeatureStyles(record, feature, options = {}) {
     const labelsEnabled = options.labelsEnabled ?? record.labelsVisible;
     const styles = [];
 
-    if (record.isPointLayer) {
+    if (isImportedVectorStyle(record)) {
+        styles.push(...getImportedVectorStyles(record, feature, createImportedVectorStyle, Boolean(options.isHighlighted)));
+    } else if (record.isPointLayer) {
         // Priority: preset marker > uploaded SVG > default circle style
         if (record.markerPresetType) {
             // Generate preset marker with stroke styling
@@ -377,16 +383,28 @@ export function createManagedFeatureStyles(record, feature, options = {}) {
                 colorOptions
             ));
         }
+    } else if (record.isPolygonLayer) {
+        const category = resolvePolygonCategory(record, feature);
+        const symbols = resolvePolygonSymbols(record, category);
+        const key = JSON.stringify([category.id || 'single', symbols, Boolean(options.isHighlighted)]);
+        const cache = getPolygonRuntime(record).styles;
+        let style = cache.get(key);
+        if (!style) {
+            style = symbols.map(symbol => new ol.style.Style({
+                fill: !symbol.fillEnabled ? null : new ol.style.Fill({ color: symbol.pattern
+                    ? getPolygonPatternDescriptor(symbol.pattern, symbol.opacity * symbol.fillOpacity)
+                    : polygonPaintColor(symbol.fillColor || record.color, symbol.opacity * symbol.fillOpacity) }),
+                stroke: !symbol.stroke.enabled ? null : new ol.style.Stroke({
+                    color: options.isHighlighted ? 'rgba(255, 223, 0, 0.9)'
+                        : polygonPaintColor(symbol.stroke.color, symbol.opacity * symbol.stroke.opacity),
+                    width: options.isHighlighted ? Math.max(symbol.stroke.width + 2, 4) : symbol.stroke.width })
+            }));
+            cache.set(key, style);
+        }
+        styles.push(...style);
     } else {
-        const strokeWidth = record.isPolygonLayer
-            ? record.polygonStrokeWidth
-            : record.lineStrokeWidth;
-        const colorOptions = record.isPolygonLayer
-            ? {
-                fillColor: record.polygonFillColor || record.color,
-                strokeColor: record.polygonStrokeColor || record.color
-            }
-            : {};
+        const strokeWidth = record.lineStrokeWidth;
+        const colorOptions = {};
 
         styles.push(createFeatureStyle(
             record.color,

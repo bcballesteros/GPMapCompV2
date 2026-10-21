@@ -47,11 +47,10 @@ function buildPdfBytes({ jpegBytes, width, height }) {
         '2 0 obj\n<< /Type /Pages /Count 1 /Kids [3 0 R] >>\nendobj\n',
         `3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pdfWidth} ${pdfHeight}] /Resources << /XObject << /Im0 4 0 R >> >> /Contents 5 0 R >>\nendobj\n`,
         `4 0 obj\n<< /Type /XObject /Subtype /Image /Width ${width} /Height ${height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${jpegBytes.length} >>\nstream\n`,
-        `\nendstream\nendobj\n`,
         null
     ];
     const contentStream = `q\n${pdfWidth} 0 0 ${pdfHeight} 0 0 cm\n/Im0 Do\nQ\n`;
-    objects[5] = `5 0 obj\n<< /Length ${contentStream.length} >>\nstream\n${contentStream}endstream\nendobj\n`;
+    objects[4] = `5 0 obj\n<< /Length ${contentStream.length} >>\nstream\n${contentStream}endstream\nendobj\n`;
 
     const encoder = new TextEncoder();
     const parts = [encoder.encode(header)];
@@ -62,13 +61,9 @@ function buildPdfBytes({ jpegBytes, width, height }) {
         offsets[index + 1] = currentOffset;
         if (index === 3) {
             const prefix = encoder.encode(object);
-            const suffix = encoder.encode(objects[4]);
+            const suffix = encoder.encode('\nendstream\nendobj\n');
             parts.push(prefix, jpegBytes, suffix);
             currentOffset += prefix.length + jpegBytes.length + suffix.length;
-            return;
-        }
-
-        if (index === 4) {
             return;
         }
 

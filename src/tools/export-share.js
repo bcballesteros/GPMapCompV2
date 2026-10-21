@@ -7,6 +7,8 @@ import ol from '../lib/ol.js';
 import northArrowUrl from '../assets/north-arrow.svg';
 import { createRecipientChips } from '../ui/recipient-chips.js';
 import { getShareDeliveryResult } from '../services/share-delivery-result.js';
+import { captureOutputLegend, drawOutputLegend, legendFont } from '../services/output-legend.js';
+import { assertOutputSize, layoutOutputLegend, OutputSizeError } from '../services/output-legend-layout.js';
 
 const EXPORT_LONG_EDGE_PX = 2560;
 const EXPORT_MAX_PIXEL_AREA = 12000000;
@@ -192,22 +194,16 @@ function isRenderableCanvas(canvas) {
 function getCanvasTransform(canvas) {
     const computedStyle = window.getComputedStyle(canvas);
     const transform = computedStyle.transform;
-    const rect = canvas.getBoundingClientRect();
-    const widthRatio = rect.width && canvas.width ? rect.width / canvas.width : 1;
-    const heightRatio = rect.height && canvas.height ? rect.height / canvas.height : 1;
+    const widthRatio = parseFloat(computedStyle.width) / canvas.width || 1;
+    const heightRatio = parseFloat(computedStyle.height) / canvas.height || 1;
 
     if (transform && transform !== 'none') {
         const match = transform.match(/^matrix\((.+)\)$/);
         if (match) {
-            const matrix = match[1].split(',').map(Number);
-            return [
-                matrix[0] * widthRatio,
-                matrix[1] * heightRatio,
-                matrix[2] * widthRatio,
-                matrix[3] * heightRatio,
-                matrix[4] * widthRatio,
-                matrix[5] * heightRatio
-            ];
+            // OL's pixel transform already maps backing pixels into viewport
+            // CSS pixels, including DPR and rotation. A rotated bounding box
+            // cannot supply an additional scale without distorting geography.
+            return match[1].split(',').map(Number);
         }
     }
 
@@ -311,7 +307,7 @@ function cloneXyzSource(source) {
     return clonedSource;
 }
 
-function cloneMapLayer(layer) {
+function cloneMapLayer(layer, snapshotResolution) {
     const source = layer.getSource?.();
     if (!source) {
         return null;
@@ -330,10 +326,34 @@ function cloneMapLayer(layer) {
     };
 
     if (layer instanceof ol.layer.Vector) {
+        let vectorSource = source;
+        let style = layer.getStyle();
+        if (snapshotResolution !== undefined) {
+            // Resolve styles synchronously, before any asynchronous rendering.
+            // No closure over a live managed record survives this boundary.
+            const styleCopies = new Map();
+            const features = source.getFeatures().map(feature => {
+                const copy = feature.clone();
+                copy.setId(feature.getId());
+                const effective = feature.getStyleFunction() || layer.getStyleFunction();
+                const resolved = effective?.(feature, snapshotResolution);
+                const styles = resolved ? (Array.isArray(resolved) ? resolved : [resolved]).map(s => {
+                    if (!styleCopies.has(s)) styleCopies.set(s, s.clone());
+                    return styleCopies.get(s);
+                }) : [];
+                copy.setStyle(styles);
+                return copy;
+            });
+            vectorSource = new ol.source.Vector({ features, wrapX: source.getWrapX() });
+            style = null;
+        }
         const previewLayer = new ol.layer.Vector({
             ...commonOptions,
-            source,
-            style: layer.getStyle()
+            source: vectorSource,
+            style,
+            declutter: layer.getDeclutter(),
+            renderBuffer: layer.getRenderBuffer(),
+            renderOrder: layer.getRenderOrder()
         });
         previewLayer.setZIndex(commonOptions.zIndex);
         return previewLayer;
@@ -358,109 +378,6 @@ function cloneMapLayer(layer) {
     return null;
 }
 
-function clonePreviewLayer(layer, index) {
-    return cloneMapLayer(layer, index);
-}
-
-function ensurePreviewMap(previewKind = 'export', target = getPreviewElements(previewKind).target) {
-    const previewState = previewStates[previewKind];
-    if (previewState.map) {
-        if (previewState.map.getTargetElement?.() !== target && target) {
-            previewState.map.setTarget(target);
-        }
-        debugPreview('ensurePreviewMap:reuse');
-        return previewState.map;
-    }
-
-    if (!target) {
-        debugPreview('ensurePreviewMap:missing-target');
-        return null;
-    }
-
-    const mainMap = getMap();
-    const projection = mainMap?.getView().getProjection();
-    debugPreview('ensurePreviewMap:create:before');
-
-    previewState.map = new ol.Map({
-        target,
-        controls: [],
-        layers: [],
-        view: new ol.View({
-            center: mainMap?.getView().getCenter() ?? [0, 0],
-            zoom: mainMap?.getView().getZoom() ?? 1,
-            projection
-        })
-    });
-
-    previewState.map.getInteractions().clear();
-    debugPreview('ensurePreviewMap:create:after');
-
-    return previewState.map;
-}
-
-function rebuildPreviewLayers(mainMapInstance, previewKind = 'export') {
-    const previewInstance = ensurePreviewMap(previewKind);
-    if (!previewInstance || !mainMapInstance) {
-        debugPreview('rebuildPreviewLayers:exit', {
-            hasPreviewInstance: Boolean(previewInstance),
-            hasMainMapInstance: Boolean(mainMapInstance)
-        });
-        return;
-    }
-
-    debugPreview('rebuildPreviewLayers:before');
-    const previewLayers = previewInstance.getLayers();
-    previewLayers.clear();
-
-    mainMapInstance.getLayers().forEach((layer, index) => {
-        const previewLayer = clonePreviewLayer(layer, index);
-        if (previewLayer) {
-            previewLayers.push(previewLayer);
-        }
-    });
-    debugPreview('rebuildPreviewLayers:after');
-}
-
-function syncPreviewView(mainMapInstance, previewKind = 'export') {
-    const previewInstance = ensurePreviewMap(previewKind);
-    if (!previewInstance || !mainMapInstance) {
-        debugPreview('syncPreviewView:exit', {
-            hasPreviewInstance: Boolean(previewInstance),
-            hasMainMapInstance: Boolean(mainMapInstance)
-        });
-        return;
-    }
-
-    debugPreview('syncPreviewView:before-updateSize');
-    previewInstance.updateSize();
-
-    const mainSize = mainMapInstance.getSize();
-    const previewSize = previewInstance.getSize();
-    const mainView = mainMapInstance.getView();
-    const previewView = previewInstance.getView();
-
-    if (mainSize && previewSize) {
-        const extent = mainView.calculateExtent(mainSize);
-        previewView.fit(extent, {
-            size: previewSize,
-            duration: 0,
-            nearest: true
-        });
-    } else {
-        previewView.setCenter(mainView.getCenter());
-        previewView.setZoom(mainView.getZoom());
-    }
-
-    previewView.setRotation(mainView.getRotation() || 0);
-    debugPreview('syncPreviewView:after', {
-        mainSize,
-        previewSize,
-        center: previewView.getCenter(),
-        zoom: previewView.getZoom(),
-        rotation: previewView.getRotation()
-    });
-}
-
 function bindPreviewSyncListeners() {
     if (previewListenersBound) {
         return;
@@ -472,6 +389,8 @@ function bindPreviewSyncListeners() {
     }
 
     const scheduleSync = (reason = 'unknown') => {
+        if (!document.getElementById('exportModal')?.classList.contains('active')
+            && !document.getElementById('shareModal')?.classList.contains('active')) return;
         debugPreview('scheduleSync:called', { reason });
         if (previewSyncScheduled) {
             debugPreview('scheduleSync:exit-already-scheduled', { reason });
@@ -496,6 +415,10 @@ function bindPreviewSyncListeners() {
     });
     mainMap.getLayers().on('remove', () => scheduleSync('layers-remove'));
     mainMap.getLayers().forEach((layer) => layer.on('change', () => scheduleSync('layer-change')));
+    window.addEventListener('gpmap:layerstylechange', () => scheduleSync('style'));
+    window.addEventListener('gpmap:statechange', event => {
+        if (event.detail?.key === 'uploadedLayers') scheduleSync('records');
+    });
     previewListenersBound = true;
     debugPreview('bindPreviewSyncListeners:bound');
 }
@@ -510,163 +433,6 @@ function rebuildMapLayers(targetMap, sourceMap) {
             targetLayers.push(clonedLayer);
         }
     });
-}
-
-function waitForAnimationFrame() {
-    return new Promise((resolve) => {
-        requestAnimationFrame(resolve);
-    });
-}
-
-function getRenderedElementRect(element) {
-    if (!element?.isConnected) {
-        return null;
-    }
-
-    const rect = element.getBoundingClientRect();
-    const style = window.getComputedStyle(element);
-    if (style.display === 'none' || rect.width <= 0 || rect.height <= 0) {
-        return null;
-    }
-
-    return rect;
-}
-
-function waitForElementRenderedSize(element) {
-    if (getRenderedElementRect(element)) {
-        debugPreview('waitForElementRenderedSize:ready-immediate', {
-            rect: getDebugRect(element)
-        });
-        return Promise.resolve();
-    }
-
-    debugPreview('waitForElementRenderedSize:wait-start', {
-        rect: getDebugRect(element)
-    });
-    return new Promise((resolve) => {
-        let resizeObserver = null;
-        let mutationObserver = null;
-        let animationFrameId = null;
-
-        const cleanup = () => {
-            if (animationFrameId !== null) {
-                cancelAnimationFrame(animationFrameId);
-                animationFrameId = null;
-            }
-
-            resizeObserver?.disconnect();
-            mutationObserver?.disconnect();
-        };
-
-        const check = () => {
-            if (!getRenderedElementRect(element)) {
-                return false;
-            }
-
-            cleanup();
-            debugPreview('waitForElementRenderedSize:ready-after-wait', {
-                rect: getDebugRect(element)
-            });
-            resolve();
-            return true;
-        };
-
-        const scheduleCheck = () => {
-            if (animationFrameId !== null) {
-                return;
-            }
-
-            animationFrameId = requestAnimationFrame(() => {
-                animationFrameId = null;
-                check();
-            });
-        };
-
-        if (typeof ResizeObserver === 'function') {
-            resizeObserver = new ResizeObserver(scheduleCheck);
-            resizeObserver.observe(element);
-
-            let parent = element.parentElement;
-            while (parent && parent !== document.body) {
-                resizeObserver.observe(parent);
-                parent = parent.parentElement;
-            }
-        }
-
-        if (typeof MutationObserver === 'function') {
-            mutationObserver = new MutationObserver(scheduleCheck);
-            mutationObserver.observe(document.documentElement, {
-                attributes: true,
-                attributeFilter: ['class', 'hidden', 'style'],
-                childList: true,
-                subtree: true
-            });
-        }
-
-        scheduleCheck();
-    });
-}
-
-function hasUsableMapSize(map) {
-    const size = map?.getSize?.();
-    return Array.isArray(size) && size[0] > 0 && size[1] > 0;
-}
-
-async function ensureMapRenderedSize(map, targetElement) {
-    const renderTarget = targetElement || map?.getTargetElement?.();
-    if (!map || !renderTarget) {
-        debugPreview('ensureMapRenderedSize:exit', {
-            role: getDebugMapRole(map),
-            hasMap: Boolean(map),
-            hasRenderTarget: Boolean(renderTarget)
-        });
-        return false;
-    }
-
-    debugPreview('ensureMapRenderedSize:before', {
-        role: getDebugMapRole(map),
-        targetRect: getDebugRect(renderTarget)
-    });
-    await waitForElementRenderedSize(renderTarget);
-    map.updateSize();
-    debugPreview('ensureMapRenderedSize:after-first-update', {
-        role: getDebugMapRole(map)
-    });
-    await waitForAnimationFrame();
-    map.updateSize();
-    debugPreview('ensureMapRenderedSize:after-second-update', {
-        role: getDebugMapRole(map),
-        usable: hasUsableMapSize(map)
-    });
-
-    return hasUsableMapSize(map);
-}
-
-function hasRenderedMapCanvas(map) {
-    const viewport = map?.getViewport?.();
-    if (!viewport || !hasUsableMapSize(map)) {
-        return false;
-    }
-
-    return Array.from(viewport.querySelectorAll('.ol-layer canvas, canvas.ol-layer')).some(isRenderableCanvas);
-}
-
-async function waitForPreviewFrame(map) {
-    debugPreview('waitForPreviewFrame:start');
-    await waitForMapSettledRender(map);
-    if (hasRenderedMapCanvas(map)) {
-        debugPreview('waitForPreviewFrame:canvas-after-settled');
-        return true;
-    }
-
-    map?.updateSize?.();
-    debugPreview('waitForPreviewFrame:no-canvas-retry');
-    await waitForAnimationFrame();
-    await waitForMapSettledRender(map, { sync: true });
-
-    const hasCanvas = hasRenderedMapCanvas(map);
-    debugPreview('waitForPreviewFrame:done', { hasCanvas });
-    return hasCanvas;
 }
 
 function getVisibleLayerSources(map) {
@@ -684,60 +450,6 @@ function getVisibleLayerSources(map) {
     });
 
     return sources;
-}
-
-function waitForViewIdle(map) {
-    const view = map?.getView?.();
-    if (!view || (!view.getAnimating?.() && !view.getInteracting?.())) {
-        return Promise.resolve();
-    }
-
-    return new Promise((resolve) => {
-        const key = view.on('change', () => {
-            if (view.getAnimating?.() || view.getInteracting?.()) {
-                return;
-            }
-
-            ol.Observable.unByKey(key);
-            resolve();
-        });
-    });
-}
-
-function waitForMapRenderComplete(map, { sync = false } = {}) {
-    if (!map) {
-        debugPreview('waitForMapRenderComplete:exit-no-map');
-        return Promise.resolve();
-    }
-
-    const observer = observeMapRender(map, {
-        sources: getVisibleLayerSources(map),
-        debug: (event, details) => debugPreview(event, { role: getDebugMapRole(map), ...details })
-    });
-    try {
-        if (sync) {
-            map.renderSync();
-        } else {
-            map.render();
-        }
-    } catch (error) {
-        observer.dispose();
-        throw error;
-    }
-    return observer.ready;
-}
-
-async function waitForMapSettledRender(map, options) {
-    debugPreview('waitForMapSettledRender:start', {
-        role: getDebugMapRole(map),
-        options: options || {}
-    });
-    await waitForViewIdle(map);
-    await waitForMapRenderComplete(map, options);
-    debugPreview('waitForMapSettledRender:done', {
-        role: getDebugMapRole(map),
-        options: options || {}
-    });
 }
 
 function getTimeStampForFileName() {
@@ -793,7 +505,7 @@ function getLocalExportDate() {
     ].join('-');
 }
 
-function drawExportFooter(context, canvasWidth, canvasHeight, footerHeight) {
+function drawExportFooter(context, canvasWidth, canvasHeight, footerHeight, crsLabel = getExportCrsLabel(), exportDate = getLocalExportDate()) {
     if (footerHeight <= 0 || canvasWidth <= 0 || canvasHeight <= 0) {
         return;
     }
@@ -802,8 +514,6 @@ function drawExportFooter(context, canvasWidth, canvasHeight, footerHeight) {
     const footerY = canvasHeight - footerHeight;
     const footerWidth = canvasWidth;
 
-    const exportDate = getLocalExportDate();
-    const crsLabel = getExportCrsLabel();
     const disclaimerText = `Generated from NAMRIA GP Map Composer | ${crsLabel} | ${exportDate}`;
 
     context.save();
@@ -963,11 +673,8 @@ function syncExportView(exportMap, mainMap, exportSize) {
     const exportView = exportMap.getView();
 
     if (mainSize) {
-        exportView.fit(mainView.calculateExtent(mainSize), {
-            size: exportSize,
-            duration: 0,
-            nearest: false
-        });
+        exportView.setCenter(mainView.getCenter());
+        exportView.setResolution(mainView.getResolution() * Math.max(mainSize[0] / exportSize[0], mainSize[1] / exportSize[1]));
     } else {
         exportView.setCenter(mainView.getCenter());
         exportView.setResolution(mainView.getResolution());
@@ -1071,143 +778,114 @@ async function renderExportMapToCanvas(mainMap, width, height) {
     }
 }
 
-async function renderMapToCanvas() {
+export async function renderMapToCanvas() {
     const mainMap = getMap();
     if (!mainMap) {
         throw new Error('Map is not ready');
     }
 
-    const { width, mapHeight } = getExportCanvasSize(mainMap);
-    const footerHeight = Math.max(24, Math.round(mapHeight * 0.025));
-    const height = mapHeight + footerHeight;
+    // Capture all state before the first await, including per-feature native
+    // styles, visibility, WMS parameters, view, CRS and legend descriptors.
+    const groups = captureOutputLegend(mainMap, getState().uploadedLayers);
+    const view = mainMap.getView();
+    const originalSources = new Set(mainMap.getLayers().getArray().map(layer => layer.getSource?.()));
+    const snapshotLayers = [];
+    let snapshotMap;
+    let mapCanvas;
+    try {
+        mainMap.getLayers().forEach(layer => {
+            const clone = cloneMapLayer(layer, view.getResolution());
+            if (clone) {
+                clone.setVisible(layer.isVisible(view));
+                // Eligibility is evaluated at the captured live view, before the
+                // output resolution changes solely to increase pixel quality.
+                clone.setMinResolution(0); clone.setMaxResolution(Infinity);
+                clone.setMinZoom(-Infinity); clone.setMaxZoom(Infinity);
+                snapshotLayers.push(clone);
+            }
+        });
+        snapshotMap = new ol.Map({ controls: [], interactions: [], layers: snapshotLayers,
+            view: new ol.View({ center: view.getCenter().slice(), resolution: view.getResolution(),
+                rotation: view.getRotation(), projection: view.getProjection() }) });
+        snapshotMap.setSize(mainMap.getSize()?.slice() || [2560, 1440]);
+        const rotation = view.getRotation();
+        const crs = getExportCrsLabel(), date = getLocalExportDate();
+        const { width, mapHeight } = getExportCanvasSize(snapshotMap);
+        const footerHeight = Math.max(24, Math.round(mapHeight * 0.025));
+        const measureContext = createExportCanvas(1, 1).getContext('2d');
+        const layout = layoutOutputLegend(groups, width, mapHeight, footerHeight, (text, bold) => {
+            measureContext.font = legendFont(bold); return measureContext.measureText(text).width;
+        });
+        assertOutputSize(layout.width, layout.height);
+        mapCanvas = await renderExportMapToCanvas(snapshotMap, width, mapHeight);
 
-    // Output readiness belongs to the fresh export map. Waiting for live-map
-    // tiles here can stall retries on errors already cached in the live map.
-    await waitForViewIdle(mainMap);
+        const exportCanvas = createExportCanvas(layout.width, layout.height);
+        const context = exportCanvas.getContext('2d');
 
-    const mapCanvas = await renderExportMapToCanvas(mainMap, width, mapHeight);
+        if (!context) {
+            throw new Error('Failed to get canvas context');
+        }
 
-    const exportCanvas = createExportCanvas(width, height);
-    const context = exportCanvas.getContext('2d');
+        context.imageSmoothingEnabled = false;
+        context.fillStyle = '#ffffff';
+        context.fillRect(0, 0, layout.width, layout.height);
+        context.drawImage(
+            mapCanvas,
+            0,
+            0,
+            width,
+            mapHeight,
+            0,
+            0,
+            width,
+            mapHeight
+        );
 
-    if (!context) {
-        throw new Error('Failed to get canvas context');
+        await drawExportNorthArrow(
+            context,
+            width,
+            rotation || 0
+        );
+
+        await drawOutputLegend(context, layout, width, groups);
+        drawExportFooter(context, layout.width, layout.height, footerHeight, crs, date);
+
+        return exportCanvas;
+    } finally {
+        if (mapCanvas) { mapCanvas.width = 0; mapCanvas.height = 0; }
+        snapshotMap?.dispose();
+        snapshotLayers.forEach(layer => { if (!originalSources.has(layer.getSource())) layer.getSource()?.dispose(); layer.dispose(); });
     }
-
-    context.imageSmoothingEnabled = false;
-    context.fillStyle = '#ffffff';
-    context.fillRect(0, 0, width, height);
-    context.drawImage(
-        mapCanvas,
-        0,
-        0,
-        width,
-        mapHeight,
-        0,
-        0,
-        width,
-        mapHeight
-    );
-
-    await drawExportNorthArrow(
-        context,
-        width,
-        mainMap.getView()?.getRotation?.() || 0
-    );
-
-    drawExportFooter(context, width, height, footerHeight);
-
-    return exportCanvas;
 }
 
 export async function renderMapPreview(reason = 'direct', previewKind = 'export') {
     const { container, target, placeholder } = getPreviewElements(previewKind);
-    const mainMap = getMap();
-
-    debugPreview('renderMapPreview:start', {
-        reason,
-        hasContainer: Boolean(container),
-        hasTarget: Boolean(target),
-        hasPlaceholder: Boolean(placeholder),
-        hasMainMap: Boolean(mainMap)
-    });
-
-    if (!container || !target || !placeholder || !mainMap) {
-        debugPreview('renderMapPreview:exit-missing-elements', { reason });
-        return;
-    }
-
-    const previewState = previewStates[previewKind] || previewStates.export;
+    if (!container || !target || !placeholder || !getMap()) return;
     bindPreviewSyncListeners();
-    const renderToken = ++previewState.renderToken;
-    debugPreview('renderMapPreview:token-created', { reason, renderToken });
-
-    await waitForElementRenderedSize(target);
-    if (renderToken !== previewState.renderToken) {
-        debugPreview('renderMapPreview:exit-token-after-target-size', {
-            reason,
-            renderToken,
-            currentToken: previewState.renderToken
-        });
-        return;
-    }
-
-    const previewInstance = ensurePreviewMap(previewKind, target);
-    if (!previewInstance || renderToken !== previewState.renderToken) {
-        debugPreview('renderMapPreview:exit-after-ensure-preview-map', {
-            reason,
-            previewKind,
-            renderToken,
-            currentToken: previewState.renderToken,
-            hasPreviewInstance: Boolean(previewInstance)
-        });
-        return;
-    }
-
-    await ensureMapRenderedSize(previewInstance, target);
-    if (renderToken !== previewState.renderToken) {
-        debugPreview('renderMapPreview:exit-token-after-preview-size', {
-            reason,
-            renderToken,
-            currentToken: previewState.renderToken
-        });
-        return;
-    }
-
+    const state = previewStates[previewKind];
+    const token = ++state.renderToken;
+    if (state.running) { state.pending = true; return; }
+    state.running = true;
     container.classList.remove('ready');
     placeholder.setAttribute('aria-hidden', 'false');
-    debugPreview('renderMapPreview:placeholder-shown', { reason, renderToken });
-
-    await ensureMapRenderedSize(mainMap);
-    await waitForMapSettledRender(mainMap, { sync: true });
-    if (renderToken !== previewState.renderToken) {
-        debugPreview('renderMapPreview:exit-token-after-main-render', {
-            reason,
-            renderToken,
-            currentToken: previewState.renderToken
-        });
-        return;
+    try {
+        const canvas = await renderMapToCanvas();
+        if (token !== state.renderToken) { canvas.width = canvas.height = 0; return; }
+        canvas.style.cssText = 'display:block;max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain';
+        canvas.setAttribute('role', 'img');
+        canvas.setAttribute('aria-label', 'Complete map output with legend, north arrow and footer');
+        target.style.cssText = 'display:flex;align-items:center;justify-content:center;overflow:auto';
+        target.replaceChildren(canvas);
+        container.classList.add('ready');
+        placeholder.setAttribute('aria-hidden', 'true');
+        debugPreview('renderMapPreview:ready-applied', { reason, renderToken: token, previewKind });
+    } catch (error) {
+        if (token === state.renderToken) placeholder.textContent = error.message || 'Map preview could not be generated.';
+    } finally {
+        state.running = false;
+        if (state.pending) { state.pending = false; void renderMapPreview('pending', previewKind); }
     }
-
-    rebuildPreviewLayers(mainMap, previewKind);
-    await ensureMapRenderedSize(previewInstance, target);
-    syncPreviewView(mainMap, previewKind);
-    const renderedFrame = await waitForPreviewFrame(previewInstance);
-
-    if (!renderedFrame || renderToken !== previewState.renderToken) {
-        debugPreview('renderMapPreview:exit-before-ready', {
-            reason,
-            renderToken,
-            currentToken: previewState.renderToken,
-            renderedFrame
-        });
-        return;
-    }
-
-    container.classList.add('ready');
-    placeholder.setAttribute('aria-hidden', 'true');
-    debugPreview('renderMapPreview:ready-applied', { reason, renderToken });
-                                }
+}
 
 export async function downloadMap() {
     const format = document.querySelector('input[name="exportFormat"]:checked')?.value || 'png';
@@ -1227,7 +905,7 @@ export async function downloadMap() {
             : conversionFailure && format === 'jpeg'
                 ? 'Could not create the JPEG export.'
                 : 'The export could not be completed.';
-        showToast('Export Failed', failureMessage, 'error');
+        showToast('Export Failed', error instanceof OutputSizeError ? error.message : failureMessage, 'error');
     } finally {
         setExportBusyState(false);
     }
@@ -1308,8 +986,8 @@ export async function sendMap(event) {
         recipients.removeDelivered(delivery.delivered);
         setShareResult({ success: delivery.success, message: delivery.message });
         return delivery.success;
-    } catch {
-        setShareResult({ error: 'Unable to share the map. Please try again.' });
+    } catch (error) {
+        setShareResult({ error: error instanceof OutputSizeError ? error.message : 'Unable to share the map. Please try again.' });
         return false;
     } finally {
         setSharePending(false);

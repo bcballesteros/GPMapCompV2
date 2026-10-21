@@ -1,9 +1,12 @@
+import { ensurePolygonSymbology, invalidatePolygonSymbology, getPolygonLegendDescriptors } from './polygon-symbology.js';
+import { invalidateSymbology } from './symbology-common.js';
+import { isImportedVectorStyle, getImportedVectorLegendDescriptors } from './vector-sld-symbology.js';
 import { DEFAULT_LAYER_COLOR, DEFAULT_LINE_STROKE_WIDTH, DEFAULT_POINT_SIZE, DEFAULT_VECTOR_OPACITY, ANNOTATION_LAYER_ID } from '../config/constants.js';
 import { DEFAULT_VIEW_PADDING } from '../config/defaults.js';
 import ol from '../lib/ol.js';
 import { createBasemapLayer } from '../config/basemaps.js';
 import { getLayerRecord, getMap, getState, removeLayerRecord, setActiveBasemap, setCurrentLayerName, setLayerRecord } from '../state/store.js';
-import { createAnnotationStyle, createManagedFeatureStyles, getAvailableLabelFields, pickDefaultLabelField } from './style-factory.js';
+import { createAnnotationStyle, createManagedFeatureStyles, generatePresetMarkerSvg, normalizeSvgDataUrl, getAvailableLabelFields, pickDefaultLabelField } from './style-factory.js';
 
 export function findLayerNameByLayer(targetLayer) {
     const uploadedLayers = getState().uploadedLayers;
@@ -93,6 +96,7 @@ export function addVectorLayer(layerName, layerColor, geojson, features, metadat
         labelsVisible: false,
         labelField: pickDefaultLabelField(features)
     };
+    if (layerRecord.isPolygonLayer) ensurePolygonSymbology(layerRecord);
     const layer = new ol.layer.Vector({
         source,
         style: (feature) => createManagedFeatureStyles(layerRecord, feature)
@@ -220,6 +224,7 @@ export function removeManagedLayer(layerName) {
     }
 
     getMap().removeLayer(record.layer);
+    invalidateSymbology(record);
     removeLayerRecord(layerName);
 }
 
@@ -248,8 +253,50 @@ export function updateManagedLayerStyle(layerName, styleFactory) {
         return;
     }
 
+    if (record.isPolygonLayer) invalidatePolygonSymbology(record);
+    else invalidateSymbology(record);
     record.layer.setStyle(styleFactory || ((feature) => createManagedFeatureStyles(record, feature)));
     record.layer.changed();
+    if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('gpmap:layerstylechange', { detail: { layerName } }));
+    }
+}
+
+export function getManagedLayerLegendDescriptors(layerName) {
+    const record = getLayerRecord(layerName);
+    if (!record || record.isWMS) return [];
+    if (isImportedVectorStyle(record)) return getImportedVectorLegendDescriptors(record, layerName);
+    if (record.isPolygonLayer) {
+        return getPolygonLegendDescriptors(record, layerName).map(entry => ({
+            ...entry, geometryType: record.geometryType, symbolType: 'polygon'
+        }));
+    }
+
+    // Only homogeneous, supported geometry layers receive one-symbol legends.
+    // Mixed layers are deliberately omitted because one preview could mislead.
+    if (record.isPointLayer) {
+        let src;
+        if (record.markerPresetType) {
+            src = generatePresetMarkerSvg(record.markerPresetType, record.color,
+                record.markerStrokeEnabled ? record.markerStrokeColor : null,
+                record.markerStrokeEnabled ? record.markerStrokeWidth : 0);
+        } else if (record.svgMarkerDataUrl) {
+            src = normalizeSvgDataUrl(record.svgMarkerDataUrl);
+        } else {
+            src = generatePresetMarkerSvg('circle', record.color,
+                record.markerStrokeEnabled ? record.markerStrokeColor : null,
+                record.markerStrokeEnabled ? record.markerStrokeWidth : 0);
+        }
+        return [{ layerIdentity: layerName, geometryType: record.geometryType, id: 'layer', label: layerName,
+            order: 0, opacity: record.opacity, symbolType: 'point',
+            symbol: { type: 'point', src, size: record.pointSize, opacity: record.opacity } }];
+    }
+    if (record.isLineLayer) {
+        return [{ layerIdentity: layerName, geometryType: record.geometryType, id: 'layer', label: layerName,
+            order: 0, opacity: record.opacity, symbolType: 'line',
+            symbol: { type: 'line', color: record.color, width: record.lineStrokeWidth, opacity: record.opacity } }];
+    }
+    return [];
 }
 
 /**
