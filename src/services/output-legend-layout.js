@@ -35,8 +35,8 @@ export function wrapLegendText(text, maxWidth, measure) {
 export function layoutOutputLegend(groups, mapWidth, mapHeight, footerHeight, measure) {
     if (!groups.length) return { width: mapWidth, height: mapHeight + footerHeight, contentHeight: mapHeight, columns: [], columnWidth: 0 };
     const columnWidth = Math.max(340, Math.min(440, Math.round(mapWidth * 0.16)));
-    const heading = group => wrapLegendText(group.name, columnWidth - 40, t => measure(t, true));
-    const prepared = groups.map(group => ({ ...group, heading: heading(group), entries: group.entries.map(entry => {
+    const prepared = groups.map(group => ({ ...group, heading: wrapLegendText(
+        group.name, columnWidth - 40, t => measure(t, true)), entries: group.entries.map(entry => {
         const lines = wrapLegendText(entry.label, columnWidth - 108, t => measure(t, false));
         return { ...entry, lines, height: Math.max(42, lines.length * 26 + 12) };
     }) }));
@@ -47,18 +47,20 @@ export function layoutOutputLegend(groups, mapWidth, mapHeight, footerHeight, me
         let fits = true;
         const nextColumn = () => { columns.push([]); y = 76; };
         for (const group of prepared) {
-            const headingHeight = group.heading.length * 28 + 16;
             let needsHeading = true;
-            let continued = false;
             for (const entry of group.entries) {
-                const required = entry.height + (needsHeading ? headingHeight : 0);
+                const headingHeight = needsHeading ? group.heading.length * 28 + 16 : 0;
+                const required = entry.height + headingHeight;
                 if (y + required > contentHeight - 24) {
-                    if (76 + headingHeight + entry.height > contentHeight - 24) { fits = false; break; }
-                    nextColumn(); needsHeading = true;
+                    const firstEntryRequired = entry.height + (needsHeading ? headingHeight : 0);
+                    if (76 + firstEntryRequired > contentHeight - 24) { fits = false; break; }
+                    nextColumn();
                 }
                 if (needsHeading) {
-                    columns.at(-1).push({ type: 'heading', lines: group.heading, continued, x: 20, y });
-                    y += headingHeight; needsHeading = false; continued = true;
+                    const firstHeadingHeight = group.heading.length * 28 + 16;
+                    if (y + firstHeadingHeight + entry.height > contentHeight - 24) { fits = false; break; }
+                    columns.at(-1).push({ type: 'heading', identity: group.identity, lines: group.heading, x: 20, y });
+                    y += firstHeadingHeight; needsHeading = false;
                 }
                 columns.at(-1).push({ type: 'entry', ...entry, x: 20, y });
                 y += entry.height;

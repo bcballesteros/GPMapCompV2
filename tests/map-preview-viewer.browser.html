@@ -1,0 +1,124 @@
+<!doctype html><html><head><link rel="stylesheet" href="/src/styles/main.css"></head><body>
+<div id="mapHost" style="width:800px;height:600px"></div>
+<div id="exportModal" class="modal-overlay active visible"><div class="modal">
+<div id="mapPreviewContainer" class="export-preview-shell"><div id="mapPreviewMap" class="export-preview-map"></div><div id="mapPreviewPlaceholder"></div></div>
+<input name="exportFormat" type="radio" value="pdf" checked><button id="downloadBtn">Download</button></div></div>
+<div id="shareModal" class="modal-overlay"><div class="modal">
+<div id="sharePreviewContainer" class="export-preview-shell"><div id="sharePreviewMap" class="export-preview-map"></div><div id="sharePreviewPlaceholder"></div></div>
+<div id="recipientChips"><span>kept@example.com</span><input id="recipientEmail" value="draft@example.com"></div>
+<select id="shareFormat"><option>pdf</option><option>png</option></select><button id="sendShareBtn">Send</button></div></div>
+<script>window.fixtureReady = new Promise(resolve => { window.resolveFixture = resolve; });</script>
+<script type="module">
+import ol from '/src/lib/ol.js';
+import { setMap } from '/src/state/store.js';
+import { renderMapPreview } from '/src/tools/export-share.js';
+import { bindModalEscapeDismissal } from '/src/ui/modal.js';
+import { getMapPreviewViewer } from '/src/ui/map-preview-viewer.js';
+const check = (ok, message) => { if (!ok) throw Error(message); };
+const tick = () => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+const reports = [];
+const report = name => reports.push({ name, passed: true });
+const map = new ol.Map({ target:'mapHost', controls:[], interactions:[], layers:[new ol.layer.Vector({source:new ol.source.Vector({features:[new ol.Feature(new ol.geom.Point([0,0]))]})})], view:new ol.View({center:[0,0],resolution:1}) });
+setMap(map); bindModalEscapeDismissal();
+const viewer = () => document.querySelector('.map-preview-viewer');
+const action = name => viewer().querySelector(`[data-action="${name}"]`).click();
+const scale = () => Number(viewer().querySelector('output').textContent.replace('%',''));
+const escape = () => viewer().dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));
+function synthetic(width=3790,height=6288) {
+    const canvas=document.createElement('canvas');canvas.width=width;canvas.height=height;
+    const ctx=canvas.getContext('2d');ctx.fillStyle='white';ctx.fillRect(0,0,width,height);
+    ctx.fillStyle='black';ctx.font='24px Arial';
+    for(let col=0;col<3;col++) for(let row=0;row<80;row++) ctx.fillText(`Legend ${col}: Category ${row}`,2560+col*400,40+row*70);
+    canvas.style.cssText='max-width:100%;max-height:100%;object-fit:contain';return canvas;
+}
+window.resolveFixture(async () => {
+    await renderMapPreview('test','export');
+    const target=document.getElementById('mapPreviewMap'), owner=document.getElementById('exportModal');
+    const original=target.firstElementChild, pixels=original.toDataURL();
+    const background=getComputedStyle(target.parentElement).backgroundImage;
+    target.click(); await tick();
+    check(viewer().open && owner.classList.contains('active'),'Export opens above intact modal');
+    check(viewer().querySelector('canvas')===original && original.width>=2560,'Reuses full-resolution canvas');
+    check(target.querySelector('canvas').width<original.width,'Small preview retained without full-size duplicate');
+    check(document.body.style.overflow==='hidden','Scroll locked');
+    const initial=scale();action('in');check(scale()>initial,'Zoom in');action('out');check(Math.abs(scale()-initial)<=1,'Zoom out');
+    action('actual');check(scale()===100,'100% source pixel scale');
+    const stage=viewer().querySelector('.map-preview-stage'), rect=stage.getBoundingClientRect();
+    stage.dispatchEvent(new WheelEvent('wheel',{deltaY:-100,clientX:rect.x+100,clientY:rect.y+100,cancelable:true}));
+    check(scale()>100,'Wheel zoom');action('fit');check(scale()===initial,'Fit reset');
+    const close=viewer().querySelector('[data-action="close"]');close.focus();
+    close.dispatchEvent(new KeyboardEvent('keydown',{key:'Tab',shiftKey:true,bubbles:true,cancelable:true}));
+    // Shift-Tab from first cycles to the stage; Tab from stage cycles to first.
+    stage.focus();stage.dispatchEvent(new KeyboardEvent('keydown',{key:'Tab',bubbles:true,cancelable:true}));
+    check(document.activeElement===viewer().querySelector('button'),'Focus cycles inside viewer');
+    owner.querySelector('#downloadBtn').focus();check(viewer().contains(document.activeElement),'Native dialog makes owner inert');
+    escape();check(!viewer() && owner.classList.contains('active'),'Escape closes only enlarged viewer');
+    check(document.activeElement===target && target.firstElementChild===original,'Canvas and focus restored');
+    check(original.toDataURL()===pixels,'Viewer leaves output pixels unchanged');
+    check(getComputedStyle(target.parentElement).backgroundImage===background,'Gray preview background retained');
+    check(document.querySelector('[name="exportFormat"]:checked').value==='pdf','Export selection preserved');
+    report('Export integration, resolution, controls, focus, pixels and background');
+
+    target.click();await tick();
+    const pending=renderMapPreview('while-enlarged','export');
+    check(!viewer().querySelector('canvas'),'Production refresh hides previous image immediately');
+    await pending;
+    check(viewer().querySelector('canvas') && viewer().querySelector('canvas')!==original,'Production refresh installs current canvas');
+    action('close');
+
+    const controller=getMapPreviewViewer(target), large=synthetic();target.replaceChildren(large);controller.setContent(large);
+    target.click();await tick();action('actual');
+    check(viewer().querySelector('canvas')===large && viewer().querySelector('.can-pan'),'Multiple legend columns inspectable');
+    controller.setContent(null);check(!viewer().querySelector('canvas') && viewer().textContent.includes('Preparing'),'Refresh clears stale image');
+    controller.setContent(null,'Rendering failed');check(viewer().textContent.includes('Rendering failed'),'Failure shown');
+    const replacement=synthetic(3200,1600);target.replaceChildren(replacement);controller.setContent(replacement);
+    check(viewer().querySelector('canvas')===replacement,'Current result replaces old image');
+    viewer().style.width='450px';viewer().style.height='350px';await tick();
+    let bounds=replacement.getBoundingClientRect(), view=viewer().querySelector('.map-preview-stage').getBoundingClientRect();
+    check(bounds.width<=view.width+1 && bounds.height<=view.height+1,'Resize refits complete composition');
+    action('actual');viewer().style.width='600px';await tick();check(scale()===100,'Resize preserves manual scale');
+    action('close');check(target.firstElementChild===replacement,'New image restored');
+    for(let i=0;i<6;i++){target.click();await tick();check(document.querySelectorAll('dialog').length===1,'One viewer');const start=scale();action('in');check(Math.abs(scale()-start*1.25)<2,'No accumulated handlers');action('close');}
+    check(document.body.style.overflow==='','Scroll restored');report('Refresh, errors, repeat opening and resize');
+
+    owner.classList.remove('active','visible');
+    const share=document.getElementById('shareModal');share.classList.add('active','visible');
+    await renderMapPreview('test','share');const shareTarget=document.getElementById('sharePreviewMap');shareTarget.focus();
+    shareTarget.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true}));await tick();
+    check(viewer()?.open && share.classList.contains('active'),'Share uses same viewer');action('close');
+    check(document.getElementById('recipientEmail').value==='draft@example.com' && document.getElementById('recipientChips').textContent.includes('kept@example.com'),'Share chips and input retained');
+    check(document.getElementById('shareFormat').value==='pdf' && !document.getElementById('sendShareBtn').disabled,'Share controls retained');
+    shareTarget.click();await tick();share.classList.remove('visible');await tick();check(!viewer(),'Owner closure cleans viewer');
+    share.classList.add('visible');shareTarget.click();await tick();share.remove();await tick();check(!viewer(),'Owner removal cleans viewer');
+    report('Share integration, state preservation and owner cleanup');
+    owner.classList.add('active','visible');target.click();await tick();action('actual');
+    window.panStage=viewer().querySelector('.map-preview-stage');window.panCanvas=viewer().querySelector('canvas');
+    window.panStart=window.panCanvas.style.transform;
+    return reports;
+});
+window.finishPanTest=async () => {
+    check(window.panCanvas.style.transform!==window.panStart,'Real pointer drag pans');
+    const image=window.panCanvas.getBoundingClientRect(), stage=window.panStage.getBoundingClientRect();
+    check(image.left<=stage.left+1 && image.right>=stage.right-1,'Horizontal pan bounds');
+    check(image.top<=stage.top+1 && image.bottom>=stage.bottom-1,'Vertical pan bounds');
+    action('fit');action('close');return true;
+};
+window.checkResponsiveViewer = async (width, height) => {
+    if(viewer()) action('close');
+    await renderMapPreview('responsive-sizing','export');
+    const target=document.getElementById('mapPreviewMap');
+    const landscape=synthetic(3200,1600);getMapPreviewViewer(target).setContent(landscape);
+    target.click(); await tick();
+    const dialog=viewer(), rect=dialog.getBoundingClientRect();
+    const viewportWidth=document.documentElement.clientWidth, viewportHeight=document.documentElement.clientHeight;
+    const expectedWidth=viewportWidth<=600 ? viewportWidth-24 : Math.min(viewportWidth*.86,viewportWidth-32);
+    const expectedHeight=viewportWidth<=600 ? viewportHeight-24 : Math.min(viewportHeight*.84,viewportHeight-32);
+    check(Math.abs(rect.width-expectedWidth)<3 && Math.abs(rect.height-expectedHeight)<3,`Responsive dimensions at ${width}x${height}`);
+    check(Math.abs((rect.left+rect.width/2)-viewportWidth/2)<2 && Math.abs((rect.top+rect.height/2)-viewportHeight/2)<2,'Popup centered in viewport');
+    const dimensions=[rect.width,rect.height];
+    const portrait=synthetic(1600,3200);getMapPreviewViewer(target).setContent(portrait);await tick();
+    const landscapeRect=viewer().getBoundingClientRect();
+    check(Math.abs(landscapeRect.width-dimensions[0])<1 && Math.abs(landscapeRect.height-dimensions[1])<1,'Outer popup independent of image shape and legend columns');
+    action('close');return true;
+};
+</script></body></html>

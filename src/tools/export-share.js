@@ -9,6 +9,7 @@ import { createRecipientChips } from '../ui/recipient-chips.js';
 import { getShareDeliveryResult } from '../services/share-delivery-result.js';
 import { captureOutputLegend, drawOutputLegend, legendFont } from '../services/output-legend.js';
 import { assertOutputSize, layoutOutputLegend, OutputSizeError } from '../services/output-legend-layout.js';
+import { getMapPreviewViewer } from '../ui/map-preview-viewer.js';
 
 const EXPORT_LONG_EDGE_PX = 2560;
 const EXPORT_MAX_PIXEL_AREA = 12000000;
@@ -864,10 +865,13 @@ export async function renderMapPreview(reason = 'direct', previewKind = 'export'
     bindPreviewSyncListeners();
     const state = previewStates[previewKind];
     const token = ++state.renderToken;
+    const viewer = getMapPreviewViewer(target);
+    viewer.setContent(null);
+    container.classList.remove('ready');
+    placeholder.textContent = 'Preparing map preview…';
+    placeholder.setAttribute('aria-hidden', 'false');
     if (state.running) { state.pending = true; return; }
     state.running = true;
-    container.classList.remove('ready');
-    placeholder.setAttribute('aria-hidden', 'false');
     try {
         const canvas = await renderMapToCanvas();
         if (token !== state.renderToken) { canvas.width = canvas.height = 0; return; }
@@ -876,11 +880,16 @@ export async function renderMapPreview(reason = 'direct', previewKind = 'export'
         canvas.setAttribute('aria-label', 'Complete map output with legend, north arrow and footer');
         target.style.cssText = 'display:flex;align-items:center;justify-content:center;overflow:auto';
         target.replaceChildren(canvas);
+        viewer.setContent(canvas);
         container.classList.add('ready');
         placeholder.setAttribute('aria-hidden', 'true');
         debugPreview('renderMapPreview:ready-applied', { reason, renderToken: token, previewKind });
     } catch (error) {
-        if (token === state.renderToken) placeholder.textContent = error.message || 'Map preview could not be generated.';
+        if (token === state.renderToken) {
+            const message = error.message || 'Map preview could not be generated.';
+            placeholder.textContent = message;
+            viewer.setContent(null, message);
+        }
     } finally {
         state.running = false;
         if (state.pending) { state.pending = false; void renderMapPreview('pending', previewKind); }

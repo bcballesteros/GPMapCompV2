@@ -5,6 +5,12 @@ the map when at least one eligible uploaded vector layer is visible. Export,
 Share and both modal previews use the same complete composition. There is no
 legend visibility control.
 
+Each eligible visible vector layer has one output legend heading at the start
+of its group. Categories can continue across multiple columns without repeating
+the layer name. Different datasets retain their own headings, and existing
+layer and category ordering remains unchanged. Export, Share and their previews
+use the same composed legend.
+
 ## Inclusion and ordering
 
 - Supported homogeneous geometry families: Point/MultiPoint,
@@ -67,8 +73,10 @@ Entry text stays at 18px, layer headings at 20px and the Legend heading at 26px.
 Symbols have their own 48 × 34px viewport and cannot overlap text.
 
 Entries flow downward through up to three columns to the right of the unchanged
-map area. A group heading repeats only when that group continues into another
-column. If three columns are insufficient, the composition gains height at the
+map area. Each group heading appears once, at its first entry; continuation
+columns contain only the remaining entries and reserve no heading height.
+Different groups keep distinct headings, including groups with the same display
+name. If three columns are insufficient, the composition gains height at the
 same font size; the space beneath the map remains neutral white. Entries and
 labels are never silently truncated. Limits are 8,192 pixels per dimension and
 24 million pixels for the complete composition. Exceeding these limits gives an
@@ -196,9 +204,8 @@ remain unchanged.
   The group gap is 20px.
 - A new layer starts immediately below the previous group in the current column
   if its complete heading and first entry fit. Otherwise it starts the next
-  column. Groups are not kept indivisible: later entries can continue in another
-  column, with the heading repeated there and kept with the first continued entry.
-  The heading text is unchanged; the internal `continued` flag adds no visible suffix.
+  column. Groups are not kept indivisible: later entries continue in another
+  column without a repeated heading or reserved heading height.
 - After a continued layer finishes, the next layer can reuse that column's
   remaining space. Placement proceeds forward; it does not backfill older
   columns, rebalance columns, merge groups or reorder categories.
@@ -233,9 +240,44 @@ physical printing and individual PDF viewers remain unverified.
 Both previews retain the complete bitmap and fit it proportionally using the
 existing styles. Their gray surrounding gradient belongs to the preview shell;
 it is not embedded as margins in the output. The pale legend panel and footer
-are intentional parts of the composition. Preview zoom, pan, fullscreen and
-fit-to-window controls, along with margin/legibility refinements, remain deferred
-to a separate UX task.
+are intentional parts of the composition.
+
+Click the ready Export or Share preview (or focus it and press Enter/Space) to
+open the shared enlarged viewer above the current modal. Use +/−, the mouse
+wheel/trackpad, or Fit to Window and 100%. Drag to pan when the image exceeds
+the viewing area; arrow keys pan when the viewing area has keyboard focus.
+Fit shows the entire composition, including every legend column, without
+upscaling small images. 100% maps one source pixel to one CSS pixel, independent
+of screen device pixel ratio. Zoom ranges from 10% (or the fit scale when lower)
+to 800%; magnifying beyond 100% cannot add source detail.
+
+`src/ui/map-preview-viewer.js` is reused by both workflows. It temporarily moves
+the existing full-resolution canvas into a native modal dialog and leaves a
+display-sized thumbnail in the original preview. Closing restores that same
+canvas and trigger focus; recipient chips, form values and format selections
+remain intact. No object URLs, image encoding or additional map rendering are
+needed. Refreshes clear the enlarged image while loading and replace it only
+with the current successful result. Resizing preserves fit mode or constrains
+the current zoom/pan. Close or Escape dismisses just the viewer; owner closure
+or removal also cleans it up. The native dialog isolates background interaction,
+with local Escape/focus handling and temporary scroll locking.
+
+This requires a modern browser with native dialog, pointer events and
+ResizeObserver (current Chrome/Edge supported by the automated suite). Other
+engines and physical touch/trackpad devices need manual qualification. Raster
+detail remains limited by the existing guarded output resolution and source
+map data. Export/Share encoders, composition and size safeguards are unchanged.
+
+Focused checks: `node --test tests/map-preview-viewer.test.js` and
+`TEST_PREVIEW_BROWSER=1 node --test tests/map-preview-viewer.browser.test.js`
+(set the environment variable using your shell's syntax). The browser fixture
+covers both production preview integrations, original canvas identity and pixel
+preservation, zoom/wheel/real pointer drag, multi-column imagery, refresh/failure,
+focus/Escape, repeated opening, resize and owner cleanup. For manual review,
+open both workflows with representative uploaded layers, inspect the last legend
+column and footer at 100%, drag to each edge, resize to a narrow laptop window,
+and verify pending recipient text/chips and format selections after closing.
+Check physical trackpad/touch behavior and another browser engine separately.
 
 The expanded browser coverage checks two projections, four aspect/view cases,
 signed rotations and north-arrow direction, SLD replacement during rendering,

@@ -71,6 +71,15 @@ The application is built using modern web technologies with an emphasis on maint
 - Export to PDF
 - Email-based sharing of static PNG, JPEG, and PDF map outputs
 
+The Export and Share small previews open the same centered inspection viewer.
+Its desktop window uses about 86% of viewport width and 84% of viewport height,
+with safe margins on narrow screens. Fit to Window uses the measured image area
+and refits after resizing; manual zoom keeps its source scale and clamps panning
+to the new bounds. The 100% control maps one output canvas pixel to one CSS pixel.
+The viewer reuses the full-resolution output canvas, so detail is limited by the
+generated output resolution. Its zoom and resize controls do not change the map
+composition or exported files.
+
 ---
 
 ## Technology Stack

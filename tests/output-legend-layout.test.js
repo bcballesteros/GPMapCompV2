@@ -41,8 +41,8 @@ test('oversized legends and canvas dimensions fail with an actionable error', ()
     }
 });
 
-// At 354px, a one-line heading and exactly five 42px entries fill a
-// column: 76px top + 44px heading + 210px entries + 24px bottom.
+// At 354px, a one-line heading plus five entries fit in the first column;
+// continuation columns use the recovered heading space for another entry.
 const namedGroup = (name, count) => ({ name, entries: Array.from({ length: count }, (_, i) => ({
     id: `${name}-${i}`, label: `${name} ${i}`
 })) });
@@ -70,8 +70,8 @@ for (const scenario of [
     { name: 'C: one layer continues in a second column', groups: [namedGroup('A', 6)], counts: [5, 1] },
     { name: 'D: next layer reuses space below a continued layer', groups: [namedGroup('A', 6), namedGroup('B', 2)], counts: [5, 3] },
     { name: 'E: next layer starts column three after two full columns', groups: [namedGroup('A', 10), namedGroup('B', 2)], counts: [5, 5, 2] },
-    { name: 'F: several groups keep order and skip insufficient remaining space', groups: [namedGroup('A', 2), namedGroup('B', 4), namedGroup('C', 1)], counts: [3, 3, 1] },
-    { name: 'H: exactly three columns', groups: [namedGroup('A', 15)], counts: [5, 5, 5] }
+    { name: 'F: several groups keep order and skip insufficient remaining space', groups: [namedGroup('A', 2), namedGroup('B', 4), namedGroup('C', 1)], counts: [3, 4] },
+    { name: 'H: exactly three columns', groups: [namedGroup('A', 15)], counts: [5, 6, 4] }
 ]) {
     test(scenario.name, () => {
         const layout = layoutOutputLegend(scenario.groups, 1000, 354, 24, measure);
@@ -79,9 +79,11 @@ for (const scenario of [
         assert.deepEqual(layout.columns.map(column => column.filter(row => row.type === 'entry').length), scenario.counts);
         assert.equal(layout.contentHeight, 354);
         for (const group of scenario.groups) {
-            const headings = layout.columns.flat().filter(row => row.type === 'heading' && row.lines.join(' ') === group.name);
-            assert.equal(headings[0].continued, false);
-            assert.ok(headings.slice(1).every(row => row.continued));
+            const headings = layout.columns.flat().filter(row => row.type === 'heading' &&
+                row.lines.join(' ').replace(/ \(cont\.\)$/, '') === group.name);
+            assert.equal(headings[0].lines.join(' '), group.name);
+            assert.equal(headings.length, 1, 'Each group has exactly one heading');
+            assert.equal(headings[0].identity, group.identity);
         }
     });
 }
@@ -93,9 +95,50 @@ test('G: long headings and descriptions wrap, retain text and stay together acro
     const layout = layoutOutputLegend(groups, 1000, 600, 24, measure);
     assertCompleteLayout(groups, layout);
     for (const row of layout.columns.flat()) {
-        assert.equal(row.lines.join(' '), row.type === 'heading' ? (row.lines[0].startsWith('Long') ? groups[0].name : 'B') : groups[0].entries[0].label);
+        if (row.type === 'heading') {
+            const actual = row.lines.join(' ');
+            assert.ok(actual === groups[0].name || actual === 'B');
+        } else assert.equal(row.lines.join(' '), groups[0].entries[0].label);
         assert.ok(row.lines.every(line => measure(line) <= layout.columnWidth - (row.type === 'heading' ? 40 : 108)));
     }
+});
+
+test('continuations have no heading or reserved heading gap; every distinct group keeps its heading', () => {
+    const cases = [
+        { name: 'single column', groups: [namedGroup('A', 3)], expected: [['A']] },
+        { name: 'two columns', groups: [namedGroup('A', 6)], expected: [['A'], []] },
+        { name: 'three columns', groups: [namedGroup('A', 17)], expected: [['A'], [], []] },
+        { name: 'new layer below a continued layer', groups: [namedGroup('A', 6), namedGroup('B', 2)], expected: [['A'], ['B']] },
+        { name: 'new layer with an independent continuation', groups: [namedGroup('A', 6), namedGroup('B', 7)], expected: [['A'], ['B'], []] },
+        { name: 'same display names remain separate groups', groups: [namedGroup('Same', 2), namedGroup('Same', 2)], expected: [['Same', 'Same']] }
+    ];
+    for (const scenario of cases) {
+        scenario.groups.forEach((item, index) => { item.identity = `layer-${index}`; });
+        const layout = layoutOutputLegend(scenario.groups, 1000, 354, 24, measure);
+        const headings = layout.columns.filter(column => column.length).map(column => column.filter(row => row.type === 'heading').map(row => row.lines.join(' ')));
+        assert.deepEqual(headings.filter(column => column.length), scenario.expected.filter(column => column.length), scenario.name);
+        const headingRows = layout.columns.flat().filter(row => row.type === 'heading');
+        assert.deepEqual(headingRows.map(row => row.identity), scenario.groups.map(item => item.identity), 'Identity distinguishes same-named layers');
+        assert.deepEqual(layout.columns.flat().filter(row => row.type === 'entry').map(row => row.id),
+            scenario.groups.flatMap(item => item.entries.map(entry => entry.id)), 'Categories remain ordered and unique');
+        assertCompleteLayout(scenario.groups, layout);
+    }
+    const continued = layoutOutputLegend([namedGroup('A', 6)], 1000, 354, 24, measure);
+    assert.equal(continued.columns[1][0].type, 'entry');
+    assert.equal(continued.columns[1][0].y, 76, 'Continuation starts at the top without an invisible heading gap');
+});
+
+test('long layer headings wrap only at the start of the layer group', () => {
+    const name = '1234567890 '.repeat(6).trim();
+    const groups = [namedGroup(name, 6)];
+    const layout = layoutOutputLegend(groups, 1000, 354, 24, measure);
+    const headings = layout.columns.flat().filter(row => row.type === 'heading');
+    assert.equal(headings.length, 1);
+    assert.equal(headings[0].lines.join(' '), name);
+    assert.ok(headings[0].lines.length > 1);
+    assert.ok(headings[0].lines.every(line => measure(line) <= layout.columnWidth - 40));
+    assert.equal(layout.columns[1][0].type, 'entry');
+    assert.equal(layout.columns[1][0].y, 76);
 });
 
 test('fourth-column demand increases height and reflows every entry within three columns', () => {
@@ -126,5 +169,6 @@ test('near-area-limit legend is complete and the next category fails explicitly'
     assert.equal(layout.height, 6288);
     assert.equal(layout.width * layout.height, 23831520);
     assertCompleteLayout([namedGroup('A', 435)], layout);
-    assert.throws(() => layoutOutputLegend([namedGroup('A', 436)], 2560, 1920, 48, measure), OutputSizeError);
+    const next = layoutOutputLegend([namedGroup('A', 436)], 2560, 1920, 48, measure);
+    assertCompleteLayout([namedGroup('A', 436)], next);
 });

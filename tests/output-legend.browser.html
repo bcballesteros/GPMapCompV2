@@ -244,6 +244,9 @@ window.resolveFixture(async () => {
         applyImportedPolygonStyle(polygon,longStyle);updateManagedLayerStyle('Polygon');
         const longGroups=groups(),longLayout=layout(longGroups);
         check(longGroups[0].entries.length===155&&longLayout.columns.length===3&&longLayout.contentHeight>1920,'Actual imported layer spans three columns and grows');
+        const continuationHeadings=longLayout.columns.map(column=>column.filter(row=>row.type==='heading').map(row=>row.lines.join(' ')));
+        check(continuationHeadings[0].filter(name=>name==='Polygon').length===1&&continuationHeadings.slice(1).every(column=>!column.includes('Polygon')),'Three-column continuation fragments do not repeat the layer heading');
+        check(longLayout.columns.slice(1).every(column=>column[0]?.type==='entry'&&column[0].y===76),'Continuation columns begin with entries and reserve no heading space');
         const longOutput=await renderMapToCanvas();await verifyCanvas(longOutput,longGroups);window.legendLongReviewCanvas=longOutput;
         const longHashes=new Map();
         for(const format of ['png','jpeg','pdf']) {
