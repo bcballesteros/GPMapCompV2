@@ -35,13 +35,34 @@ The application is built using modern web technologies with an emphasis on maint
 ### Geospatial Data
 
 - Upload multiple geospatial datasets
-- Shapefile (.shp)
+- Shapefile ZIP (.zip)
 - GeoJSON
+- GeoPackage (.gpkg), vector feature tables with table selection
 - KML
 - CSV
 - GeoTIFF (limited support)
 - Web Map Service (WMS)
 - Geoportal Layer integration
+
+GeoPackage import supports Point/MultiPoint, LineString/MultiLineString and
+Polygon/MultiPolygon, including holes. Select **GeoPackage (.gpkg)** in **Add
+Geospatial Data**, choose a file, select feature tables, and click the existing
+**Upload** button. Each table becomes a separate managed layer with the existing
+styling, labels, attribute table, SLD, legends, Export and Share controls.
+
+Imports are vector-only: tile/raster data is ignored. Source coordinates are
+transformed to WGS84 before map conversion. EPSG:4326, EPSG:3857, WGS84 UTM and
+supported file CRS definitions with reliable datum parameters are accepted;
+unknown/unreliable CRS is rejected with reprojection guidance. Explicit supported
+GeoJSON CRS declarations are also transformed correctly.
+
+Limits per import: **50 MiB file, 50,000 selected features, 1,000,000 coordinate
+positions, 32 MiB estimated attribute data, 1 MiB per attribute value**. Modern
+browsers with module workers and WebAssembly are required. GeoPackage code and
+SQLite assets load locally on demand. Large integers are preserved as decimal
+strings, binary values as `hex:` strings, and date-like values as their source
+text. See [GeoPackage implementation and QA guide](GEOPACKAGE_IMPORT.md) for
+policies, tested behavior, runtime requirements and limitations.
 
 ### Layer Management
 

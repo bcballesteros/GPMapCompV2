@@ -166,7 +166,7 @@ function getEmptyStateMarkup() {
             <div class="empty-state-icon" aria-hidden="true"><i class="fas fa-layer-group"></i></div>
             <div class="empty-state-title">No layers in this workspace</div>
             <div class="empty-state-text">Use Add Geospatial Data to add an uploaded dataset, WMS layer, or Geoportal layer, then start styling, inspecting, and exporting your map composition.</div>
-            <div class="empty-state-formats">Supported: Shapefile (.zip), KML (.kml), GeoJSON (.geojson/.json), CSV (.csv), WMS, and Geoportal layers.</div>
+            <div class="empty-state-formats">Supported: Shapefile (.zip), KML (.kml), GeoJSON (.geojson/.json), CSV (.csv), vector GeoPackage (.gpkg), WMS, and Geoportal layers.</div>
         </div>
     `;
 }

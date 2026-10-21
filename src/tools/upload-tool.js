@@ -1,9 +1,10 @@
 import { DEFAULT_LAYER_COLOR, DEFAULT_LAYER_NAME } from '../config/constants.js';
 import ol from '../lib/ol.js';
 import { addVectorLayer, addWmsLayer, fitLayerToView } from '../map/layer-manager.js';
-import { getCurrentLayerData, getLayerRecord, getState, setCurrentLayerData } from '../state/store.js';
+import { getCurrentLayerData, getLayerRecord, getState, setCurrentLayerData, setCurrentLayerName } from '../state/store.js';
 import { formatFileSize } from '../utils/format.js';
 import { parseUploadFile } from '../services/shapefile-service.js';
+import { geojsonToOpenLayers } from '../utils/geo.js';
 import { createGpLayerConfig } from '../services/gp-service.js';
 import { createWmsLayerConfig } from '../services/wms-service.js';
 import { addLayerItem, removeLayerItem } from '../ui/layers-panel.js';
@@ -20,10 +21,14 @@ let gpLayerFetchPromise = null;
 let gpSearchDebounceId = null;
 let gpHighlightedLayerIndex = -1;
 const GP_SEARCH_DEBOUNCE_MS = 180;
+let uploadBusy = false;
+let gpkgSession = null;
+let gpkgRequestId = 0;
+let gpkgDiscovering = false;
 
 function formatLayerNameFromFileName(fileName = '') {
     const baseName = fileName
-        .replace(/\.(geojson|json|kml|kmz|csv|zip|shp)$/i, '')
+        .replace(/\.(gpkg|geojson|json|kml|kmz|csv|zip|shp)$/i, '')
         .replace(/[_-]+/g, ' ')
         .replace(/\s+/g, ' ')
         .trim();
@@ -69,6 +74,7 @@ function applyDefaultLayerName(file) {
 }
 
 function setUploadBusyState(isBusy, label = 'Processing file...') {
+    uploadBusy = isBusy;
     const progress = document.getElementById('uploadProgress');
     const progressFill = document.getElementById('progressFill');
     const progressLabel = progress?.querySelector('div');
@@ -91,6 +97,79 @@ function setUploadBusyState(isBusy, label = 'Processing file...') {
         submitButton.disabled = isBusy;
         submitButton.dataset.uploadBusy = String(isBusy);
         submitButton.setAttribute('aria-busy', isBusy ? 'true' : 'false');
+    }
+    document.querySelectorAll('#uploadPanel input, #uploadPanel select, #uploadPanel .file-preview-clear').forEach(control => { control.disabled = isBusy; });
+}
+
+function gpkgFeedback(message = '') {
+    const element = document.getElementById('gpkgFeedback');
+    if (element) element.textContent = message;
+}
+
+export function clearGeoPackageSelection() {
+    gpkgRequestId++;
+    gpkgSession?.dispose();
+    gpkgSession = null;
+    gpkgDiscovering = false;
+    const input = document.getElementById('gpkgInput');
+    if (input) input.value = '';
+    document.getElementById('gpkgFilePreview')?.classList.remove('active');
+    document.getElementById('gpkgTables')?.replaceChildren();
+    gpkgFeedback();
+    if (getCurrentLayerData()?.type === 'geopackage') setCurrentLayerData(null);
+    if (!uploadBusy) setUploadBusyState(false);
+}
+
+export async function handleGeoPackageSelect(event) {
+    if (uploadBusy) return;
+    const file = event.target.files[0];
+    clearGeoPackageSelection();
+    if (!file) return;
+    const requestId = gpkgRequestId;
+    document.getElementById('gpkgFileName').textContent = file.name;
+    document.getElementById('gpkgFileSize').textContent = formatFileSize(file.size);
+    document.getElementById('gpkgFilePreview').classList.add('active');
+    setCurrentLayerData({ file, type: 'geopackage', tables: [] });
+    gpkgDiscovering = true;
+    gpkgFeedback('Inspecting vector feature tables...');
+    // Keep clear/type controls usable so the worker can be cancelled during discovery.
+    const action = document.getElementById('addDataPrimaryAction');
+    action.disabled = true;
+    action.dataset.uploadBusy = 'true';
+    action.setAttribute('aria-busy', 'true');
+    try {
+        const { createGeoPackageSession } = await import('../services/geopackage-service.js');
+        if (requestId !== gpkgRequestId) return;
+        const session = createGeoPackageSession();
+        gpkgSession = session;
+        const result = await session.open(file);
+        if (requestId !== gpkgRequestId) return;
+        const container = document.getElementById('gpkgTables');
+        result.tables.forEach(table => {
+            const label = document.createElement('label');
+            label.className = 'gpkg-table-option';
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.value = table.name;
+            checkbox.checked = true;
+            const text = document.createElement('span');
+            text.textContent = `${table.name} — ${table.geometryType} · ${table.count.toLocaleString()} features · ${table.sourceCrs}${table.crsName ? ` (${table.crsName})` : ''}`;
+            label.append(checkbox, text);
+            container.append(label);
+        });
+        setCurrentLayerData({ file, type: 'geopackage', tables: result.tables });
+        const skipped = result.unsupported.map(table => `${table.name}: ${table.reason}`);
+        gpkgFeedback(`${result.tables.length} vector table(s) available. Select tables to import.${result.rasterTables ? ` ${result.rasterTables} raster/tile table(s) ignored.` : ''}${skipped.length ? ` Unavailable tables: ${skipped.join(' ')}` : ''}`);
+    } catch (error) {
+        if (requestId !== gpkgRequestId) return;
+        gpkgSession?.dispose();
+        gpkgSession = null;
+        gpkgFeedback(error.message);
+    } finally {
+        if (requestId === gpkgRequestId) {
+            gpkgDiscovering = false;
+            setUploadBusyState(false);
+        }
     }
 }
 
@@ -172,14 +251,24 @@ export function clearCsvSelection() {
 
 export function updateDataSection() {
     const dataType = document.getElementById('dataTypeSelect').value;
+    if (dataType !== 'geopackage') clearGeoPackageSelection();
+    if (getCurrentLayerData()?.type !== dataType) {
+        const inputId = { shapefile: 'fileInput', geojson: 'geojsonInput', kml: 'kmlInput', csv: 'csvInput' }[dataType];
+        const file = document.getElementById(inputId)?.files?.[0];
+        setCurrentLayerData(file ? { file, type: dataType } : null);
+        if (file) applyDefaultLayerName(file);
+    }
 
     document.getElementById('shapefileSection').style.display = dataType === 'shapefile' ? 'block' : 'none';
     document.getElementById('geojsonSection').style.display = dataType === 'geojson' ? 'block' : 'none';
     document.getElementById('kmlSection').style.display = dataType === 'kml' ? 'block' : 'none';
     document.getElementById('csvSection').style.display = dataType === 'csv' ? 'block' : 'none';
+    document.getElementById('gpkgSection').style.display = dataType === 'geopackage' ? 'block' : 'none';
+    document.getElementById('layerName').closest('.form-group').style.display = dataType === 'geopackage' ? 'none' : 'block';
 }
 
 export async function submitUpload() {
+    if (uploadBusy || gpkgDiscovering) return;
     const currentLayerData = getCurrentLayerData();
     if (!currentLayerData) {
         showToast('No File Selected', 'Select a file before uploading.', 'warning');
@@ -192,6 +281,48 @@ export async function submitUpload() {
     setUploadBusyState(true, 'Uploading...');
 
     try {
+        if (currentLayerData.type === 'geopackage') {
+            if (!gpkgSession) throw new Error('Select the GeoPackage again before importing.');
+            const selected = [...document.querySelectorAll('#gpkgTables input:checked')].map(input => input.value);
+            if (!selected.length) throw new Error('Select at least one vector feature table.');
+            setUploadBusyState(true, 'Reading and transforming selected tables...');
+            let prepared;
+            try { prepared = await gpkgSession.read(selected); }
+            finally { gpkgSession = null; }
+            // Strict conversion: reject the entire batch if OpenLayers omitted anything.
+            prepared.forEach(table => {
+                table.features = geojsonToOpenLayers(table.geojson);
+                if (table.features.length !== table.geojson.features.length) throw new Error(`${table.tableName}: map feature conversion failed.`);
+            });
+            const added = [];
+            const previousLayerName = getState().currentLayerName;
+            try {
+                for (const table of prepared) {
+                    const name = makeUniqueLayerName(formatLayerNameFromFileName(table.tableName));
+                    added.push(name); // Also covers a failure during layer/panel registration.
+                    addVectorLayer(name, layerColor, table.geojson, table.features, {
+                        ...table, sourceFormat: 'geopackage', sourceFileName: currentLayerData.file.name
+                    });
+                    addLayerItem(name, layerColor, table.features.length);
+                }
+            } catch (error) {
+                for (const name of added.reverse()) removeLayerItem(name);
+                setCurrentLayerName(previousLayerName);
+                document.querySelectorAll('.layer-item').forEach(item => item.classList.toggle('active', item.dataset.layerName === previousLayerName));
+                throw error;
+            }
+            const extent = [Infinity, Infinity, -Infinity, -Infinity];
+            added.forEach(name => {
+                const bounds = getLayerRecord(name).source.getExtent();
+                extent[0] = Math.min(extent[0], bounds[0]); extent[1] = Math.min(extent[1], bounds[1]);
+                extent[2] = Math.max(extent[2], bounds[2]); extent[3] = Math.max(extent[3], bounds[3]);
+            });
+            fitLayerToView({ getExtent: () => extent });
+            clearGeoPackageSelection();
+            closeModal('uploadModal');
+            showToast('Layers Added', `${added.length} GeoPackage vector layer(s) added.`, 'success');
+            return;
+        }
         const { geojson, features, sourceCrs, sourceCrsDetected } = await parseUploadFile(currentLayerData);
         if (features.length === 0) {
             showToast('No Features Found', 'The selected file did not contain any usable features.', 'warning');
@@ -216,13 +347,19 @@ export async function submitUpload() {
         showToast('Layer Added', `"${layerName}" was added with ${features.length} feature${features.length === 1 ? '' : 's'}.`, 'success');
     } catch (error) {
         console.error('Error processing upload:', error);
-        showToast('Upload Failed', 'The file could not be loaded.', 'error');
+        if (currentLayerData.type === 'geopackage') {
+            gpkgFeedback(error.message);
+        }
+        showToast('Upload Failed', error.message || 'The file could not be loaded.', 'error');
     } finally {
         setUploadBusyState(false);
     }
 }
 
 export function initializeUploadForm() {
+    window.addEventListener('gpmap:modalchange', event => {
+        if (event.detail?.modalId === 'uploadModal' && !event.detail.isOpen) clearGeoPackageSelection();
+    });
     const layerNameInput = document.getElementById('layerName');
     if (!layerNameInput) {
         return;
