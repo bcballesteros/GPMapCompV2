@@ -1820,7 +1820,9 @@ export async function deleteSelectedDrawing() {
     }
 
     const deletedDrawing = selectedDrawing;
-    drawingLayer.source.removeFeature(selectedDrawing);
+    const hadDrawing = drawingLayer.source.getFeatures().includes(deletedDrawing);
+    drawingLayer.source.removeFeature(deletedDrawing);
+    const drawingDeleted = hadDrawing && !drawingLayer.source.getFeatures().includes(deletedDrawing);
     selectedDrawing = null;
     hoveredDrawing = null;
     hideDrawingHoverSummary();
@@ -1830,6 +1832,7 @@ export async function deleteSelectedDrawing() {
     drawingLayer.layer.changed();
     updateDrawingControls();
     syncMapCursor();
+    if (drawingDeleted) showToast('Drawing Deleted', 'The selected drawing was removed.', 'success', 1700);
 }
 
 export async function clearDrawings() {
@@ -2010,7 +2013,10 @@ export async function deleteSelectedMeasurement() {
     }
 
     const deletedMeasurement = selectedMeasurement;
-    measureLayer.getSource().removeFeature(deletedMeasurement);
+    const measurementSource = measureLayer.getSource();
+    const hadMeasurement = measurementSource.getFeatures().includes(deletedMeasurement);
+    measurementSource.removeFeature(deletedMeasurement);
+    const measurementDeleted = hadMeasurement && !measurementSource.getFeatures().includes(deletedMeasurement);
     setSelectedMeasurement(null);
     hoveredMeasurement = null;
     if (measureHoverTooltipElement) {
@@ -2018,6 +2024,7 @@ export async function deleteSelectedMeasurement() {
     }
     updateMeasurementCursor();
     updateMeasurementResultPanel(Number.NaN);
+    if (measurementDeleted) showToast('Measurement Deleted', 'The selected measurement was removed.', 'success', 1700);
 }
 
 export function isMeasurementActive() {
@@ -2157,8 +2164,13 @@ export async function deleteAnnotation(feature) {
         return;
     }
 
+    const annotationSource = annotationLayer.source;
+    const hadAnnotation = annotationSource?.getFeatures().includes(feature);
+    if (!hadAnnotation) return;
+
     setMoveMode(false);
     annotationLayer.source.removeFeature(feature);
+    const annotationDeleted = !annotationSource.getFeatures().includes(feature);
     selectedAnnotation = null;
     setSelectedFeature(null);
     syncDraggableAnnotations();
@@ -2169,6 +2181,7 @@ export async function deleteAnnotation(feature) {
         getMap().removeLayer(annotationLayer.layer);
         removeLayerRecord(ANNOTATION_LAYER_ID);
     }
+    if (annotationDeleted) showToast('Annotation Deleted', 'The selected annotation was removed.', 'success', 1700);
 }
 
 export async function clearAnnotations() {

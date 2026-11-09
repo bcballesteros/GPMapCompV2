@@ -1680,6 +1680,17 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
     outline: none;
 }
 
+.vector-color-swatch:disabled,
+.marker-stroke-section input:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    filter: grayscale(0.65);
+}
+
+.marker-stroke-section:has(.marker-stroke-enabled:disabled) {
+    opacity: 0.55;
+}
+
 .svg-marker-input {
     position: absolute;
     opacity: 0;

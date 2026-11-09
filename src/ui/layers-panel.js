@@ -690,6 +690,7 @@ function setActiveSvgMarker(record, index, layerItem) {
 
     record.activeSvgMarkerIndex = index;
     syncSvgMarkerState(record);
+    syncMarkerTypeWidgets(record, layerItem);
     updateSvgMarkerPreview(layerItem, record.svgMarkerDataUrl);
     renderSvgMarkerGallery(record, layerItem);
     updateManagedLayerStyle(layerItem.querySelector('.layer-name').textContent);
@@ -716,6 +717,7 @@ function removeActiveSvgMarker(record, layerItem) {
         syncMarkerTypeWidgets(record, layerItem);
         updateSvgMarkerPreview(layerItem, record.svgMarkerDataUrl);
         renderSvgMarkerGallery(record, layerItem);
+        updateManagedLayerStyle(layerItem.querySelector('.layer-name').textContent);
     }
 }
 
@@ -1402,6 +1404,7 @@ export function addLayerItem(name, color, featureCount, options = {}) {
         markerStrokeWidthSlider.addEventListener('input', () => updateMarkerStrokeWidth(markerStrokeWidthSlider));
         markerStrokeWidthSlider.addEventListener('change', () => updateMarkerStrokeWidth(markerStrokeWidthSlider));
     }
+    syncMarkerTypeWidgets(record, newItem);
 }
 
 export function selectLayer(element) {
@@ -1427,6 +1430,9 @@ export function updateLayerColor(colorPicker) {
 
     // Only allow color updates for vector point or line layers (not WMS or polygons)
     if (record.isWMS || record.isPolygonLayer || !(record.isPointLayer || record.isLineLayer)) {
+        return;
+    }
+    if (record.isPointLayer && record.svgMarkerDataUrl && !record.markerPresetType) {
         return;
     }
 
@@ -1562,7 +1568,8 @@ function syncMarkerTypeWidgets(record, layerItem) {
     const svgSection = layerItem.querySelector('.marker-svg-section');
     const removeBtn = layerItem.querySelector('.svg-marker-remove-button');
 
-    const selected = record.markerPresetType || (record.svgMarkerDataUrl ? 'custom' : 'circle');
+    const isSvgMode = Boolean(record.svgMarkerDataUrl && !record.markerPresetType);
+    const selected = record.markerPresetType || (isSvgMode ? 'custom' : 'circle');
 
     if (markerTypeSelect) {
         markerTypeSelect.value = selected;
@@ -1593,27 +1600,28 @@ function syncMarkerTypeWidgets(record, layerItem) {
         removeBtn.style.display = record.svgMarkerDataUrl ? 'inline-flex' : 'none';
     }
 
-    // Hide or disable stroke UI when custom SVG marker mode is active.
-    // Stroke remains available for preset marker types (circle, square, star, triangle, diamond).
+    const pointColorControl = layerItem.querySelector('[data-vector-color="color"]');
+    if (pointColorControl && record.isPointLayer) {
+        pointColorControl.disabled = isSvgMode;
+        pointColorControl.setAttribute('aria-disabled', String(isSvgMode));
+        pointColorControl.title = isSvgMode ? 'Point Color is unavailable for custom SVG markers' : 'Point Color';
+    }
+
+    // Keep stroke controls visible while disabling edits for custom SVG markers.
     const strokeSection = layerItem.querySelector('.marker-stroke-section');
     const strokeControls = layerItem.querySelector('.marker-stroke-controls');
     const markerStrokeToggle = layerItem.querySelector('.marker-stroke-enabled');
-    const isSvgMode = selected === 'custom';
     if (strokeSection) {
-        if (isSvgMode) {
-            strokeSection.style.display = 'none';
-            // disable inputs inside stroke section to prevent accidental changes
-            strokeSection.querySelectorAll('input,button,select').forEach((el) => el.disabled = true);
-        } else {
-            // restore stroke section visibility but keep inner controls' visibility in sync with enabled flag
-            strokeSection.style.display = '';
-            strokeSection.querySelectorAll('input,button,select').forEach((el) => el.disabled = false);
-            if (strokeControls) {
-                strokeControls.style.display = record.markerStrokeEnabled ? 'block' : 'none';
-            }
-            if (markerStrokeToggle) {
-                markerStrokeToggle.checked = Boolean(record.markerStrokeEnabled);
-            }
+        strokeSection.style.display = '';
+        strokeSection.querySelectorAll('input,button,select').forEach((el) => {
+            el.disabled = isSvgMode;
+            el.setAttribute('aria-disabled', String(isSvgMode));
+        });
+        if (strokeControls) {
+            strokeControls.style.display = record.markerStrokeEnabled ? 'block' : 'none';
+        }
+        if (markerStrokeToggle) {
+            markerStrokeToggle.checked = Boolean(record.markerStrokeEnabled);
         }
     }
 }
@@ -1621,7 +1629,7 @@ function syncMarkerTypeWidgets(record, layerItem) {
 function updateMarkerStrokeEnabled(checkbox, layerName, layerItem) {
     const record = getLayerRecord(layerName);
 
-    if (!record || !record.isPointLayer) {
+    if (!record || !record.isPointLayer || (record.svgMarkerDataUrl && !record.markerPresetType)) {
         return;
     }
 
@@ -1703,7 +1711,7 @@ function updateMarkerStrokeColor(colorPicker, layerName) {
     const newColor = colorPicker.value;
     const record = getLayerRecord(layerName);
 
-    if (!record || !record.isPointLayer) {
+    if (!record || !record.isPointLayer || (record.svgMarkerDataUrl && !record.markerPresetType)) {
         return;
     }
 
@@ -1722,7 +1730,7 @@ function updateMarkerStrokeWidth(slider) {
         valueEl.textContent = `${strokeWidth}px`;
     }
 
-    if (!record || !record.isPointLayer || !Number.isFinite(strokeWidth)) {
+    if (!record || !record.isPointLayer || (record.svgMarkerDataUrl && !record.markerPresetType) || !Number.isFinite(strokeWidth)) {
         return;
     }
 

@@ -1,0 +1,103 @@
+<!doctype html>
+<html><head><link rel="stylesheet" href="/src/styles/main.css"></head>
+<body><div id="layerList"></div>
+<script type="module">
+import { addLayerItem } from '/src/ui/layers-panel.js';
+import { setLayerRecord } from '/src/state/store.js';
+import { getManagedLayerLegendDescriptors } from '/src/map/layer-manager.js';
+import ol from '/src/lib/ol.js';
+
+const assert = (condition, message) => { if (!condition) throw new Error(message); };
+window.fixtureReady = Promise.resolve(async () => {
+    const svg = color => `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><circle cx="5" cy="5" r="4" fill="${color}"/></svg>`)}`;
+    const firstSvg = svg('#e11d48');
+    const secondSvg = svg('#2563eb');
+    const record = {
+        isPointLayer: true,
+        geometryType: 'Point',
+        color: '#22AA44',
+        pointSize: 7,
+        opacity: 0.8,
+        markerPresetType: null,
+        svgMarkerGallery: [
+            { name: 'red.svg', dataUrl: firstSvg },
+            { name: 'blue.svg', dataUrl: secondSvg }
+        ],
+        activeSvgMarkerIndex: 0,
+        svgMarkerDataUrl: firstSvg,
+        markerStrokeEnabled: true,
+        markerStrokeColor: '#123456',
+        markerStrokeWidth: 3,
+        source: new ol.source.Vector(),
+        layer: new ol.layer.Vector({ source: new ol.source.Vector() })
+    };
+    record.layer = new ol.layer.Vector({ source: record.source });
+    setLayerRecord('Marker Test', record);
+    addLayerItem('Marker Test', record.color, 1);
+    const item = document.querySelector('.layer-item');
+    const pointColor = item.querySelector('[data-vector-color="color"]');
+    const stroke = item.querySelector('.marker-stroke-enabled');
+    const pointSize = item.querySelector('.point-size-slider');
+    const opacity = item.querySelector('.transparency-slider');
+    const checkState = (disabled, label) => {
+        assert(pointColor.disabled === disabled, `${label}: Point Color state`);
+        assert(stroke.disabled === disabled, `${label}: Add Stroke state`);
+        assert(pointSize && !pointSize.disabled, `${label}: Point Size remains enabled`);
+        assert(opacity && !opacity.disabled, `${label}: Point Opacity remains enabled`);
+    };
+    const checkRenderedSvg = (color, label) => {
+        const actual = getManagedLayerLegendDescriptors('Marker Test')[0]?.symbol?.src;
+        assert(actual?.includes(encodeURIComponent(color)), `${label}: active SVG render uses ${color}`);
+    };
+
+    checkState(true, 'initial SVG');
+    checkRenderedSvg('#e11d48', 'initial SVG');
+    pointColor.click();
+    assert(!document.querySelector('.vector-color-popup'), 'disabled Point Color cannot open its picker');
+    item.querySelector('.marker-type-option[data-value="circle"]').click();
+    checkState(false, 'Circle preset');
+    assert(getManagedLayerLegendDescriptors('Marker Test')[0]?.symbol?.src !== firstSvg, 'Circle preset rendering restored');
+    assert(record.color === '#22AA44' && record.markerStrokeEnabled && record.markerStrokeColor === '#123456' && record.markerStrokeWidth === 3,
+        'preset styling values are preserved');
+
+    item.querySelector('.svg-marker-thumbnail[data-svg-index="0"]').click();
+    checkState(true, 'switch back to first SVG');
+    assert(record.svgMarkerDataUrl === firstSvg, 'first SVG is active');
+    checkRenderedSvg('#e11d48', 'reselected SVG');
+
+    item.querySelector('.marker-type-option[data-value="star"]').click();
+    checkState(false, 'Star preset');
+    item.querySelector('.svg-marker-thumbnail[data-svg-index="1"]').click();
+    checkState(true, 'second SVG thumbnail');
+    assert(record.svgMarkerDataUrl === secondSvg, 'second SVG is active');
+    checkRenderedSvg('#2563eb', 'second SVG');
+    item.querySelector('.svg-marker-thumbnail[data-svg-index="0"]').click();
+    checkState(true, 'switch between SVG thumbnails');
+
+    for (const preset of ['diamond', 'circle', 'triangle']) {
+        item.querySelector(`.marker-type-option[data-value="${preset}"]`).click();
+        checkState(false, `${preset} preset`);
+        item.querySelector('.svg-marker-thumbnail[data-svg-index="1"]').click();
+        checkState(true, `SVG after ${preset}`);
+    }
+
+    const removeSvg = async index => {
+        item.querySelector(`.svg-marker-thumbnail[data-svg-index="${index}"] .svg-marker-delete`).click();
+        const deadline = Date.now() + 3000;
+        while (!document.querySelector('#confirmationDialogConfirm') && Date.now() < deadline) {
+            await new Promise(resolve => setTimeout(resolve, 10));
+        }
+        const confirm = document.querySelector('#confirmationDialogConfirm');
+        assert(confirm, 'SVG removal confirmation opened');
+        confirm.click();
+        await new Promise(resolve => setTimeout(resolve, 30));
+    };
+    await removeSvg(1);
+    checkState(true, 'one SVG remains after removal');
+    await removeSvg(0);
+    checkState(false, 'last SVG removed returns to preset controls');
+    assert(!record.svgMarkerDataUrl && record.markerStrokeEnabled && record.markerStrokeColor === '#123456' && record.markerStrokeWidth === 3,
+        'removing SVGs preserves stroke settings');
+    return { passed: true };
+});
+</script></body></html>
