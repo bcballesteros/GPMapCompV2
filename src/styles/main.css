@@ -1211,12 +1211,15 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
 }
 
 .layer-name {
-    display: block;
     max-width: 100%;
     min-width: 0;
     overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    white-space: normal;
+    overflow-wrap: anywhere;
     font-size: 14px;
     font-weight: 700;
     color: var(--gray-900);

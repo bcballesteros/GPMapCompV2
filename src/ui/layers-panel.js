@@ -11,6 +11,7 @@ import { showToast } from './toast.js';
 import { syncLabelAttributeControl } from './sidebar.js';
 import { confirmDestructiveAction } from './confirmation-dialog.js';
 import { syncVectorLegend, vectorLegendMarkup } from './vector-legend.js';
+import { isLayerNameTruncated } from '../utils/layer-name-layout.js';
 
 let layerNameTooltipElement = null;
 let layerNameTooltipListenersBound = false;
@@ -728,6 +729,8 @@ function ensureLayerNameTooltip() {
 
     layerNameTooltipElement = document.createElement('div');
     layerNameTooltipElement.className = 'layer-name-tooltip';
+    layerNameTooltipElement.id = 'layer-name-tooltip';
+    layerNameTooltipElement.setAttribute('role', 'tooltip');
     layerNameTooltipElement.setAttribute('aria-hidden', 'true');
     document.body.appendChild(layerNameTooltipElement);
 
@@ -739,10 +742,6 @@ function ensureLayerNameTooltip() {
     }
 
     return layerNameTooltipElement;
-}
-
-function isLayerNameTruncated(nameElement) {
-    return Boolean(nameElement && nameElement.scrollWidth > nameElement.clientWidth + 1);
 }
 
 function positionLayerNameTooltip(anchorElement, tooltipElement) {
@@ -778,6 +777,8 @@ function showLayerNameTooltip(nameElement) {
     }
 
     tooltipElement.textContent = nameElement.textContent;
+    tooltipElement.setAttribute('aria-hidden', 'false');
+    nameElement.setAttribute('aria-describedby', tooltipElement.id);
     tooltipElement.classList.add('visible');
     positionLayerNameTooltip(nameElement, tooltipElement);
 }
@@ -788,6 +789,7 @@ function hideLayerNameTooltip() {
     }
 
     layerNameTooltipElement.classList.remove('visible');
+    layerNameTooltipElement.setAttribute('aria-hidden', 'true');
 }
 
 function attachLayerNameTooltip(layerItem) {
