@@ -3,7 +3,7 @@ import { bindVectorSldControls, vectorSldMarkup } from './vector-sld-controls.js
 import { ensurePolygonSymbology, setPolygonCategoryColor } from '../map/polygon-symbology.js';
 import { DEFAULT_LINE_STROKE_WIDTH, DEFAULT_POINT_SIZE } from '../config/constants.js';
 import { canZoomToLayer, fitLayerToView, removeManagedLayer, updateManagedLayerStyle } from '../map/layer-manager.js';
-import { getLayerRecord, renameLayerRecord, setCurrentLayerName } from '../state/store.js';
+import { getMap, getLayerRecord, renameLayerRecord, setCurrentLayerName } from '../state/store.js';
 import { syncLabelsToggle } from '../tools/labels-tool.js';
 import { commitLayerOpacity as commitLayerOpacityValue, updateLayerOpacity as updateLayerOpacityValue } from '../tools/transparency-tool.js';
 import { bindVectorColorPickers, colorSwatchMarkup } from './vector-color-picker.js';
@@ -12,6 +12,7 @@ import { syncLabelAttributeControl } from './sidebar.js';
 import { confirmDestructiveAction } from './confirmation-dialog.js';
 import { syncVectorLegend, vectorLegendMarkup } from './vector-legend.js';
 import { isLayerNameTruncated } from '../utils/layer-name-layout.js';
+import { layerSourceType, layerSubtitle, topToBottomLayers } from '../utils/layer-list-layout.js';
 
 let layerNameTooltipElement = null;
 let layerNameTooltipListenersBound = false;
@@ -172,100 +173,58 @@ function getEmptyStateMarkup() {
     `;
 }
 
-const LAYER_GROUP_ORDER = ['vector', 'wms', 'geoportal', 'annotation', 'other'];
-const LAYER_GROUP_LABELS = {
-    vector: 'Vector Layers',
-    wms: 'WMS Layers',
-    geoportal: 'Geoportal Layers',
-    annotation: 'Annotations',
-    other: 'Other Layers'
-};
 const LAYER_ACTIONS = [
     { id: 'zoom', label: 'Zoom to Layer' },
     { id: 'rename', label: 'Rename' }
 ];
 
-function getLayerGroupKey(record, options = {}) {
-    if (record?.isGP || options.isGP) {
-        return 'geoportal';
-    }
-    if (record?.isWMS || options.isWMS) {
-        return 'wms';
-    }
-    if (record?.isPointLayer || record?.isLineLayer || record?.isPolygonLayer) {
-        return 'vector';
-    }
-    if (record?.isAnnotation) {
-        return 'annotation';
-    }
-    return 'other';
-}
-
-function getLayerGroupContainer(groupKey) {
-    return document.querySelector(`#layerList .layer-group[data-group="${groupKey}"]`);
-}
-
-function getLayerGroupBody(/* groupKey */) {
-    // Return the logical body container for a group when present.
-    // Keep backwards compatibility by returning the root list if no group body exists.
-    const container = getLayerGroupContainer(arguments[0]);
-    if (container) {
-        const body = container.querySelector('.layer-group-body');
-        if (body) return body;
-    }
-    return getLayerList();
-}
+// Record identity survives display-name changes; moving cards preserves controls.
+const cardRecords = new WeakMap();
+let observedLayerGroup = null;
 
 function getLayerList() {
     return document.getElementById('layerList');
 }
 
-function createLayerGroup(groupKey) {
-    const layerList = getLayerList();
-    const groupLabel = LAYER_GROUP_LABELS[groupKey] || LAYER_GROUP_LABELS.other;
-    const groupHTML = `
-        <div class="layer-group" data-group="${groupKey}">
-            <div class="layer-group-header">
-                <button type="button" class="layer-group-toggle" data-group="${groupKey}" aria-expanded="true">
-                    <span class="layer-group-title">${groupLabel}</span>
-                    <span class="layer-group-count">0</span>
-                    <i class="fas fa-chevron-down layer-group-chevron" aria-hidden="true"></i>
-                </button>
-            </div>
-            <div class="layer-group-body" role="group" aria-label="${groupLabel}"></div>
-        </div>
-    `;
-    const template = document.createElement('div');
-    template.innerHTML = groupHTML;
-    const groupElement = template.firstElementChild;
-
-    const insertBefore = LAYER_GROUP_ORDER
-        .slice(LAYER_GROUP_ORDER.indexOf(groupKey) + 1)
-        .map((nextKey) => getLayerGroupContainer(nextKey))
-        .find(Boolean);
-
-    if (insertBefore) {
-        layerList.insertBefore(groupElement, insertBefore);
-    } else {
-        layerList.appendChild(groupElement);
+function ensureLayerArea(operational = false) {
+    const root = getLayerList();
+    const className = operational ? 'operational-layer-list' : 'map-layer-list';
+    let body = root.querySelector('.' + className);
+    if (!body) {
+        const heading = document.createElement('div');
+        heading.className = 'map-layers-heading';
+        heading.innerHTML = operational ? '<span>Operational Layers</span>' : '<span>Map Layers</span><span class="map-layers-direction">Top &rarr; Bottom</span>';
+        body = document.createElement('div');
+        body.className = className;
+        body.setAttribute('role', 'group');
+        body.setAttribute('aria-label', operational ? 'Operational Layers' : 'Map Layers, top to bottom');
+        const before = operational ? null : root.querySelector('.map-layers-heading');
+        root.insertBefore(heading, before);
+        root.insertBefore(body, before);
     }
-
-    return groupElement;
+    return body;
 }
 
-function ensureLayerGroup(groupKey) {
-    // Ensure a visual group header exists and return its header element.
-    const container = getLayerGroupContainer(groupKey) || createLayerGroup(groupKey);
-    return container.querySelector('.layer-group-header');
+function syncLayerListOrder() {
+    const body = getLayerList()?.querySelector('.map-layer-list');
+    if (!body) return;
+    const cards = new Map(Array.from(body.children, card => [cardRecords.get(card)?.layer, card]));
+    let cursor = body.firstElementChild;
+    for (const layer of topToBottomLayers(getMap())) {
+        const card = cards.get(layer);
+        if (!card) continue;
+        if (card === cursor) cursor = cursor.nextElementSibling;
+        else body.insertBefore(card, cursor);
+    }
 }
 
-function updateLayerGroupCount(groupKey) {
-    const group = getLayerGroupContainer(groupKey);
-    if (!group) return;
-    const body = group.querySelector('.layer-group-body') || getLayerList();
-    const count = body.querySelectorAll(`.layer-item[data-group="${groupKey}"]`).length;
-    const countEl = group.querySelector('.layer-group-count');
-    if (countEl) countEl.textContent = String(count);
+function observeLayerOrder() {
+    const group = getMap()?.getLayerGroup?.();
+    if (group === observedLayerGroup) return;
+    observedLayerGroup?.un('change', syncLayerListOrder);
+    observedLayerGroup = group;
+    // Group change events include collection and child z-index changes.
+    group?.on('change', syncLayerListOrder);
 }
 
 function collapseLayerItem(layerItem) {
@@ -284,14 +243,6 @@ function collapseAllLayerItems(exceptItem = null) {
             collapseLayerItem(item);
         }
     });
-}
-
-function formatLayerSubtitle({ featureCount, isWms, isGp }) {
-    if (isWms) {
-        return isGp ? 'Geoportal Layer' : 'Remote Layer';
-    }
-
-    return `${featureCount} Feature${featureCount === 1 ? '' : 's'}`;
 }
 
 function getLayerItemName(layerItem) {
@@ -523,35 +474,6 @@ function renameLayerFromItem(layerItem) {
     requestAnimationFrame(() => {
         input.focus();
         input.select();
-    });
-}
-
-function setupLayerGroupToggleListeners(layerList) {
-    if (!layerList) {
-        return;
-    }
-
-    layerList.addEventListener('click', (event) => {
-        const toggle = event.target.closest('.layer-group-toggle');
-        if (!toggle) {
-            return;
-        }
-
-        event.stopPropagation();
-        const group = toggle.closest('.layer-group');
-        if (!group) return;
-
-        const expanded = toggle.getAttribute('aria-expanded') === 'true';
-        toggle.setAttribute('aria-expanded', String(!expanded));
-        group.classList.toggle('collapsed', expanded);
-
-        const groupKey = group.getAttribute('data-group');
-        if (groupKey) {
-            document.querySelectorAll(`#layerList .layer-item[data-group="${groupKey}"]`).forEach((item) => {
-                item.classList.toggle('hidden', expanded);
-                collapseLayerItem(item);
-            });
-        }
     });
 }
 
@@ -815,13 +737,12 @@ function attachLayerNameTooltip(layerItem) {
 
 export function addLayerItem(name, color, featureCount, options = {}) {
     const layerList = document.getElementById('layerList');
+    const record = getLayerRecord(name);
+    const existing = Array.from(layerList.querySelectorAll('.layer-item'))
+        .find(item => record && cardRecords.get(item) === record);
+    if (existing) return;
     if (layerList.querySelector('.empty-state')) {
         layerList.innerHTML = '';
-    }
-
-    if (!document._layerGroupToggleListenerAdded) {
-        setupLayerGroupToggleListeners(layerList);
-        document._layerGroupToggleListenerAdded = true;
     }
 
     bindVectorColorPickers(layerList, {
@@ -844,14 +765,12 @@ export function addLayerItem(name, color, featureCount, options = {}) {
         }
     });
 
-    const record = getLayerRecord(name);
     color = record?.color || color;
     const isWms = Boolean(record?.isWMS) || Boolean(options.isWMS);
-    const isGp = Boolean(options.isGP || record?.isGP);
     const isPointLayer = Boolean(record?.isPointLayer);
     const isLineLayer = Boolean(record?.isLineLayer);
     const isPolygonLayer = Boolean(record?.isPolygonLayer);
-    const groupKey = getLayerGroupKey(record, options);
+    const sourceType = layerSourceType(record, options);
     const opacityValue = Math.round((record?.opacity ?? 1) * 100);
     const canZoom = canZoomToLayer(record);
     const zoomDisabledReason = record?.zoomUnavailableReason || 'This layer does not have a zoomable extent yet.';
@@ -865,7 +784,7 @@ export function addLayerItem(name, color, featureCount, options = {}) {
     const polygonFillColor = record?.polygonFillColor || color;
     const polygonStrokeColor = record?.polygonStrokeColor || color;
     const polygonStrokeWidthValue = Math.round(record?.polygonStrokeWidth ?? DEFAULT_LINE_STROKE_WIDTH);
-    const statsText = formatLayerSubtitle({ featureCount, isWms, isGp });
+    const statsText = layerSubtitle(sourceType, featureCount);
 
     // Build controls strictly by geometry type. WMS only gets opacity.
     let colorControl = '';
@@ -1057,7 +976,7 @@ export function addLayerItem(name, color, featureCount, options = {}) {
         opacityLabel = 'Opacity';
     }
 
-    const isVisible = options.visible !== false;
+    const isVisible = options.visible ?? record?.layer?.getVisible?.() ?? true;
     const safeName = escapeHtml(name);
     const layerHTML = `
         <div class="layer-item collapsed" data-layer-name="${safeName}">
@@ -1068,7 +987,6 @@ export function addLayerItem(name, color, featureCount, options = {}) {
                         <div class="layer-name-wrap" data-tooltip="${safeName}">
                             <div class="layer-name" tabindex="0" aria-label="Layer name: ${safeName}">${safeName}</div>
                         </div>
-                        <div class="layer-stats">${statsText}</div>
                     </div>
                     <div class="layer-header-actions">
                         <button type="button" class="layer-expand-btn" aria-expanded="false" title="Layer Controls"><i class="fas fa-chevron-down" aria-hidden="true"></i></button>
@@ -1077,6 +995,7 @@ export function addLayerItem(name, color, featureCount, options = {}) {
         zoomDisabledReason
     })}
                     </div>
+                    <div class="layer-stats">${statsText}</div>
                 </div>
             </div>
             <div class="layer-controls-wrapper">
@@ -1113,9 +1032,6 @@ export function addLayerItem(name, color, featureCount, options = {}) {
         </div>
     `;
 
-    const headerEl = ensureLayerGroup(groupKey);
-    const layerListEl = getLayerList();
-
     // Create element from HTML so we can set data attributes and insert at correct position
     const tmp = document.createElement('div');
     tmp.innerHTML = layerHTML.trim();
@@ -1123,18 +1039,11 @@ export function addLayerItem(name, color, featureCount, options = {}) {
     if (isPolygonLayer) bindPolygonControls(newItem, record);
     if (isPointLayer || isLineLayer) bindVectorSldControls(newItem, record);
     if (isPointLayer || isLineLayer) syncVectorLegend(newItem, name);
-    if (newItem) {
-        newItem.setAttribute('data-group', groupKey);
-
-        // Insert the layer item into the group's body container to make the
-        // header a true structural anchor for its layers.
-        const groupContainer = getLayerGroupContainer(groupKey) || createLayerGroup(groupKey);
-        const groupBody = groupContainer.querySelector('.layer-group-body') || layerListEl;
-
-        // Append to the group's body. Keep relative ordering within a group.
-        groupBody.appendChild(newItem);
-    }
-    updateLayerGroupCount(groupKey);
+    cardRecords.set(newItem, record);
+    newItem.dataset.sourceType = sourceType;
+    ensureLayerArea(sourceType === 'Annotation' || sourceType === 'Other').appendChild(newItem);
+    observeLayerOrder();
+    syncLayerListOrder();
     attachLayerNameTooltip(newItem);
 
     // Initialize collapsed state and header/expand behavior (compact by default)
@@ -1862,18 +1771,13 @@ export function removeLayerItem(layerName) {
     removeManagedLayer(layerName);
     hideLayerNameTooltip();
 
-    const groupKey = layerItem.getAttribute('data-group');
+    const body = layerItem.parentElement;
     layerItem.remove();
-
-    if (groupKey) {
-        const group = getLayerGroupContainer(groupKey);
-        const remaining = group?.querySelectorAll('.layer-item').length || 0;
-        if (group && remaining === 0) {
-            group.remove();
-        } else if (group) {
-            updateLayerGroupCount(groupKey);
-        }
+    if (!body.children.length) {
+        body.previousElementSibling.remove();
+        body.remove();
     }
+    syncLayerListOrder();
 
     if (layerList.querySelectorAll('.layer-item').length === 0) {
         layerList.innerHTML = getEmptyStateMarkup();

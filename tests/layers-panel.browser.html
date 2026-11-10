@@ -1,0 +1,129 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><link rel="stylesheet" href="/src/styles/main.css"></head>
+<body><aside class="sidebar-left"><div class="sidebar-main"><div class="sidebar-content"><div id="layerList" class="layer-list"><div class="empty-state">No layers in this workspace</div></div></div></div></aside>
+<script type="module">
+import ol from '/src/lib/ol.js';
+import { setMap, getLayerRecord, setLayerRecord, getState } from '/src/state/store.js';
+import { addVectorLayer, addWmsLayer, ensureAnnotationLayer } from '/src/map/layer-manager.js';
+import { addLayerItem, removeLayerItem } from '/src/ui/layers-panel.js';
+const assert = (value, message) => { if (!value) throw Error(message); };
+const tick = () => new Promise(resolve => setTimeout(resolve, 30));
+const cards = () => [...document.querySelectorAll('.map-layer-list > .layer-item')];
+const names = () => cards().map(card => card.querySelector('.layer-name').textContent);
+const order = expected => assert(JSON.stringify(names()) === JSON.stringify(expected), 'order: ' + names());
+const map = new ol.Map({ controls: [], interactions: [], view: new ol.View({ center: [0,0], zoom: 4 }) });
+setMap(map);
+const addVector = name => {
+    const feature = new ol.Feature(new ol.geom.Point([0,0]));
+    const record = addVectorLayer(name, '#2563eb', { type: 'FeatureCollection', features: [{ geometry: { type: 'Point' } }] }, [feature]);
+    addLayerItem(name, record.color, 1);
+    return record;
+};
+window.fixtureReady = Promise.resolve(async () => {
+    assert(!document.querySelector('.map-layer-list, .layer-group'), 'empty: no groups');
+    const first = addVector('Municipal Boundaries');
+    order(['Municipal Boundaries']);
+    assert(cards()[0].querySelector('.layer-stats').textContent === 'Vector · 1 Feature', 'vector stats');
+    const second = addVector('Land Use');
+    order(['Land Use', 'Municipal Boundaries']);
+    const service = (name, isGP, zIndex) => {
+        const source = new ol.source.TileWMS({ url: 'https://example.invalid/wms', params: { LAYERS: 'test' } });
+        const layer = new ol.layer.Tile({ source, zIndex });
+        const record = addWmsLayer(name, source, layer, { isGP, layerExtent: [0,0,100,100], layerExtentProjection: 'EPSG:3857' });
+        addLayerItem(name, '#2563eb', 0);
+        return record;
+    };
+    const wms = service('Administrative Boundaries', false, 100);
+    const gp = service('Geoportal Land Cover', true, 101);
+    order(['Geoportal Land Cover', 'Administrative Boundaries', 'Land Use', 'Municipal Boundaries']);
+    first.layer.setZIndex(102);
+    second.layer.setZIndex(100.5);
+    order(['Municipal Boundaries', 'Geoportal Land Cover', 'Land Use', 'Administrative Boundaries']);
+    const originalCollection = map.getLayers().getArray().slice();
+    const originalCard = cards()[0];
+    originalCard.querySelector('.layer-expand-btn').click();
+    assert(!originalCard.classList.contains('collapsed'), 'expand');
+    originalCard.querySelector('.layer-expand-btn').click();
+    assert(originalCard.classList.contains('collapsed'), 'collapse');
+    originalCard.querySelector('.layer-expand-btn').click();
+    first.layer.setZIndex(100.5);
+    order(['Geoportal Land Cover', 'Land Use', 'Municipal Boundaries', 'Administrative Boundaries']);
+    assert(cards()[2] === originalCard && !originalCard.classList.contains('collapsed'), 'preserve card and expansion');
+    assert(cards()[0].querySelector('.layer-stats').textContent === 'Geoportal · Map Service', 'gp label');
+    assert(cards()[3].querySelector('.layer-stats').textContent === 'WMS · Map Service', 'wms label');
+    addLayerItem('Municipal Boundaries', first.color, 1);
+    assert(cards().length === 4, 'no duplicates');
+    const checkbox = originalCard.querySelector('.layer-toggle');
+    checkbox.click();
+    assert(!first.layer.getVisible() && cards().includes(originalCard), 'hidden card remains');
+    const opacity = originalCard.querySelector('.transparency-slider');
+    opacity.value = 42; opacity.dispatchEvent(new Event('input', { bubbles: true }));
+    assert(first.opacity === 0.42, 'opacity');
+    const actions = originalCard.querySelector('.layer-header-actions');
+    assert(actions.firstElementChild.classList.contains('layer-expand-btn'), 'expand before menu');
+    originalCard.querySelector('.layer-actions-trigger').click();
+    document.querySelector('[data-layer-floating-root] .layer-actions-dropdown [data-action="zoom"]').click();
+    originalCard.querySelector('.layer-actions-trigger').click();
+    document.querySelector('[data-layer-floating-root] .layer-actions-dropdown [data-action="rename"]').click();
+    const longName = 'Administrative Boundaries of the Province of Camiguin for Geographic Information System Mapping and Analysis';
+    document.querySelector('.layer-rename-input').value = longName;
+    document.querySelector('.layer-rename-save').click();
+    assert(getLayerRecord(longName) === first, 'rename record');
+    assert(originalCard.classList.contains('active'), 'active layer');
+    assert(cards()[2] === originalCard, 'rename position');
+    const label = originalCard.querySelector('.layer-name');
+    assert(originalCard.querySelector('.layer-name-wrap').dataset.tooltip === longName, 'rename tooltip');
+    assert(getComputedStyle(label).webkitLineClamp === '2', 'two lines');
+    label.focus();
+    await tick();
+    label.dispatchEvent(new MouseEvent('mouseenter'));
+    assert(document.querySelector('.layer-name-tooltip.visible')?.textContent === longName, 'full-name tooltip: ' + JSON.stringify({ width: label.clientWidth, height: label.clientHeight, scroll: label.scrollHeight, tooltip: document.querySelector('.layer-name-tooltip')?.outerHTML, rect: label.getBoundingClientRect().toJSON() }));
+    ensureAnnotationLayer();
+    const internal = new ol.layer.Vector({ source: new ol.source.Vector() });
+    map.addLayer(internal);
+    assert(cards().length === 4 && !document.querySelector('.operational-layer-list'), 'no internal layers');
+    assert(!document.querySelector('.layer-group'), 'no old source groups');
+    const basemap = new ol.layer.Tile();
+    map.getLayers().insertAt(0, basemap);
+    order(['Geoportal Land Cover', 'Land Use', longName, 'Administrative Boundaries']);
+    map.removeLayer(basemap);
+    // If a caller explicitly requests an operational card, keep its controls
+    // separate rather than silently dropping them or mixing them with overlays.
+    setLayerRecord('Operational control', { layer: internal, source: internal.getSource(), isAnnotation: true });
+    addLayerItem('Operational control', '#2563eb', 0);
+    const operational = document.querySelector('.operational-layer-list .layer-item');
+    assert(operational && cards().length === 4, 'separate operational card');
+    operational.querySelector('.layer-toggle').click();
+    assert(!internal.getVisible(), 'operational visibility control');
+    removeLayerItem('Operational control');
+    assert(!document.querySelector('.operational-layer-list'), 'no empty operational area');
+    assert(map.getLayers().getArray().slice(0,4).every((layer,index) => layer === originalCollection[index]), 'collection unchanged');
+    assert(!first.layer.getVisible() && first.layer.getZIndex() === 100.5, 'presentation preserves map state');
+    window.reviewCard = originalCard;
+    window.checkLayout = async () => {
+        await tick();
+        const sidebar = document.querySelector('.sidebar-left');
+        assert(sidebar.getBoundingClientRect().width === parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--left-sidebar-width')), 'sidebar width');
+        assert(sidebar.scrollWidth <= sidebar.clientWidth, 'no horizontal overflow');
+        const rect = label.getBoundingClientRect();
+        assert(rect.height <= parseFloat(getComputedStyle(label).lineHeight) * 2 + 1, 'two-line height');
+        assert(label.scrollHeight > label.clientHeight, 'long name truncated');
+        const expand = originalCard.querySelector('.layer-expand-btn').getBoundingClientRect();
+        assert(rect.right <= expand.left + 1, 'no overlapping controls');
+        for (const card of cards()) {
+            const stats = card.querySelector('.layer-stats');
+            assert(stats.clientHeight <= Math.ceil(parseFloat(getComputedStyle(stats).lineHeight)) + 1, 'compact metadata row');
+        }
+        return true;
+    };
+    window.finish = () => {
+        removeLayerItem('Land Use');
+        order(['Geoportal Land Cover', longName, 'Administrative Boundaries']);
+        assert(cards()[1] === originalCard, 'remove preserves remaining nodes');
+        for (const name of names()) removeLayerItem(name);
+        assert(document.querySelector('.empty-state') && !document.querySelector('.map-layer-list, .map-layers-heading'), 'restored empty state');
+        return true;
+    };
+    return { passed: true };
+});
+</script></body></html>

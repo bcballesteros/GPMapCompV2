@@ -34,6 +34,14 @@ The application is built using modern web technologies with an emphasis on maint
 
 ### Geospatial Data
 
+The Layers panel presents uploaded vectors, WMS and Geoportal overlays in one
+**Map Layers** list, ordered **Top → Bottom** by their effective map stacking
+order. Each card includes a compact source label and feature count or service
+description. Visibility, styling, Rename, Zoom to Layer, two-line names and
+full-name tooltips remain available. Basemaps and operational tools stay separate.
+This display does not change map stacking or provide interactive reordering.
+See [Layers panel implementation and acceptance checks](LAYERS_PANEL.md).
+
 - Upload multiple geospatial datasets
 - Shapefile ZIP (.zip)
 - GeoJSON
