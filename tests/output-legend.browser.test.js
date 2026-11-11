@@ -79,7 +79,7 @@ test('output legends follow effective vector symbols, snapshots, formats and pre
             expression: 'window.fixtureReady.then(run => run())', awaitPromise: true, returnByValue: true
         });
         const result = evaluation.result.value;
-        assert.equal(result.length, 16);
+        assert.equal(result.length, 17);
         for (const entry of result) t.diagnostic(JSON.stringify(entry));
         if (process.env.LEGEND_SCREENSHOT_PATH) {
             const capture = await call('Runtime.evaluate', { expression: 'window.legendReviewCanvas.toDataURL()', returnByValue: true });

@@ -4,8 +4,11 @@
 <script type="module">
 import ol from '/src/lib/ol.js';
 import { setMap, getLayerRecord, setLayerRecord, getState } from '/src/state/store.js';
-import { addVectorLayer, addWmsLayer, ensureAnnotationLayer } from '/src/map/layer-manager.js';
+import { addVectorLayer, addWmsLayer, ensureAnnotationLayer, changeBasemapLayer } from '/src/map/layer-manager.js';
 import { addLayerItem, removeLayerItem } from '/src/ui/layers-panel.js';
+import { applyOverlayOrder, eligibleOverlays } from '/src/map/overlay-order.js';
+import { topToBottomLayers } from '/src/utils/layer-list-layout.js';
+import { captureOutputLegend } from '/src/services/output-legend.js';
 const assert = (value, message) => { if (!value) throw Error(message); };
 const tick = () => new Promise(resolve => setTimeout(resolve, 30));
 const cards = () => [...document.querySelectorAll('.map-layer-list > .layer-item')];
@@ -100,6 +103,225 @@ window.fixtureReady = Promise.resolve(async () => {
     assert(map.getLayers().getArray().slice(0,4).every((layer,index) => layer === originalCollection[index]), 'collection unchanged');
     assert(!first.layer.getVisible() && first.layer.getZIndex() === 100.5, 'presentation preserves map state');
     window.reviewCard = originalCard;
+    let nativeOriginal;
+    window.prepareNativeDrag = async () => {
+        nativeOriginal = topToBottomLayers(map).filter(layer => eligibleOverlays(getState().uploadedLayers).includes(layer));
+        originalCard.querySelector('.layer-expand-btn').click();
+        document.querySelector('.sidebar-main').scrollTop = 0;
+        await new Promise(resolve => setTimeout(resolve, 250));
+        window.nativeDragLog = [];
+        for (const type of ['dragstart','drop','dragend']) document.addEventListener(type, event => window.nativeDragLog.push(type), { capture: true });
+        const from = originalCard.querySelector('.layer-drag-handle').getBoundingClientRect();
+        const to = cards()[0].getBoundingClientRect();
+        return { x: from.x + from.width / 2, y: from.y + from.height / 2, targetX: to.x + 30, targetY: to.y + 2 };
+    };
+    window.finishNativeDrag = () => {
+        assert(cards()[0] === originalCard, 'real Chrome mouse drag moves card: ' + JSON.stringify(window.nativeDragLog));
+        assert(topToBottomLayers(map).filter(layer => eligibleOverlays(getState().uploadedLayers).includes(layer))[0] === first.layer, 'real mouse drag changes map');
+        applyOverlayOrder(map, eligibleOverlays(getState().uploadedLayers), nativeOriginal);
+        originalCard.querySelector('.layer-expand-btn').click();
+        return true;
+    };
+    window.nativeDropPoint = async () => {
+        await new Promise(resolve => requestAnimationFrame(resolve));
+        const gap=document.querySelector('.layer-drop-gap');
+        const destination=gap?.nextElementSibling?.classList.contains('layer-item')?gap.nextElementSibling:cards().at(-1);
+        const rect=destination.getBoundingClientRect();
+        return {x:rect.left+30,y:rect.top+2};
+    };
+    window.inspectActiveDrag = async (x, y) => {
+        await new Promise(resolve => requestAnimationFrame(resolve));
+        const source = document.querySelector('.layer-drag-source');
+        const previews = document.querySelectorAll('.layer-drag-preview');
+        assert(source && previews.length === 1, 'exactly one floating card during a real drag');
+        const preview = previews[0], rect = preview.getBoundingClientRect();
+        assert(getComputedStyle(preview).visibility === 'visible' && getComputedStyle(preview).opacity === '1', 'preview is painted');
+        assert(rect.width > 150 && rect.height > 30 && x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom, 'card follows cursor at handle: '+JSON.stringify({x,y,rect:rect.toJSON()}));
+        assert(preview.querySelector('.layer-name').textContent === source.querySelector('.layer-name').textContent && preview.querySelector('.layer-stats').textContent === source.querySelector('.layer-stats').textContent, 'preview retains name and metadata');
+        assert(getComputedStyle(source).visibility === 'hidden' && source.getBoundingClientRect().height === 0, 'original card has no visible source slot');
+        assert(document.querySelectorAll('.layer-drop-gap').length === 1, 'one blank destination gap');
+        assert(document.elementFromPoint(x,y)?.closest('.layer-drag-preview') !== preview, 'preview cannot intercept drop targets');
+        return true;
+    };
+    let namedDrag;
+    window.prepareNamedDrag = async () => {
+        const baseline = addVector('Baseline');
+        const approach = service('Approach Chart', false, 100);
+        const abra = service('Abra Wgs', true, 101);
+        const eligible = eligibleOverlays(getState().uploadedLayers);
+        const rest = topToBottomLayers(map).filter(layer => eligible.includes(layer) && ![baseline.layer, approach.layer, abra.layer].includes(layer));
+        applyOverlayOrder(map, eligible, [baseline.layer, approach.layer, abra.layer, ...rest]);
+        namedDrag = { approach, original: topToBottomLayers(map).slice() };
+        document.querySelector('.sidebar-main').scrollTop = 0;
+        await new Promise(resolve => setTimeout(resolve, 250));
+        const handle = cards()[1].querySelector('.layer-drag-handle').getBoundingClientRect();
+        const target = cards()[0].getBoundingClientRect();
+        return { x: handle.left + handle.width/2, y: handle.top + handle.height/2, targetX: target.left+30, targetY: target.top+3 };
+    };
+    window.finishNamedCancel = () => {
+        assert(!document.querySelector('.layer-drag-preview, .layer-drag-source, .layer-drop-gap'), 'Escape removes all temporary state');
+        assert(topToBottomLayers(map).every((layer,i)=>layer===namedDrag.original[i]), 'cancel preserves actual map order');
+        assert(names().slice(0,3).join('|') === 'Baseline|Approach Chart|Abra Wgs', 'cancel restores named cards');
+        for (const name of ['Baseline', 'Approach Chart', 'Abra Wgs']) removeLayerItem(name);
+        return true;
+    };
+    window.reorderChecks = async () => {
+        const eligible = () => eligibleOverlays(getState().uploadedLayers);
+        const actual = () => topToBottomLayers(map).filter(layer => eligible().includes(layer));
+        const initial = actual();
+        const originalOpacity = first.layer.getOpacity();
+        map.getLayers().insertAt(0,new ol.layer.Tile({properties:{basemapId:'test'}}));
+        const handle = originalCard.querySelector('.layer-drag-handle');
+        assert(handle && !originalCard.draggable && handle.draggable && handle.getAttribute('aria-hidden')==='true', 'pointer-only dedicated handle');
+        assert(handle.parentElement.classList.contains('layer-metadata'), 'metadata handle');
+        const beforeKeyboard=actual();
+        for (const keyName of [' ', 'Enter', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'Escape']) handle.dispatchEvent(new KeyboardEvent('keydown', { key: keyName, bubbles: true, cancelable: true }));
+        assert(actual().every((layer,i) => layer === initial[i]), 'keyboard input does not reorder layers');
+        assert(actual().every((layer,i)=>layer===beforeKeyboard[i]) && !handle.hasAttribute('aria-describedby'), 'no reorder-specific keyboard state');
+        const nativeMatchMedia=window.matchMedia.bind(window);
+        window.matchMedia=query=>query==='(prefers-reduced-motion: reduce)'?{matches:true,media:query,addEventListener(){},removeEventListener(){}}:nativeMatchMedia(query);
+        const reducedTransfer=new DataTransfer();
+        handle.dispatchEvent(new DragEvent('dragstart',{bubbles:true,dataTransfer:reducedTransfer}));
+        const reducedTarget=cards()[0], reducedRect=reducedTarget.getBoundingClientRect();
+        reducedTarget.dispatchEvent(new DragEvent('dragover',{bubbles:true,cancelable:true,dataTransfer:reducedTransfer,clientX:reducedRect.left+20,clientY:reducedRect.top+2}));
+        await new Promise(resolve=>requestAnimationFrame(resolve));
+        assert(!cards().some(card=>card.getAnimations().some(animation=>animation.effect?.getKeyframes().some(frame=>frame.translate))), 'reduced motion disables FLIP animation');
+        assert(document.querySelector('.layer-drop-gap'), 'reduced motion keeps spatial insertion feedback');
+        handle.dispatchEvent(new DragEvent('dragend',{bubbles:true,dataTransfer:reducedTransfer}));
+        window.matchMedia=nativeMatchMedia;
+        const drag = async (card, target, after, cancel = false) => {
+            const dragHandle = card.querySelector('.layer-drag-handle');
+            label.focus();
+            label.dispatchEvent(new MouseEvent('mouseenter'));
+            assert(document.querySelector('.layer-name-tooltip.visible'), 'tooltip shown before drag');
+            const dataTransfer = new DataTransfer();
+            dragHandle.dispatchEvent(new DragEvent('dragstart', { bubbles: true, dataTransfer }));
+            assert(!document.querySelector('.layer-name-tooltip.visible') && !label.hasAttribute('aria-describedby'), 'tooltip hidden at drag start');
+            target.scrollIntoView({ block: after ? 'end' : 'start' });
+            const rect = target.getBoundingClientRect();
+            target.dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer, clientX: rect.left + 20,
+                clientY: after ? rect.bottom - 2 : rect.top + 2 }));
+            await new Promise(resolve => requestAnimationFrame(resolve));
+            const gap = document.querySelector('.map-layer-list > .layer-drop-gap');
+            assert(gap, 'pointer drag creates an empty spatial insertion gap');
+            assert(Number.parseFloat(gap.style.height) >= card.getBoundingClientRect().height - 1, 'gap fits the dragged card');
+            assert(getComputedStyle(gap).backgroundColor === 'rgba(0, 0, 0, 0)' && getComputedStyle(gap).borderStyle === 'none' && getComputedStyle(gap).boxShadow === 'none', 'gap has no decorative effect');
+            assert(!document.querySelector('.layer-drop-before, .layer-drop-after'), 'old insertion highlight classes are absent');
+            const pickedUp=document.querySelector('.layer-dragging');
+            assert(pickedUp===card && pickedUp.isConnected && pickedUp.classList.contains('layer-drag-source'), 'original card stays mounted but is visually picked up after drag image capture');
+            assert(pickedUp.getBoundingClientRect().height===0 && getComputedStyle(pickedUp).visibility==='hidden', 'source slot closes without removing the card node: '+JSON.stringify({rect:pickedUp.getBoundingClientRect().toJSON(),visibility:getComputedStyle(pickedUp).visibility,position:getComputedStyle(pickedUp).position}));
+            assert(document.querySelectorAll('.layer-drag-preview').length===1 && document.querySelector('.layer-drag-preview .layer-name').textContent===label.textContent, 'expanded long-name card has an independent visible preview');
+            assert([...gap.parentElement.children].filter(item=>item.classList.contains('layer-drop-gap')).length===1, 'only one destination gap exists');
+            await new Promise(resolve=>setTimeout(resolve,190));
+            const firstGapIndex=[...gap.parentElement.children].indexOf(gap);
+            const remainingCards=cards().filter(item=>item!==card);
+            const firstIntent=remainingCards.indexOf(target)+(after?1:0);
+            const otherTarget=firstIntent>remainingCards.length/2?remainingCards[0]:remainingCards.at(-1);
+            const otherAfter=otherTarget===remainingCards.at(-1);
+            otherTarget.scrollIntoView({block:'nearest'});
+            const otherRect=otherTarget.getBoundingClientRect();
+            otherTarget.dispatchEvent(new DragEvent('dragover',{bubbles:true,cancelable:true,dataTransfer,clientX:otherRect.left+20,clientY:otherAfter?otherRect.bottom-2:otherRect.top+2}));
+            await new Promise(resolve => requestAnimationFrame(resolve));
+            assert(gap===document.querySelector('.layer-drop-gap') && [...gap.parentElement.children].indexOf(gap)!==firstGapIndex, 'same gap moves to the new destination');
+            const movingCard=cards().find(item=>item!==card && item.getAnimations().some(animation=>animation.effect?.getKeyframes().some(frame=>frame.translate)));
+            if (movingCard) {
+                const animation=movingCard.getAnimations().find(item=>item.effect?.getKeyframes().some(frame=>frame.translate));
+                const initialTime=animation.currentTime;
+                await new Promise(resolve=>setTimeout(resolve,45));
+                assert(animation.playState==='running' && animation.currentTime>initialTime, 'neighbor FLIP animation advances across frames');
+            }
+            await new Promise(resolve=>setTimeout(resolve,190));
+            target.scrollIntoView({block:after?'end':'start'});
+            const firstRect=target.getBoundingClientRect();
+            const dropEvent = { bubbles:true,cancelable:true,dataTransfer,clientX:firstRect.left+20,clientY:after?firstRect.bottom-2:firstRect.top+2 };
+            target.dispatchEvent(new DragEvent('dragover',dropEvent));
+            await new Promise(resolve => requestAnimationFrame(resolve));
+            assert(cancel || !after || [...gap.parentElement.children].indexOf(gap) === gap.parentElement.children.length - 1, 'bottom pointer positions spacer at end');
+            if (cancel) {
+                document.querySelector('.map-layer-list').dispatchEvent(new DragEvent('dragleave',{bubbles:true,relatedTarget:document.body}));
+                assert(!document.querySelector('.layer-drop-gap'),'leaving the list clears the temporary gap');
+            } else {
+                target.dispatchEvent(new DragEvent('drop',dropEvent));
+                assert(!card.getAnimations().some(animation=>animation.effect?.getKeyframes().some(frame=>frame.translate)), 'successful drop does not start a post-drop FLIP animation');
+                assert(getComputedStyle(card).translate==='none' && getComputedStyle(card).visibility==='visible', 'dropped card is immediately visible without a lingering translate');
+            }
+            dragHandle.dispatchEvent(new DragEvent('dragend', { bubbles: true, dataTransfer }));
+            assert(!document.querySelector('.layer-drop-gap, .layer-drop-before, .layer-drop-after'), 'placeholder and old highlight state are removed');
+            assert(!card.classList.contains('layer-drag-source') && !card.classList.contains('layer-dragging'), 'drag styles are cleaned after completion');
+            assert(!document.querySelector('.layer-drag-preview'), 'floating preview removed on drop or cancellation');
+            assert(!document.querySelector('.layer-name-tooltip.visible'), cancel ? 'tooltip hidden after cancel' : 'tooltip hidden after drop');
+        };
+        await drag(originalCard, cards()[0], false, true);
+        assert(cards()[2] === originalCard && actual().every((layer,i)=>layer===initial[i]), 'pointer cancellation');
+        for (const cancel of [
+            () => document.body.dispatchEvent(new DragEvent('drop', { bubbles:true })),
+            () => document.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape'})),
+            () => window.dispatchEvent(new Event('blur'))
+        ]) {
+            handle.dispatchEvent(new DragEvent('dragstart', {bubbles:true, dataTransfer:new DataTransfer()}));
+            cancel();
+            assert(!document.querySelector('.layer-drag-preview, .layer-drag-source, .layer-drop-gap') && getComputedStyle(originalCard).visibility==='visible', 'invalid drop, Escape and blur restore source and clear preview: '+JSON.stringify({cancel:String(cancel), remaining:document.querySelector('.layer-drag-preview, .layer-drag-source, .layer-drop-gap')?.className,visibility:getComputedStyle(originalCard).visibility}));
+            assert(actual().every((layer,i)=>layer===initial[i]), 'cancellation never commits an order');
+        }
+        for (let i = 0; i < 4; i++) {
+            await drag(originalCard, cards()[0], false);
+            assert(cards()[0] === originalCard && actual()[0] === first.layer, 'pointer move top actual order');
+            await drag(originalCard, cards().at(-1), true);
+            assert(cards().at(-1) === originalCard && actual().at(-1) === first.layer, 'pointer move bottom actual order');
+        }
+        const beforeBasemap=actual();
+        changeBasemapLayer('osm');
+        assert(map.getLayers().item(0).getZIndex()===-1 && actual().every((layer,i)=>layer===beforeBasemap[i]),'basemap switch preserves overlay order');
+        assert(topToBottomLayers(map).at(-1)===map.getLayers().item(0),'basemap below all overlays');
+        map.removeLayer(map.getLayers().item(0));
+        assert(first.opacity === 0.42 && first.layer.getOpacity() === originalOpacity && !first.layer.getVisible(), 'preserved hidden layer and opacity');
+        assert(!originalCard.classList.contains('collapsed'), 'preserved expanded state');
+        for(const nextName of ['Renamed after reorder',longName]) {
+            const beforeRename=actual();
+            originalCard.querySelector('.layer-actions-trigger').click();
+            document.querySelector('[data-layer-floating-root] [data-action="rename"]').click();
+            document.querySelector('.layer-rename-input').value=nextName;
+            document.querySelector('.layer-rename-save').click();
+            assert(getLayerRecord(nextName)===first && actual().every((layer,i)=>layer===beforeRename[i]),'rename after reorder preserves identity and order');
+        }
+        first.layer.setVisible(true);
+        const legend = captureOutputLegend(map, getState().uploadedLayers);
+        assert(legend.length === 2 && legend[0].name === longName && legend[1].name === 'Land Use', 'bottom-first legend ordering and completeness');
+        first.layer.setVisible(false);
+        assert(captureOutputLegend(map, getState().uploadedLayers).length === 1, 'hidden legend excluded');
+        const beforeAdd = actual();
+        const added = service('New service', true, 101);
+        assert(actual()[0] === added.layer && actual().slice(1).every((layer,i) => layer === beforeAdd[i]), 'new service goes top');
+        removeLayerItem('New service');
+        const addedWms = service('New WMS', false, 100);
+        assert(actual()[0] === addedWms.layer && actual().slice(1).every((layer,i) => layer === beforeAdd[i]), 'new WMS goes top');
+        removeLayerItem('New WMS');
+        const vectorAdded = addVector('New vector');
+        assert(actual()[0] === vectorAdded.layer, 'new vector goes top');
+        removeLayerItem('New vector');
+        for (let i=0;i<16;i++) addVector(`Scrollable vector ${i}`);
+        const scroll = document.querySelector('.sidebar-main');
+        assert(scroll.scrollHeight > scroll.clientHeight, 'long list scrolls');
+        scroll.scrollTop = 0;
+        const scrollHandle = cards()[0].querySelector('.layer-drag-handle');
+        const transfer = new DataTransfer();
+        scrollHandle.dispatchEvent(new DragEvent('dragstart', { bubbles:true, dataTransfer:transfer }));
+        const scrollRect = scroll.getBoundingClientRect();
+        const underPointer = document.elementFromPoint(scrollRect.left+40,scrollRect.bottom-10);
+        underPointer.dispatchEvent(new DragEvent('dragover', { bubbles:true,cancelable:true,dataTransfer:transfer,clientX:scrollRect.left+40,clientY:scrollRect.bottom-10 }));
+        await new Promise(resolve=>requestAnimationFrame(resolve));
+        assert(document.querySelector('.layer-drop-gap'), 'scroll drag has a valid target');
+        await new Promise(resolve=>setTimeout(resolve,500));
+        assert(scroll.scrollTop>0,'drag auto-scrolls sidebar: '+JSON.stringify({rect:scrollRect.toJSON(),target:underPointer.outerHTML.slice(0,180),height:scroll.scrollHeight,client:scroll.clientHeight}));
+        scrollHandle.dispatchEvent(new DragEvent('dragend', {bubbles:true,dataTransfer:transfer}));
+        assert(!document.querySelector('.layer-drop-gap'), 'auto-scroll placeholder cleaned');
+        for (let i=0;i<16;i++) removeLayerItem(`Scrollable vector ${i}`);
+        scroll.scrollTop=0;
+        assert(topToBottomLayers(map).indexOf(internal) < topToBottomLayers(map).indexOf(first.layer), 'operational graphics above overlays');
+        applyOverlayOrder(map, eligible(), initial);
+        order(['Geoportal Land Cover', 'Land Use', longName, 'Administrative Boundaries']);
+        return true;
+    };
     window.checkLayout = async () => {
         await tick();
         const sidebar = document.querySelector('.sidebar-left');
@@ -120,10 +342,25 @@ window.fixtureReady = Promise.resolve(async () => {
         removeLayerItem('Land Use');
         order(['Geoportal Land Cover', longName, 'Administrative Boundaries']);
         assert(cards()[1] === originalCard, 'remove preserves remaining nodes');
+        const removedLabel=originalCard.querySelector('.layer-name');
+        removedLabel.focus();
+        removedLabel.dispatchEvent(new MouseEvent('mouseenter'));
+        assert(document.querySelector('.layer-name-tooltip.visible'), 'removal tooltip precondition');
+        removeLayerItem(longName);
+        assert(!document.querySelector('.layer-name-tooltip.visible') && !removedLabel.hasAttribute('aria-describedby'), 'removed focused layer clears tooltip');
         for (const name of names()) removeLayerItem(name);
         assert(document.querySelector('.empty-state') && !document.querySelector('.map-layer-list, .map-layers-heading'), 'restored empty state');
         return true;
     };
+    window.showDropFeedback = async () => {
+        const card=cards()[1],handle=card.querySelector('.layer-drag-handle'),target=cards()[0];
+        const dataTransfer=new DataTransfer();
+        handle.dispatchEvent(new DragEvent('dragstart',{bubbles:true,dataTransfer}));
+        const rect=target.getBoundingClientRect();
+        target.dispatchEvent(new DragEvent('dragover',{bubbles:true,cancelable:true,dataTransfer,clientX:rect.left+20,clientY:rect.top+2}));
+        await new Promise(resolve=>requestAnimationFrame(resolve));
+    };
+    window.clearDropFeedback = () => cards()[1]?.querySelector('.layer-drag-handle')?.dispatchEvent(new DragEvent('dragend',{bubbles:true,dataTransfer:new DataTransfer()}));
     return { passed: true };
 });
 </script></body></html>

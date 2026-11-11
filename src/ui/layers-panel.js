@@ -3,7 +3,7 @@ import { bindVectorSldControls, vectorSldMarkup } from './vector-sld-controls.js
 import { ensurePolygonSymbology, setPolygonCategoryColor } from '../map/polygon-symbology.js';
 import { DEFAULT_LINE_STROKE_WIDTH, DEFAULT_POINT_SIZE } from '../config/constants.js';
 import { canZoomToLayer, fitLayerToView, removeManagedLayer, updateManagedLayerStyle } from '../map/layer-manager.js';
-import { getMap, getLayerRecord, renameLayerRecord, setCurrentLayerName } from '../state/store.js';
+import { getMap, getLayerRecord, getUploadedLayers, renameLayerRecord, setCurrentLayerName } from '../state/store.js';
 import { syncLabelsToggle } from '../tools/labels-tool.js';
 import { commitLayerOpacity as commitLayerOpacityValue, updateLayerOpacity as updateLayerOpacityValue } from '../tools/transparency-tool.js';
 import { bindVectorColorPickers, colorSwatchMarkup } from './vector-color-picker.js';
@@ -13,9 +13,12 @@ import { confirmDestructiveAction } from './confirmation-dialog.js';
 import { syncVectorLegend, vectorLegendMarkup } from './vector-legend.js';
 import { isLayerNameTruncated } from '../utils/layer-name-layout.js';
 import { layerSourceType, layerSubtitle, topToBottomLayers } from '../utils/layer-list-layout.js';
+import { applyOverlayOrder, eligibleOverlays, isOverlayOrderUpdating } from '../map/overlay-order.js';
+import { bindLayerReorder } from './layer-reorder.js';
 
 let layerNameTooltipElement = null;
 let layerNameTooltipListenersBound = false;
+let layerNameTooltipAnchor = null;
 let activeLayerRenamePopover = null;
 let floatingLayerRoot = null;
 let activeLayerActionsOverlay = null;
@@ -181,6 +184,8 @@ const LAYER_ACTIONS = [
 // Record identity survives display-name changes; moving cards preserves controls.
 const cardRecords = new WeakMap();
 let observedLayerGroup = null;
+let observedMap = null;
+let reorderCleanup = null;
 
 function getLayerList() {
     return document.getElementById('layerList');
@@ -201,20 +206,33 @@ function ensureLayerArea(operational = false) {
         const before = operational ? null : root.querySelector('.map-layers-heading');
         root.insertBefore(heading, before);
         root.insertBefore(body, before);
+        if (!operational) reorderCleanup = bindLayerReorder(body, {
+            getLayer: card => cardRecords.get(card)?.layer,
+            onDragState: () => { hideLayerNameTooltip(); syncLayerListOrder(); },
+            getOrder: () => {
+                const eligible = new Set(eligibleOverlays(getUploadedLayers()));
+                return topToBottomLayers(getMap()).filter(layer => eligible.has(layer));
+            },
+            commit: order => applyOverlayOrder(getMap(), eligibleOverlays(getUploadedLayers()), order)
+        });
     }
     return body;
 }
 
 function syncLayerListOrder() {
+    if (isOverlayOrderUpdating(getMap())) return;
     const body = getLayerList()?.querySelector('.map-layer-list');
-    if (!body) return;
+    if (!body || body.querySelector('.layer-drop-gap')) return;
     const cards = new Map(Array.from(body.children, card => [cardRecords.get(card)?.layer, card]));
     let cursor = body.firstElementChild;
     for (const layer of topToBottomLayers(getMap())) {
         const card = cards.get(layer);
         if (!card) continue;
         if (card === cursor) cursor = cursor.nextElementSibling;
-        else body.insertBefore(card, cursor);
+        else {
+            if (layerNameTooltipAnchor && card.contains(layerNameTooltipAnchor)) hideLayerNameTooltip();
+            body.insertBefore(card, cursor);
+        }
     }
 }
 
@@ -222,9 +240,13 @@ function observeLayerOrder() {
     const group = getMap()?.getLayerGroup?.();
     if (group === observedLayerGroup) return;
     observedLayerGroup?.un('change', syncLayerListOrder);
+    observedMap?.un('change:overlayorder', syncLayerListOrder);
+    observedMap = getMap();
     observedLayerGroup = group;
     // Group change events include collection and child z-index changes.
     group?.on('change', syncLayerListOrder);
+    // The map event fires once after all priorities have been assigned.
+    getMap()?.on('change:overlayorder', syncLayerListOrder);
 }
 
 function collapseLayerItem(layerItem) {
@@ -360,6 +382,7 @@ function applyLayerRename(layerItem, previousName, nextName) {
 
     const safeName = escapeHtml(nextName);
     layerItem.setAttribute('data-layer-name', safeName);
+    layerItem.querySelector('.layer-drag-handle')?.setAttribute('aria-label', `Reorder layer: ${nextName}`);
 
     const nameWrap = layerItem.querySelector('.layer-name-wrap');
     if (nameWrap) {
@@ -698,6 +721,10 @@ function showLayerNameTooltip(nameElement) {
         return;
     }
 
+    if (layerNameTooltipAnchor && layerNameTooltipAnchor !== nameElement) {
+        layerNameTooltipAnchor.removeAttribute('aria-describedby');
+    }
+    layerNameTooltipAnchor = nameElement;
     tooltipElement.textContent = nameElement.textContent;
     tooltipElement.setAttribute('aria-hidden', 'false');
     nameElement.setAttribute('aria-describedby', tooltipElement.id);
@@ -712,6 +739,8 @@ function hideLayerNameTooltip() {
 
     layerNameTooltipElement.classList.remove('visible');
     layerNameTooltipElement.setAttribute('aria-hidden', 'true');
+    layerNameTooltipAnchor?.removeAttribute('aria-describedby');
+    layerNameTooltipAnchor = null;
 }
 
 function attachLayerNameTooltip(layerItem) {
@@ -721,9 +750,11 @@ function attachLayerNameTooltip(layerItem) {
     }
 
     const showTooltip = () => showLayerNameTooltip(nameElement);
-    const hideTooltip = () => hideLayerNameTooltip();
+    const hideTooltip = () => {
+        if (layerNameTooltipAnchor === nameElement) hideLayerNameTooltip();
+    };
     const updateTooltip = () => {
-        if (layerNameTooltipElement?.classList.contains('visible')) {
+        if (layerNameTooltipAnchor === nameElement && layerNameTooltipElement?.classList.contains('visible')) {
             showLayerNameTooltip(nameElement);
         }
     };
@@ -995,7 +1026,8 @@ export function addLayerItem(name, color, featureCount, options = {}) {
         zoomDisabledReason
     })}
                     </div>
-                    <div class="layer-stats">${statsText}</div>
+                    <div class="layer-metadata"><div class="layer-stats" title="${escapeHtml(statsText)}">${statsText}</div>
+                    ${sourceType === 'Annotation' || sourceType === 'Other' ? '' : `<span class="layer-drag-handle" draggable="true" aria-hidden="true" title="Drag to reorder"><span aria-hidden="true">⠿</span></span>`}</div>
                 </div>
             </div>
             <div class="layer-controls-wrapper">
@@ -1045,6 +1077,7 @@ export function addLayerItem(name, color, featureCount, options = {}) {
     observeLayerOrder();
     syncLayerListOrder();
     attachLayerNameTooltip(newItem);
+    newItem.querySelector('.layer-drag-handle')?.addEventListener('click', event => event.stopPropagation());
 
     // Initialize collapsed state and header/expand behavior (compact by default)
     const header = newItem.querySelector('.layer-item-header');
@@ -1763,17 +1796,20 @@ export function removeLayerItem(layerName) {
         .find((item) => getLayerItemName(item) === layerName);
 
     if (!layerItem) {
+        if (layerNameTooltipAnchor?.textContent === layerName) hideLayerNameTooltip();
         removeManagedLayer(layerName);
         return;
     }
 
     const wasActive = layerItem.classList.contains('active');
+    reorderCleanup?.cancel();
+    if (layerNameTooltipAnchor && layerItem.contains(layerNameTooltipAnchor)) hideLayerNameTooltip();
     removeManagedLayer(layerName);
-    hideLayerNameTooltip();
 
     const body = layerItem.parentElement;
     layerItem.remove();
     if (!body.children.length) {
+        if (body.classList.contains('map-layer-list')) { reorderCleanup?.dispose(); reorderCleanup = null; }
         body.previousElementSibling.remove();
         body.remove();
     }

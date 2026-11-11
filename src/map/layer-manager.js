@@ -1,4 +1,5 @@
 import { ensurePolygonSymbology, invalidatePolygonSymbology, getPolygonLegendDescriptors } from './polygon-symbology.js';
+import { eligibleOverlays, insertOrderedOverlay, prepareOrderedBasemap } from './overlay-order.js';
 import { invalidateSymbology } from './symbology-common.js';
 import { isImportedVectorStyle, getImportedVectorLegendDescriptors } from './vector-sld-symbology.js';
 import { DEFAULT_LAYER_COLOR, DEFAULT_LINE_STROKE_WIDTH, DEFAULT_POINT_SIZE, DEFAULT_VECTOR_OPACITY, ANNOTATION_LAYER_ID } from '../config/constants.js';
@@ -116,6 +117,7 @@ export function addVectorLayer(layerName, layerColor, geojson, features, metadat
     try {
         map.addLayer(layer);
         setLayerRecord(layerName, layerRecord);
+        insertOrderedOverlay(map, eligibleOverlays(getState().uploadedLayers), layer);
         setCurrentLayerName(layerName);
     } catch (error) {
         map.removeLayer(layer);
@@ -155,6 +157,7 @@ export function addWmsLayer(layerName, source, layer, metadata = {}) {
         gpTileUrl: metadata.gpTileUrl || '',
         displayName: metadata.displayName || layerName
     });
+    insertOrderedOverlay(getMap(), eligibleOverlays(getState().uploadedLayers), layer);
     setCurrentLayerName(layerName);
 
     return getLayerRecord(layerName);
@@ -380,7 +383,7 @@ export function changeBasemapLayer(basemapName) {
         map.removeLayer(basemapLayer);
     }
 
-    map.getLayers().insertAt(0, createBasemapLayer(basemapName));
+    map.getLayers().insertAt(0, prepareOrderedBasemap(map, createBasemapLayer(basemapName)));
 
     setActiveBasemap(basemapName);
 

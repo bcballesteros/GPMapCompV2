@@ -15,6 +15,7 @@ import { generateMapOutput, renderMapToCanvas, renderMapPreview, sendMap, downlo
 import { captureOutputLegend, drawOutputLegend, legendFont } from '/src/services/output-legend.js';
 import { layoutOutputLegend } from '/src/services/output-legend-layout.js';
 import { openModal, closeModal } from '/src/ui/modal.js';
+import { applyOverlayOrder, eligibleOverlays } from '/src/map/overlay-order.js';
 
 const check = (condition, message) => { if (!condition) throw Error(message); };
 const reports = [];
@@ -344,6 +345,48 @@ window.resolveFixture(async () => {
         report('Consecutive outputs and both previews recover after size-limit and encoder failures on the same map');
         check(!document.querySelector('[aria-hidden="true"][style*="-100000px"]'),'Temporary map targets cleaned');
         report('Temporary rendering resource cleanup');
+        // Exercise the same ordering transaction as the panel, against actual
+        // rasterized overlap and the shared output pipeline (no live services).
+        Object.keys(getState().uploadedLayers).forEach(removeManagedLayer);
+        map.getView().setCenter([0,0]);map.getView().setRotation(0);map.getView().setResolution(1);
+        const red=add('Reordered red','Polygon'),blue=add('Reordered blue','Polygon');
+        red.layer.setStyle(new ol.style.Style({fill:new ol.style.Fill({color:'#ff0000'})}));
+        blue.layer.setStyle(new ol.style.Style({fill:new ol.style.Fill({color:'#0000ff'})}));
+        const wms=addWmsLayer('Ordered WMS',source,new ol.layer.Tile({source,zIndex:100}));
+        const gp=addWmsLayer('Ordered Geoportal',source,new ol.layer.Tile({source,zIndex:101}),{isGP:true});
+        const eligible=()=>eligibleOverlays(getState().uploadedLayers);
+        for(const [order,color] of [
+            [[red.layer,gp.layer,wms.layer,blue.layer],[255,0,0]],
+            [[gp.layer,red.layer,blue.layer,wms.layer],[66,128,96]],
+            [[blue.layer,wms.layer,red.layer,gp.layer],[0,0,255]]
+        ]) {
+            check(applyOverlayOrder(map,eligible(),order),'Mixed-source reorder committed');
+            for(const format of ['png','jpeg','pdf']) {
+                const decoded=await decodeOutput((await generateMapOutput(format)).blob,format);
+                const pixel=decoded.getContext('2d').getImageData(1280,960,1,1).data;
+                check(color.every((value,i)=>Math.abs(pixel[i]-value)<8),`${format} paints topmost reordered layer`);
+                decoded.width=decoded.height=0;
+            }
+            for(const kind of ['export','share']) {
+                await renderMapPreview('reordered',kind);
+                const preview=document.querySelector(kind==='export'?'#mapPreviewMap canvas':'#sharePreviewMap canvas');
+                const pixel=preview.getContext('2d').getImageData(1280,960,1,1).data;
+                check(color.every((value,i)=>Math.abs(pixel[i]-value)<8),`${kind} preview paints reordered top layer`);
+            }
+            const expected=order.filter(layer=>layer===red.layer||layer===blue.layer).reverse();
+            check(groups().every((group,i)=>getState().uploadedLayers[group.identity].layer===expected[i]),'Legend follows bottom-first drawing order');
+            map.renderSync();
+            const liveCanvas=document.createElement('canvas');liveCanvas.width=800;liveCanvas.height=600;
+            const liveContext=liveCanvas.getContext('2d');
+            for(const layerCanvas of map.getViewport().querySelectorAll('.ol-layer canvas')) {
+                liveContext.setTransform(new DOMMatrix(layerCanvas.style.transform));
+                liveContext.globalAlpha=Number(layerCanvas.parentNode.style.opacity||1);
+                liveContext.drawImage(layerCanvas,0,0);
+            }
+            const livePixel=liveContext.getImageData(400,300,1,1).data;
+            check(color.every((value,i)=>Math.abs(livePixel[i]-value)<8),'Live map paints the same reordered overlap');
+        }
+        report('Mixed-source user ordering preserves raster overlap in PNG/JPEG/PDF and both previews');
         return reports;
     } finally {
         Object.keys(getState().uploadedLayers).forEach(removeManagedLayer);map.dispose();source.dispose();
