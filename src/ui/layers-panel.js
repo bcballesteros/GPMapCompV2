@@ -969,13 +969,13 @@ export function addLayerItem(name, color, featureCount, options = {}) {
         opacityLabel = 'Line Opacity';
     } else if (isPolygonLayer) {
         polygonStyleControls = `${polygonModeMarkup}
-            <div class="control-row polygon-stroke-toggle-row"><label><span>Show Stroke</span><input type="checkbox" class="polygon-stroke-enabled" aria-label="Show Stroke" checked></label></div>
             <div class="control-row">
                 <label>
                     <span>Fill Color</span>
                     ${colorSwatchMarkup('polygonFillColor', 'Fill Color', polygonFillColor, 'color-picker polygon-fill-picker')}
                 </label>
             </div>
+            <div class="control-row polygon-stroke-toggle-row"><label><span>Show Stroke</span><input type="checkbox" class="polygon-stroke-enabled" aria-label="Show Stroke" checked></label></div>
             <div class="control-row">
                 <label>
                     <span>Stroke Color</span>

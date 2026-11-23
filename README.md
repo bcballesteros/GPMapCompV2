@@ -270,6 +270,16 @@ The roadmap will continue to evolve as new requirements and user feedback are in
 
 ---
 
+## Desktop workspace presentation
+
+The Layers sidebar scales from 256 to 288 px (`21.1vw`); Tools & Properties scales from 264 to 300 px (`22vw`). Both remain in the flex layout beside the map, and their existing collapse controls return their space to the map. Interface headings, tool descriptions, buttons, and form text use a slightly larger hierarchy while map and exported cartographic text retain their own sizing.
+
+Supported browsers use a 96% white sidebar surface and a 3 px backdrop blur; otherwise the surface remains opaque white. The effect is intentionally subtle because the map does not extend underneath the panels. Narrow-screen navigation remains a separate future phase.
+
+The desktop browser test checks workspace widths, map space, overflow, handle hit targets, and collapse state at 1920 × 1080, 1440 × 900, 1366 × 768, 1280 × 800, and 1100 × 700. Run it with `TEST_DESKTOP_BROWSER=1` in an environment with Chrome available. For manual acceptance, check both handles and map resizing, long layer names and drag ordering, expanded styling controls, and Export and Share dialogs at the intended desktop sizes.
+
+---
+
 ## Acknowledgements
 
 GPMapCompV2 is being developed as part of the **Geoportal Philippines initiative**.

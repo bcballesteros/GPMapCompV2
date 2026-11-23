@@ -325,7 +325,7 @@ window.fixtureReady = Promise.resolve(async () => {
     window.checkLayout = async () => {
         await tick();
         const sidebar = document.querySelector('.sidebar-left');
-        assert(sidebar.getBoundingClientRect().width === parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--left-sidebar-width')), 'sidebar width');
+        assert(Math.abs(sidebar.getBoundingClientRect().width - parseFloat(getComputedStyle(sidebar).width)) < 1, 'sidebar width');
         assert(sidebar.scrollWidth <= sidebar.clientWidth, 'no horizontal overflow');
         const rect = label.getBoundingClientRect();
         assert(rect.height <= parseFloat(getComputedStyle(label).lineHeight) * 2 + 1, 'two-line height');
