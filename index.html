@@ -392,9 +392,10 @@
                 </div>
             </div>
 
+            <div class="right-sidebar-scroll" role="region" aria-label="Tools and properties" tabindex="0">
             <div class="right-sidebar-content">
                 <!-- Map Settings -->
-                <div class="tool-section-group map-settings-section">
+                <div class="tool-section-group map-settings-section" data-help-section="mapSettings">
                     <button type="button" class="tool-section-header" aria-expanded="false" onclick="toggleSection(this)">
                         <span class="tool-icon amber"><i class="fas fa-sliders"></i></span>
                         <span class="tool-section-info">
@@ -426,7 +427,7 @@
                 </div>
 
                 <!-- Layer Information -->
-                <div class="tool-section-group data-analysis-section layer-information-section">
+                <div class="tool-section-group data-analysis-section layer-information-section" data-help-section="information">
                     <button type="button" class="tool-section-header" aria-expanded="false" onclick="toggleSection(this)">
                         <span class="tool-icon cyan"><i class="fas fa-chart-line"></i></span>
                         <span class="tool-section-info">
@@ -456,7 +457,7 @@
                 </div>
 
                 <!-- Annotation Tools -->
-                <div class="tool-section-group annotation-tools-section">
+                <div class="tool-section-group annotation-tools-section" data-help-section="annotation">
                     <button type="button" class="tool-section-header" aria-expanded="false" onclick="toggleSection(this)">
                         <span class="tool-icon amber"><i class="fas fa-pen-fancy"></i></span>
                         <span class="tool-section-info">
@@ -479,7 +480,7 @@
                 </div>
 
                 <!-- Drawing Tools -->
-                <div class="tool-section-group annotation-tools-section drawing-tools-section">
+                <div class="tool-section-group annotation-tools-section drawing-tools-section" data-help-section="drawing">
                     <button type="button" class="tool-section-header" aria-expanded="false" onclick="toggleSection(this)">
                         <span class="tool-icon teal"><i class="fas fa-draw-polygon"></i></span>
                         <span class="tool-section-info">
@@ -507,7 +508,7 @@
                 </div>
 
                 <!-- Measurement Tools -->
-                <div class="tool-section-group data-analysis-section measurement-section">
+                <div class="tool-section-group data-analysis-section measurement-section" data-help-section="measurement">
                     <button type="button" class="tool-section-header" aria-expanded="false" onclick="toggleSection(this)">
                         <span class="tool-icon orange"><i class="fas fa-ruler-combined"></i></span>
                         <span class="tool-section-info">
@@ -529,7 +530,7 @@
                 </div>
 
                 <!-- Feature Saving -->
-                <div class="tool-section-group data-analysis-section feature-saving-section">
+                <div class="tool-section-group data-analysis-section feature-saving-section" data-help-section="saving">
                     <button type="button" class="tool-section-header" aria-expanded="false" onclick="toggleSection(this)">
                         <span class="tool-icon blue"><i class="fas fa-floppy-disk"></i></span>
                         <span class="tool-section-info">
@@ -541,13 +542,13 @@
                     <div class="tool-section-content collapsed">
                         <div class="tool-buttons">
                             <button class="tool-btn" onclick="openFeatureSaveDialog()"><span><i class="fas fa-floppy-disk"></i> Save Features</span></button>
-                            <button class="tool-btn" onclick="document.getElementById('featureSaveFileInput').click()"><span><i class="fas fa-folder-open"></i> Load Features</span></button>
+                            <button class="tool-btn" id="loadFeaturesBtn" onclick="document.getElementById('featureSaveFileInput').click()"><span><i class="fas fa-folder-open"></i> Load Features</span></button>
                         </div>
                     </div>
                 </div>
 
                 <!-- Advanced Layers -->
-                <div class="tool-section-group advanced-layers-section">
+                <div class="tool-section-group advanced-layers-section" data-help-section="advanced">
                     <button type="button" class="tool-section-header" aria-expanded="false" onclick="toggleSection(this)">
                         <span class="tool-icon violet"><i class="fas fa-layer-group"></i></span>
                         <span class="tool-section-info">
@@ -571,12 +572,13 @@
                     </div>
                 </div>
 
-                <div class="quick-tips smart-help-panel" id="smartHelpPanel" aria-live="polite">
-                    <div class="quick-tips-header"><i class="fas fa-circle-info"></i> Smart Help</div>
-                    <div class="quick-tips-content">
-                        <div class="quick-tips-item quick-tips-item-primary" id="smartHelpPrimary">Upload a layer to begin.</div>
-                        <div class="quick-tips-item" id="smartHelpSecondary">Use Add Geospatial Data from the Layers panel to start styling and analysis.</div>
-                    </div>
+            </div>
+            </div>
+            <div class="smart-help-panel" id="smartHelpPanel" role="region" aria-labelledby="smartHelpTitle" tabindex="0">
+                <div class="smart-help-title" id="smartHelpTitle"><i class="far fa-lightbulb" aria-hidden="true"></i> Smart Help</div>
+                <div class="smart-help-message" aria-live="polite" aria-atomic="true">
+                    <div id="smartHelpPrimary">Upload a layer to begin.</div>
+                    <div id="smartHelpSecondary">Use Add Geospatial Data from the Layers panel to start styling and analysis.</div>
                 </div>
             </div>
             </div>

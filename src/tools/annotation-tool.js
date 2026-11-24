@@ -1,6 +1,7 @@
 ﻿import { ANNOTATION_LAYER_ID, DRAWING_LAYER_ID } from '../config/constants.js';
 import ol from '../lib/ol.js';
 import { ensureAnnotationLayer } from '../map/layer-manager.js';
+import { notifySmartHelp } from '../ui/smart-help.js';
 import { getLayerRecord, getMap, getState, removeLayerRecord, setAnnotationMode, setLayerRecord, setSelectedFeature, setSelectedTool } from '../state/store.js';
 import { toggleSelectedLayerLabels } from './labels-tool.js';
 import { showToast } from '../ui/toast.js';
@@ -508,16 +509,20 @@ function getMeasuredFeatureAtPixel(pixel, options = {}) {
 
 function setSelectedMeasurement(feature) {
     if (selectedMeasurement === feature) {
+        if (feature) setSelectedFeature(feature);
         return;
     }
 
+    const previousMeasurement = selectedMeasurement;
     selectedMeasurement = feature ?? null;
     hasLatestMeasurementResult = Boolean(selectedMeasurement);
 
     if (selectedMeasurement) {
         clearSelectedDrawingContext();
         clearSelectedAnnotationContext();
+        setSelectedFeature(selectedMeasurement);
     } else {
+        if (getState().selectedFeature === previousMeasurement) setSelectedFeature(null);
         updateMeasurementResultPanel(Number.NaN);
     }
 
@@ -541,6 +546,7 @@ function clearSelectedMeasurementContext() {
         return;
     }
 
+    if (selectedMeasurement && getState().selectedFeature === selectedMeasurement) setSelectedFeature(null);
     selectedMeasurement = null;
     hasLatestMeasurementResult = false;
     if (measureLayer) {
@@ -1469,7 +1475,9 @@ function selectAnnotationFeature(feature) {
 }
 
 function setMoveMode(enabled) {
+    const wasMoving = annotationMoveMode;
     annotationMoveMode = enabled && !!selectedAnnotation;
+    if (wasMoving !== annotationMoveMode) notifySmartHelp('move', annotationMoveMode);
 
     if (annotationTranslateInteraction) {
         annotationTranslateInteraction.setActive(annotationMoveMode);
@@ -1555,6 +1563,7 @@ function clearAnnotationPlacementPopup() {
     const popup = document.getElementById('annotationPopup');
     if (popup) {
         popup.classList.remove('active');
+        notifySmartHelp('popup', null);
     }
 
     const input = document.getElementById('annotationInput');
@@ -1646,6 +1655,7 @@ export function activateAnnotation(type) {
             popup.style.left = `${pixel[0] + 10}px`;
             popup.style.top = `${pixel[1] - 50}px`;
             popup.classList.add('active');
+            notifySmartHelp('popup', 'placement');
 
             const input = document.getElementById('annotationInput');
             input.focus();
@@ -1708,6 +1718,7 @@ export function activateDrawing(type) {
     drawingInteraction.set('gpmapInteractionKind', DRAW_INTERACTION_KIND);
 
     drawStartHandler = () => {
+        notifySmartHelp('drawing', false);
         selectedAnnotation = null;
         setSelectedDrawing(null);
         setSelectedFeature(null);
@@ -1718,6 +1729,7 @@ export function activateDrawing(type) {
     drawEndHandler = (event) => {
         if (event.feature) {
             event.feature.set('drawingType', type);
+            notifySmartHelp('drawing', true);
         }
         drawingLayer.layer.changed();
     };
@@ -2062,6 +2074,7 @@ export function submitAnnotation() {
     resetAnnotationPlacement();
 
     document.getElementById('annotationPopup').classList.remove('active');
+    notifySmartHelp('popup', null);
     input.value = '';
     delete input.dataset.x;
     delete input.dataset.y;
@@ -2119,6 +2132,12 @@ export function editAnnotation(feature) {
     backdrop.className = 'annotation-edit-backdrop';
     document.body.insertBefore(backdrop, editPopup);
 
+    const closeEditor = () => {
+        backdrop.remove();
+        editPopup.remove();
+        notifySmartHelp('popup', null);
+    };
+
     document.getElementById('editSaveBtn').onclick = () => {
         const newText = document.getElementById('editAnnotationText').value.trim();
         const newFontSize = parseInt(document.getElementById('editAnnotationFontSize').value, 10) || 12;
@@ -2135,19 +2154,11 @@ export function editAnnotation(feature) {
 
         ensureAnnotationLayer().layer.changed();
         updateAnnotationControls();
-        backdrop.remove();
-        editPopup.remove();
+        closeEditor();
     };
 
-    document.getElementById('editCancelBtn').onclick = () => {
-        backdrop.remove();
-        editPopup.remove();
-    };
-
-    backdrop.addEventListener('click', () => {
-        backdrop.remove();
-        editPopup.remove();
-    }, { once: true });
+    document.getElementById('editCancelBtn').onclick = closeEditor;
+    backdrop.addEventListener('click', closeEditor, { once: true });
 
     window.dispatchEvent(new CustomEvent('gpmap:annotationeditoropen', { detail: editPopup }));
 }

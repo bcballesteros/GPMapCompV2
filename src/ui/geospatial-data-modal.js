@@ -1,5 +1,6 @@
 import { prepareGpLayerDialog, resetWmsLayerFormSession, submitUpload } from '../tools/upload-tool.js';
 import { closeModal, isModalOpen, openModal } from './modal.js';
+import { notifySmartHelp } from './smart-help.js';
 
 const TAB_NAMES = ['upload', 'wms', 'geoportal'];
 let preparedTabs = new Set();
@@ -40,6 +41,7 @@ function activateTab(name, { focus = false } = {}) {
     });
 
     syncAddDataFooter(nextTab);
+    notifySmartHelp('uploadTab');
 
     if (!preparedTabs.has(nextTab)) {
         preparedTabs.add(nextTab);

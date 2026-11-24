@@ -3,6 +3,7 @@ import ol from '../lib/ol.js';
 import { getMap, getState } from '../state/store.js';
 import { findLayerNameByLayer } from './layer-manager.js';
 import { updateManagedLayerStyle } from './layer-manager.js';
+import { notifySmartHelp } from '../ui/smart-help.js';
 
 function isManagedVectorLayer(layer) {
     if (!(layer instanceof ol.layer.Vector)) {
@@ -42,6 +43,11 @@ export function setupMapInteractions({ getSelectedAnnotationMode, onAnnotationSe
     });
     select.getFeatures().on('remove', () => {
         refreshHighlightStyles(select, getSelectedAnnotationMode);
+    });
+    select.on('select', () => {
+        const feature = select.getFeatures().item(0);
+        const layer = feature && select.getLayer(feature);
+        notifySmartHelp('vectorSelection', layer && findLayerNameByLayer(layer));
     });
 
     map.addInteraction(select);

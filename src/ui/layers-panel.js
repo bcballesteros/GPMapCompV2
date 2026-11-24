@@ -3,6 +3,7 @@ import { bindVectorSldControls, vectorSldMarkup } from './vector-sld-controls.js
 import { ensurePolygonSymbology, setPolygonCategoryColor } from '../map/polygon-symbology.js';
 import { DEFAULT_LINE_STROKE_WIDTH, DEFAULT_POINT_SIZE } from '../config/constants.js';
 import { canZoomToLayer, fitLayerToView, removeManagedLayer, updateManagedLayerStyle } from '../map/layer-manager.js';
+import { notifySmartHelp } from './smart-help.js';
 import { getMap, getLayerRecord, getUploadedLayers, renameLayerRecord, setCurrentLayerName } from '../state/store.js';
 import { syncLabelsToggle } from '../tools/labels-tool.js';
 import { commitLayerOpacity as commitLayerOpacityValue, updateLayerOpacity as updateLayerOpacityValue } from '../tools/transparency-tool.js';
@@ -346,6 +347,7 @@ function zoomToLayerFromItem(layerItem) {
     }
 
     fitLayerToView(record);
+    notifySmartHelp('zoomLayer');
 }
 
 function closeLayerRenamePopover({ restoreFocus = false } = {}) {
@@ -375,6 +377,7 @@ function closeLayerRenamePopover({ restoreFocus = false } = {}) {
     }
 
     activeLayerRenamePopover = null;
+    notifySmartHelp('popup', null);
 }
 
 function applyLayerRename(layerItem, previousName, nextName) {
@@ -456,6 +459,7 @@ function renameLayerFromItem(layerItem) {
     `;
 
     mountFloatingElement(trigger, popover, 'grid');
+    notifySmartHelp('popup', 'rename');
 
     const input = popover.querySelector('.layer-rename-input');
     const cancelButton = popover.querySelector('.layer-rename-cancel');

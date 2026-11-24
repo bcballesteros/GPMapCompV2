@@ -1,3 +1,5 @@
+import { notifySmartHelp } from './smart-help.js';
+
 const MODAL_CLOSE_DURATION_MS = 220;
 const modalGeometry = new Map();
 
@@ -205,6 +207,7 @@ export function toggleSection(header) {
     header.setAttribute('aria-expanded', String(isOpening));
     group?.classList.toggle('expanded', isOpening);
     group?.classList.toggle('active-section', isOpening);
+    if (group?.dataset.helpSection) notifySmartHelp('section', header);
 
     if (!isOpening) {
         group?.classList.remove('active-section');

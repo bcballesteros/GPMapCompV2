@@ -66,6 +66,7 @@ export function initializeResponsiveWorkspace() {
         }
         openDrawer = next;
         syncInteraction();
+        window.dispatchEvent(new CustomEvent('gpmap:drawerchange', { detail: { drawerId: next?.panel.id ?? null } }));
         if (activeModal) return;
         if (next) focus(next.close);
         else if (restore) focus(previous?.trigger);
