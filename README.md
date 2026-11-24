@@ -274,9 +274,19 @@ The roadmap will continue to evolve as new requirements and user feedback are in
 
 The Layers sidebar scales from 256 to 288 px (`21.1vw`); Tools & Properties scales from 264 to 300 px (`22vw`). Both remain in the flex layout beside the map, and their existing collapse controls return their space to the map. Interface headings, tool descriptions, buttons, and form text use a slightly larger hierarchy while map and exported cartographic text retain their own sizing.
 
-Supported browsers use a 96% white sidebar surface and a 3 px backdrop blur; otherwise the surface remains opaque white. The effect is intentionally subtle because the map does not extend underneath the panels. Narrow-screen navigation remains a separate future phase.
+The sidebars use the Phase 1A surface and apply a 3 px backdrop blur in supported browsers. The map stays between the inline panels. The desktop browser test verifies sidebar widths, collapse preferences, and OpenLayers sizing at 1920 × 1080, 1440 × 900, 1366 × 768, 1280 × 800, and 1100 × 700.
 
-The desktop browser test checks workspace widths, map space, overflow, handle hit targets, and collapse state at 1920 × 1080, 1440 × 900, 1366 × 768, 1280 × 800, and 1100 × 700. Run it with `TEST_DESKTOP_BROWSER=1` in an environment with Chrome available. For manual acceptance, check both handles and map resizing, long layer names and drag ordering, expanded styling controls, and Export and Share dialogs at the intended desktop sizes.
+## Phone and tablet workspace
+
+At widths of 1024 CSS px or less, or heights of 480 CSS px or less, the map fills the workspace and the navbar exposes **Layers** and **Tools**. The navbar uses two rows at widths of 720 px or less and gives the controls more room on very narrow phones at 340 px or less. Location search, basemap selection, Share, and Export stay in the navbar. Short viewports use a horizontal map-control cluster with zoom, reset, and the north indicator. The scale, attribution, and compact status bar sit along the bottom.
+
+The existing sidebars open one at a time as scrollable drawers with pinned close buttons. Close a drawer with its close button, by tapping the backdrop, or by pressing Escape. Focus enters at the close button, cycles within the drawer, and returns to the trigger on dismissal. Hidden drawers and the background are inert while appropriate. A dialog launched from a drawer takes focus above it, and the drawer resumes when the dialog closes. The annotation editor uses its existing map backdrop and opens after the Tools drawer closes.
+
+Drawers start closed and dismiss on rotation or when the layout crosses the workspace breakpoint. Desktop collapse preferences stay in session storage and are reapplied when the inline layout returns. The same OpenLayers map observes its target size, preserving the view, layers, and GIS state. Drawers and dialogs use dynamic viewport height with a fallback, account for safe areas, and use the browser's visual viewport when a keyboard reduces the visible height. Dialog bodies scroll between the header and actions. Export and Share retain their existing preview rendering and output dimensions.
+
+Chrome automation covers 768 × 1024 and 1024 × 768 tablets, 360 × 800, 390 × 844, and 430 × 932 phone portrait sizes, and 800 × 360, 844 × 390, and 915 × 412 phone landscape sizes. Enable the mobile and desktop browser tests with `TEST_MOBILE_BROWSER=1` and `TEST_DESKTOP_BROWSER=1` respectively. An optional `MOBILE_SCREENSHOT_DIR` captures representative rendered layouts. The mobile test uses synthetic vector data, a mocked geocoder, and Chrome touch emulation.
+
+Touch layer reordering remains unsupported. Desktop pointer drag-and-drop remains available. For physical-device acceptance, verify Chrome on Android and Safari on iPhone or iPad in both orientations. Exercise map pans and pinches, drawer scrolling and dismissal with a screen reader, file selection, address-bar and keyboard changes, annotation editing, measurement completion, and Export and Share preview controls with a real map composition.
 
 ---
 

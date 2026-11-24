@@ -55,6 +55,10 @@ function closePicker(restoreFocus = false) {
     if (restoreFocus && trigger.isConnected && !trigger.disabled) trigger.focus();
 }
 
+export function dismissColorPickerWithin(panel) {
+    if (activePicker && panel.contains(activePicker.trigger)) closePicker();
+}
+
 function openPicker(trigger, controller) {
     if (activePicker?.trigger === trigger) {
         closePicker(true);
@@ -76,7 +80,8 @@ function openPicker(trigger, controller) {
         <label class="vector-color-hex-row">HEX<input class="vector-color-hex" type="text" spellcheck="false" autocomplete="off" maxlength="7" aria-describedby="vector-color-error"></label>
         <div id="vector-color-error" class="vector-color-error" aria-live="polite"></div>`;
     popup.querySelector('strong').textContent = trigger.title;
-    document.body.appendChild(popup);
+    const owner = trigger.closest('.is-drawer-open') || document.body;
+    owner.appendChild(popup);
     const abort = new AbortController();
     const listen = (target, type, handler, options = {}) => target.addEventListener(type, handler, { ...options, signal: abort.signal });
     const input = popup.querySelector('.vector-color-hex');
@@ -108,9 +113,13 @@ function openPicker(trigger, controller) {
     const position = () => {
         const rect = trigger.getBoundingClientRect();
         const width = popup.offsetWidth, height = popup.offsetHeight, padding = 12;
+        const viewport = window.visualViewport;
+        const useVisibleViewport = viewport?.scale === 1 && viewport.height < window.innerHeight;
+        const top = useVisibleViewport ? viewport.offsetTop : 0;
+        const bottom = top + (useVisibleViewport ? viewport.height : window.innerHeight);
         const left = rect.right + 6 + width <= window.innerWidth - padding ? rect.right + 6 : rect.left - width - 6;
         popup.style.left = `${Math.max(padding, Math.min(left, window.innerWidth - width - padding))}px`;
-        popup.style.top = `${Math.max(padding, Math.min(rect.top, window.innerHeight - height - padding))}px`;
+        popup.style.top = `${Math.max(top + padding, Math.min(rect.top, bottom - height - padding))}px`;
     };
     const observer = new MutationObserver(() => {
         if (!trigger.isConnected || trigger.disabled || !trigger.getClientRects().length) closePicker();
@@ -121,6 +130,10 @@ function openPicker(trigger, controller) {
     trigger.setAttribute('aria-controls', popup.id);
     position();
     listen(window, 'resize', position);
+    if (window.visualViewport) {
+        listen(window.visualViewport, 'resize', position);
+        listen(window.visualViewport, 'scroll', position);
+    }
     listen(document, 'scroll', position, { capture: true });
     listen(document, 'pointerdown', event => {
         if (!popup.contains(event.target) && !trigger.contains(event.target)) closePicker();

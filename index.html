@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Geoportal Philippines Map Composer</title>
     <style>
         :root {
@@ -168,6 +168,10 @@
                     <span class="app-title-short" aria-hidden="true">Map Composer</span>
                 </div>
             </a>
+            <div class="drawer-triggers">
+                <button type="button" class="btn drawer-trigger" aria-controls="layersSidebar" aria-expanded="false" aria-haspopup="dialog"><i class="fas fa-layer-group" aria-hidden="true"></i> Layers</button>
+                <button type="button" class="btn drawer-trigger" aria-controls="toolsSidebar" aria-expanded="false" aria-haspopup="dialog" aria-label="Tools &amp; Properties"><i class="fas fa-toolbox" aria-hidden="true"></i> Tools</button>
+            </div>
         </div>
 
         <div class="navbar-center">
@@ -181,6 +185,7 @@
                         id="locationSearchInput"
                         type="text"
                         class="location-search-input"
+                        aria-label="Search place or coordinates"
                         placeholder="Search place or coordinates"
                         autocomplete="off"
                         spellcheck="false"
@@ -201,7 +206,7 @@
                     <i class="fas fa-map"></i>
                     <span>Basemap</span>
                 </label>
-                <select id="basemapSelect" onchange="changeBasemap(this.value)" title="NAMRIA Basemaps">
+                <select id="basemapSelect" onchange="changeBasemap(this.value)" aria-label="Basemap" title="NAMRIA Basemaps">
                     <option value="namria">NAMRIA Basemaps</option>
                     <option value="namria-orthoimage-2011">NAMRIA Orthoimage 2011 (selected areas)</option>
                     <option value="namria-orthoimage-2013-2014">NAMRIA Orthoimage 2013–2014 (selected areas)</option>
@@ -221,12 +226,14 @@
 
     <!-- MAIN CONTAINER -->
     <div class="app-container">
+        <div class="drawer-backdrop" hidden></div>
         <!-- LEFT SIDEBAR -->
-        <aside class="sidebar-left">
+        <aside class="sidebar-left" id="layersSidebar" aria-labelledby="layersSidebarTitle">
             <div class="sidebar-main">
                     <div class="sidebar-header">
                         <div class="sidebar-title-row">
-                            <div class="sidebar-title"><i class="fas fa-layer-group"></i> Layers</div>
+                            <div class="sidebar-title" id="layersSidebarTitle"><i class="fas fa-layer-group" aria-hidden="true"></i> Layers</div>
+                            <button type="button" class="drawer-close modal-close" aria-label="Close Layers">&times;</button>
                         </div>
                     <button class="btn-upload" onclick="openModal('uploadModal')"><i class="fas fa-plus"></i> Add Geospatial Data</button>
                 </div>
@@ -247,7 +254,7 @@
         <!-- MAIN CANVAS -->
         <main class="canvas-area">
             <div id="mapContainer"></div>
-            <div id="toastContainer" class="toast-container"></div>
+            <div id="toastContainer" class="toast-container" role="status"></div>
 
             <!-- Zoom Controls -->
             <div class="map-control-stack" aria-label="Map controls">
@@ -285,10 +292,11 @@
         </main>
 
         <!-- RIGHT SIDEBAR -->
-        <aside class="sidebar-right">
+        <aside class="sidebar-right" id="toolsSidebar" aria-labelledby="toolsSidebarTitle">
             <div class="right-sidebar-main">
             <div class="right-sidebar-header">
-                <div class="right-sidebar-title"><i class="fas fa-toolbox"></i> Tools & Properties</div>
+                <div class="right-sidebar-title" id="toolsSidebarTitle"><i class="fas fa-toolbox" aria-hidden="true"></i> Tools &amp; Properties</div>
+                <button type="button" class="drawer-close modal-close" aria-label="Close Tools &amp; Properties">&times;</button>
                 <div class="right-sidebar-subtitle">Editing, analysis, and workspace display controls</div>
             </div>
             <div class="contextual-inspector" aria-label="Contextual selection inspector" hidden>
@@ -387,14 +395,14 @@
             <div class="right-sidebar-content">
                 <!-- Map Settings -->
                 <div class="tool-section-group map-settings-section">
-                    <div class="tool-section-header" onclick="toggleSection(this)">
-                        <div class="tool-icon amber"><i class="fas fa-sliders"></i></div>
-                        <div class="tool-section-info">
-                            <div class="tool-section-title">Map Settings</div>
-                            <div class="tool-section-desc">Adjust visible workspace overlays</div>
-                        </div>
-                        <div class="tool-section-chevron" aria-hidden="true">&rsaquo;</div>
-                    </div>
+                    <button type="button" class="tool-section-header" aria-expanded="false" onclick="toggleSection(this)">
+                        <span class="tool-icon amber"><i class="fas fa-sliders"></i></span>
+                        <span class="tool-section-info">
+                            <span class="tool-section-title">Map Settings</span>
+                            <span class="tool-section-desc">Adjust visible workspace overlays</span>
+                        </span>
+                        <span class="tool-section-chevron" aria-hidden="true">&rsaquo;</span>
+                    </button>
                     <div class="tool-section-content collapsed">
                         <div class="settings-list">
                             <label class="settings-item" title="Toggle North Arrow">
@@ -419,14 +427,14 @@
 
                 <!-- Layer Information -->
                 <div class="tool-section-group data-analysis-section layer-information-section">
-                    <div class="tool-section-header" onclick="toggleSection(this)">
-                        <div class="tool-icon cyan"><i class="fas fa-chart-line"></i></div>
-                        <div class="tool-section-info">
-                            <div class="tool-section-title">Layer Information</div>
-                            <div class="tool-section-desc">Inspect attributes and source details</div>
-                        </div>
-                        <div class="tool-section-chevron" aria-hidden="true">&rsaquo;</div>
-                    </div>
+                    <button type="button" class="tool-section-header" aria-expanded="false" onclick="toggleSection(this)">
+                        <span class="tool-icon cyan"><i class="fas fa-chart-line"></i></span>
+                        <span class="tool-section-info">
+                            <span class="tool-section-title">Layer Information</span>
+                            <span class="tool-section-desc">Inspect attributes and source details</span>
+                        </span>
+                        <span class="tool-section-chevron" aria-hidden="true">&rsaquo;</span>
+                    </button>
                     <div class="tool-section-content collapsed">
                         <div class="tool-buttons">
                             <div class="label-attribute-control">
@@ -449,14 +457,14 @@
 
                 <!-- Annotation Tools -->
                 <div class="tool-section-group annotation-tools-section">
-                    <div class="tool-section-header" onclick="toggleSection(this)">
-                        <div class="tool-icon amber"><i class="fas fa-pen-fancy"></i></div>
-                        <div class="tool-section-info">
-                            <div class="tool-section-title">Annotation Tools</div>
-                            <div class="tool-section-desc">Create notes and control feature labels</div>
-                        </div>
-                        <div class="tool-section-chevron" aria-hidden="true">&rsaquo;</div>
-                    </div>
+                    <button type="button" class="tool-section-header" aria-expanded="false" onclick="toggleSection(this)">
+                        <span class="tool-icon amber"><i class="fas fa-pen-fancy"></i></span>
+                        <span class="tool-section-info">
+                            <span class="tool-section-title">Annotation Tools</span>
+                            <span class="tool-section-desc">Create notes and control feature labels</span>
+                        </span>
+                        <span class="tool-section-chevron" aria-hidden="true">&rsaquo;</span>
+                    </button>
                     <div class="tool-section-content collapsed">
                         <div class="tool-buttons">
                             <label class="settings-item" title="Toggle text annotations">
@@ -472,14 +480,14 @@
 
                 <!-- Drawing Tools -->
                 <div class="tool-section-group annotation-tools-section drawing-tools-section">
-                    <div class="tool-section-header" onclick="toggleSection(this)">
-                        <div class="tool-icon teal"><i class="fas fa-draw-polygon"></i></div>
-                        <div class="tool-section-info">
-                            <div class="tool-section-title">Drawing Tools</div>
-                            <div class="tool-section-desc">Sketch points, lines, polygons, and freehand</div>
-                        </div>
-                        <div class="tool-section-chevron" aria-hidden="true">&rsaquo;</div>
-                    </div>
+                    <button type="button" class="tool-section-header" aria-expanded="false" onclick="toggleSection(this)">
+                        <span class="tool-icon teal"><i class="fas fa-draw-polygon"></i></span>
+                        <span class="tool-section-info">
+                            <span class="tool-section-title">Drawing Tools</span>
+                            <span class="tool-section-desc">Sketch points, lines, polygons, and freehand</span>
+                        </span>
+                        <span class="tool-section-chevron" aria-hidden="true">&rsaquo;</span>
+                    </button>
                     <div class="tool-section-content collapsed">
                         <div class="tool-buttons">
                             <button class="tool-btn" data-draw-mode="point" onclick="activateDrawing('point')">
@@ -500,14 +508,14 @@
 
                 <!-- Measurement Tools -->
                 <div class="tool-section-group data-analysis-section measurement-section">
-                    <div class="tool-section-header" onclick="toggleSection(this)">
-                        <div class="tool-icon orange"><i class="fas fa-ruler-combined"></i></div>
-                        <div class="tool-section-info">
-                            <div class="tool-section-title measurement-section-title">Measurement</div>
-                            <div class="tool-section-desc">Measure distance, area, and perimeter</div>
-                        </div>
-                        <div class="tool-section-chevron" aria-hidden="true">&rsaquo;</div>
-                    </div>
+                    <button type="button" class="tool-section-header" aria-expanded="false" onclick="toggleSection(this)">
+                        <span class="tool-icon orange"><i class="fas fa-ruler-combined"></i></span>
+                        <span class="tool-section-info">
+                            <span class="tool-section-title measurement-section-title">Measurement</span>
+                            <span class="tool-section-desc">Measure distance, area, and perimeter</span>
+                        </span>
+                        <span class="tool-section-chevron" aria-hidden="true">&rsaquo;</span>
+                    </button>
                     <div class="tool-section-content collapsed">
                         <div class="tool-buttons">
                             <button id="measureDistanceBtn" class="tool-btn" onclick="activateMeasureDistance()">
@@ -522,14 +530,14 @@
 
                 <!-- Feature Saving -->
                 <div class="tool-section-group data-analysis-section feature-saving-section">
-                    <div class="tool-section-header" onclick="toggleSection(this)">
-                        <div class="tool-icon blue"><i class="fas fa-floppy-disk"></i></div>
-                        <div class="tool-section-info">
-                            <div class="tool-section-title">Feature Saving</div>
-                            <div class="tool-section-desc">Save and load created features</div>
-                        </div>
-                        <div class="tool-section-chevron" aria-hidden="true">&rsaquo;</div>
-                    </div>
+                    <button type="button" class="tool-section-header" aria-expanded="false" onclick="toggleSection(this)">
+                        <span class="tool-icon blue"><i class="fas fa-floppy-disk"></i></span>
+                        <span class="tool-section-info">
+                            <span class="tool-section-title">Feature Saving</span>
+                            <span class="tool-section-desc">Save and load created features</span>
+                        </span>
+                        <span class="tool-section-chevron" aria-hidden="true">&rsaquo;</span>
+                    </button>
                     <div class="tool-section-content collapsed">
                         <div class="tool-buttons">
                             <button class="tool-btn" onclick="openFeatureSaveDialog()"><span><i class="fas fa-floppy-disk"></i> Save Features</span></button>
@@ -540,14 +548,14 @@
 
                 <!-- Advanced Layers -->
                 <div class="tool-section-group advanced-layers-section">
-                    <div class="tool-section-header" onclick="toggleSection(this)">
-                        <div class="tool-icon violet"><i class="fas fa-layer-group"></i></div>
-                        <div class="tool-section-info">
-                            <div class="tool-section-title">Advanced Layers</div>
-                            <div class="tool-section-desc">Connect remote and raster data sources</div>
-                        </div>
-                        <div class="tool-section-chevron" aria-hidden="true">&rsaquo;</div>
-                    </div>
+                    <button type="button" class="tool-section-header" aria-expanded="false" onclick="toggleSection(this)">
+                        <span class="tool-icon violet"><i class="fas fa-layer-group"></i></span>
+                        <span class="tool-section-info">
+                            <span class="tool-section-title">Advanced Layers</span>
+                            <span class="tool-section-desc">Connect remote and raster data sources</span>
+                        </span>
+                        <span class="tool-section-chevron" aria-hidden="true">&rsaquo;</span>
+                    </button>
                     <div class="tool-section-content collapsed">
                         <div class="tool-buttons">
                             <button class="tool-btn" onclick="openAddGeospatialData('wms')">

@@ -161,7 +161,7 @@ export function closeModal(modalId) {
     modal.classList.remove('visible');
 
     window.setTimeout(() => {
-        if (!modal.classList.contains('visible')) {
+        if (modal.classList.contains('active') && !modal.classList.contains('visible')) {
             modal.classList.remove('active');
             const dialog = modal.querySelector('.attributes-modal');
             if (dialog) {
@@ -202,6 +202,7 @@ export function toggleSection(header) {
     const isOpening = content.classList.contains('collapsed');
 
     content.classList.toggle('collapsed');
+    header.setAttribute('aria-expanded', String(isOpening));
     group?.classList.toggle('expanded', isOpening);
     group?.classList.toggle('active-section', isOpening);
 
@@ -231,6 +232,7 @@ export function toggleSection(header) {
     const candidateContent = collapseCandidate?.querySelector('.tool-section-content');
     if (candidateContent) {
         candidateContent.classList.add('collapsed');
+        collapseCandidate.querySelector('.tool-section-header')?.setAttribute('aria-expanded', 'false');
         collapseCandidate.classList.remove('expanded', 'active-section');
     }
 }

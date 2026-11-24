@@ -10,6 +10,7 @@ import { initializeLocationSearch } from '../ui/location-search.js';
 import { initializeLabelAttributeControl, openAttributeTable } from '../ui/sidebar.js';
 import { initializeLayersSidebar } from '../ui/layers-sidebar.js';
 import { initializeToolsSidebar } from '../ui/tools-sidebar.js';
+import { initializeResponsiveWorkspace } from '../ui/responsive-workspace.js';
 import { initializeWorkspaceStatus } from '../ui/workspace-status.js';
 import { showToast } from '../ui/toast.js';
 import { bindAnnotationPopupDismissal } from '../ui/toolbar.js';
@@ -127,6 +128,7 @@ export function bootstrapApp() {
         syncBasemapSelectTitle();
         runOptionalStartupStep('layers sidebar init', () => initializeLayersSidebar());
         runOptionalStartupStep('tools sidebar init', () => initializeToolsSidebar());
+        runOptionalStartupStep('responsive workspace init', () => initializeResponsiveWorkspace());
         runOptionalStartupStep('label attribute control init', () => initializeLabelAttributeControl());
 
         runOptionalStartupStep('location search init', () => initializeLocationSearch());

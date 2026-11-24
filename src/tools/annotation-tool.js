@@ -2148,6 +2148,8 @@ export function editAnnotation(feature) {
         backdrop.remove();
         editPopup.remove();
     }, { once: true });
+
+    window.dispatchEvent(new CustomEvent('gpmap:annotationeditoropen', { detail: editPopup }));
 }
 
 export async function deleteAnnotation(feature) {

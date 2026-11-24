@@ -54,6 +54,10 @@ function positionFloatingElement(trigger, element) {
     }
 
     const viewportPadding = 12;
+    const viewport = trigger.closest('.is-drawer-open') && window.visualViewport?.scale === 1
+        ? window.visualViewport : null;
+    const viewportTop = viewport?.offsetTop ?? 0;
+    const viewportBottom = viewportTop + (viewport?.height ?? window.innerHeight);
     const triggerRect = trigger.getBoundingClientRect();
     const elementRect = element.getBoundingClientRect();
     const gap = 5;
@@ -64,16 +68,18 @@ function positionFloatingElement(trigger, element) {
     }
 
     let top = triggerRect.top;
-    if (top + elementRect.height > window.innerHeight - viewportPadding) {
-        top = window.innerHeight - viewportPadding - elementRect.height;
+    if (top + elementRect.height > viewportBottom - viewportPadding) {
+        top = viewportBottom - viewportPadding - elementRect.height;
     }
 
     element.style.left = `${clampFloatingPosition(left, viewportPadding, window.innerWidth - viewportPadding - elementRect.width)}px`;
-    element.style.top = `${clampFloatingPosition(top, viewportPadding, window.innerHeight - viewportPadding - elementRect.height)}px`;
+    element.style.top = `${clampFloatingPosition(top, viewportTop + viewportPadding, viewportBottom - viewportPadding - elementRect.height)}px`;
 }
 
 function mountFloatingElement(trigger, element, displayValue) {
     const root = ensureFloatingLayerRoot();
+    const owner = trigger.closest('.is-drawer-open') || document.body;
+    if (root.parentElement !== owner) owner.appendChild(root);
     root.appendChild(element);
     Object.assign(element.style, {
         position: 'fixed',
@@ -319,6 +325,17 @@ function closeLayerActionMenus({ except } = {}) {
     });
 }
 
+export function dismissLayerPanelOverlays() {
+    closeLayerActionMenus();
+    closeLayerRenamePopover();
+    hideLayerNameTooltip();
+    reorderCleanup?.cancel();
+    document.querySelectorAll('.marker-type-dropdown[data-open="true"]').forEach(dropdown => {
+        dropdown.dataset.open = 'false';
+        dropdown.querySelector('.marker-type-current')?.setAttribute('aria-expanded', 'false');
+    });
+}
+
 function zoomToLayerFromItem(layerItem) {
     const layerName = getLayerItemName(layerItem);
     const record = getLayerRecord(layerName);
@@ -348,6 +365,8 @@ function closeLayerRenamePopover({ restoreFocus = false } = {}) {
     document.removeEventListener('pointerdown', onDocumentPointerDown, true);
     window.removeEventListener('keydown', onWindowKeyDown, true);
     window.removeEventListener('resize', onReposition, true);
+    window.visualViewport?.removeEventListener('resize', onReposition);
+    window.visualViewport?.removeEventListener('scroll', onReposition);
     document.removeEventListener('scroll', onReposition, true);
     popover.remove();
 
@@ -488,6 +507,10 @@ function renameLayerFromItem(layerItem) {
     document.addEventListener('pointerdown', onDocumentPointerDown, true);
     window.addEventListener('keydown', onWindowKeyDown, true);
     window.addEventListener('resize', activeLayerRenamePopover.onReposition, true);
+    if (trigger.closest('.is-drawer-open')) {
+        window.visualViewport?.addEventListener('resize', activeLayerRenamePopover.onReposition);
+        window.visualViewport?.addEventListener('scroll', activeLayerRenamePopover.onReposition);
+    }
     document.addEventListener('scroll', activeLayerRenamePopover.onReposition, true);
 
     cancelButton.addEventListener('click', () => cancelRename({ restoreFocus: true }));
