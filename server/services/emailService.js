@@ -84,7 +84,7 @@ export function createEmailTransport() {
   });
 }
 
-export async function sendShareEmail({ recipientEmail, shareUrl } = {}) {
+export async function sendShareEmail({ recipientEmail, shareUrl, customMessage } = {}) {
   const recipient = requireEmail(recipientEmail, EmailDeliveryError);
   const safeShareUrl = validateShareUrl(shareUrl);
   const configuration = validateConfiguration();
@@ -95,7 +95,13 @@ export async function sendShareEmail({ recipientEmail, shareUrl } = {}) {
     auth: { user: configuration.user, pass: configuration.password },
   });
 
-  const text = `Geoportal Philippines Map Composer\n\nA map has been shared with you\n\nA map has been shared with you through Geoportal Philippines Map Composer.\n\nView Shared Map\n\nShared maps are snapshots of the current map composition and cannot be edited by recipients.\n\nGeoportal Philippines\nNational Mapping and Resource Information Authority (NAMRIA)`;
+  const textMessage = customMessage ? `Message from sender\n\n${customMessage}\n\n` : '';
+  const htmlMessage = customMessage ? `
+          <div style="background-color:#f7f9fa;border:1px solid #dce2e7;padding:16px;margin:0 0 24px;">
+            <h2 style="margin:0 0 8px;font-size:15px;line-height:1.4;">Message from sender</h2>
+            <p style="margin:0;white-space:pre-wrap;word-wrap:break-word;word-break:break-word;overflow-wrap:anywhere;">${escapeHtml(customMessage).replace(/\n/g, '<br>')}</p>
+          </div>` : '';
+  const text = `Geoportal Philippines Map Composer\n\nA map has been shared with you\n\nA map has been shared with you through Geoportal Philippines Map Composer.\n\n${textMessage}View Shared Map\n\nShared maps are snapshots of the current map composition and cannot be edited by recipients.\n\nGeoportal Philippines\nNational Mapping and Resource Information Authority (NAMRIA)`;
   const htmlUrl = escapeHtml(safeShareUrl);
   const html = `<!doctype html><html><body style="margin:0;padding:0;background-color:#f3f5f7;font-family:Arial,Helvetica,sans-serif;color:#24313d;">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f3f5f7;padding:32px 12px;"><tr><td align="center">
@@ -108,7 +114,7 @@ export async function sendShareEmail({ recipientEmail, shareUrl } = {}) {
         </td></tr>
         <tr><td style="padding:32px;font-size:15px;line-height:1.6;">
           <h1 style="margin:0 0 16px;font-size:22px;line-height:1.3;color:#172554;">A map has been shared with you</h1>
-          <p style="margin:0 0 24px;">A map has been shared with you through Geoportal Philippines Map Composer.</p>
+          <p style="margin:0 0 24px;">A map has been shared with you through Geoportal Philippines Map Composer.</p>${htmlMessage}
           <p style="margin:0 0 24px;"><a href="${htmlUrl}" style="display:inline-block;padding:12px 22px;background-color:#2563eb;color:#ffffff;text-decoration:none;font-weight:bold;border-radius:5px;">View Shared Map</a></p>
           <p style="margin:0;font-size:13px;line-height:1.5;color:#465663;">Shared maps are snapshots of the current map composition and cannot be edited by recipients.</p>
         </td></tr>

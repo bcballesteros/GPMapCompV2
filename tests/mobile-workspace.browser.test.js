@@ -31,8 +31,9 @@ test('responsive workspace preserves the map and exposes GIS workflows on phones
             const select = selector => `document.querySelector(${JSON.stringify(selector)})`;
             const click = selector => evaluate(`${select(selector)}.click()`);
             const key = async (pressed, modifiers = 0) => {
-                await call('Input.dispatchKeyEvent', { type: 'rawKeyDown', key: pressed, code: pressed, modifiers,
-                    windowsVirtualKeyCode: { Escape: 27, Tab: 9, Enter: 13 }[pressed] });
+                await call('Input.dispatchKeyEvent', { type: pressed === 'Enter' ? 'keyDown' : 'rawKeyDown',
+                    key: pressed, code: pressed, modifiers, ...(pressed === 'Enter' && { text: '\r' }),
+                    windowsVirtualKeyCode: { Escape: 27, Tab: 9, Enter: 13, Backspace: 8 }[pressed] });
                 await call('Input.dispatchKeyEvent', { type: 'keyUp', key: pressed, modifiers });
             };
             const tap = async selector => {
@@ -113,6 +114,7 @@ test('responsive workspace preserves the map and exposes GIS workflows on phones
                 }
                 document.querySelector('.app-logo img').src = '${base}/assets/images/gplogo.png';
             })()`);
+            const [fixtureCenter, fixtureZoom] = await evaluate('[map.getView().getCenter(), map.getView().getZoom()]');
             await screenshot('desktop-1366x768');
             await click('.sidebar-left .sidebar-layout-handle');
             await click('.right-sidebar-layout-handle');
@@ -310,7 +312,7 @@ test('responsive workspace preserves the map and exposes GIS workflows on phones
                     return { top: modal.top, bottom: modal.bottom, height: innerHeight,
                         close: box('#${id} .modal-close').top, primary: box('${primary}').bottom };
                 })()`);
-                await screenshot(`${id}-844x390`);
+                if (id === 'exportModal') await screenshot(`${id}-844x390`);
                 assert.ok(geometry.top >= 0 && geometry.bottom <= geometry.height && geometry.close >= geometry.top &&
                     geometry.primary <= geometry.bottom + 1, `${id} ${JSON.stringify(geometry)}`);
                 await tap(`#${id} .modal-close`);
@@ -324,6 +326,97 @@ test('responsive workspace preserves the map and exposes GIS workflows on phones
             await waitFor(`() => map.getView().getCenter()[0] !== ${center[0]}`);
             await call('Input.synthesizePinchGesture', { x: 320, y: 180, scaleFactor: 1.7, gestureSourceType: 'touch' });
             await waitFor(`() => map.getView().getZoom() > ${zoom}`);
+            await evaluate(`map.getView().setCenter(${JSON.stringify(fixtureCenter)}); map.getView().setZoom(${fixtureZoom})`);
+
+            const shareViewports = [[1920, 1080], [1440, 900], [1366, 768], [768, 1024], [1024, 768], [390, 844], [844, 390], [915, 412]];
+            const shareMessage = '#shareCustomMessage';
+            const count = () => evaluate("document.getElementById('shareCustomMessageCount').textContent");
+            const value = () => evaluate(`${select(shareMessage)}.value`);
+            for (const [width, height] of shareViewports) {
+                await viewport(width, height, width <= 1024);
+                await click('.btn-share');
+                await waitFor(`() => document.querySelector('#sharePreviewMap canvas[role="img"]') &&
+                    getComputedStyle(document.querySelector('#shareModal')).opacity === '1' &&
+                    getComputedStyle(document.querySelector('#sharePreviewPlaceholder')).opacity === '0'`);
+                const geometry = await evaluate(`(() => {
+                    const find = selector => document.querySelector(selector);
+                    const box = selector => find(selector).getBoundingClientRect();
+                    const modal = box('.share-modal');
+                    const preview = box('#sharePreviewContainer');
+                    const body = find('.share-modal-body');
+                    const controls = box('.share-controls-grid');
+                    const message = box('#shareCustomMessage');
+                    const counter = box('#shareCustomMessageCount');
+                    const footer = box('#shareModal .modal-footer');
+                    return {
+                        fits: modal.top >= 0 && modal.bottom <= innerHeight + 1 && modal.left >= 0 && modal.right <= innerWidth,
+                        previewRatio: preview.width / preview.height,
+                        fullWidth: Math.abs(message.left - controls.left) < 1 && Math.abs(message.right - controls.right) < 1,
+                        order: preview.bottom <= controls.top && controls.bottom <= message.top && message.bottom <= counter.top,
+                        noOverflow: body.scrollWidth <= body.clientWidth && counter.right <= modal.right &&
+                            document.documentElement.scrollWidth <= innerWidth,
+                        actions: box('#shareModal .modal-close').top >= modal.top && footer.top >= body.getBoundingClientRect().bottom - 1 &&
+                            box('#sendShareBtn').bottom <= modal.bottom && box('#shareModal .modal-footer .btn-secondary').bottom <= modal.bottom,
+                        scrolls: body.scrollHeight > body.clientHeight
+                    };
+                })()`);
+                assert.ok(geometry.fits && geometry.fullWidth && geometry.order && geometry.noOverflow && geometry.actions &&
+                    Math.abs(geometry.previewRatio - 4 / 3) < 0.01, `${width}x${height} ${JSON.stringify(geometry)}`);
+                if (height < 500) assert.ok(geometry.scrolls, `${width}x${height} scrolls`);
+                await evaluate(`(() => {
+                    const area = document.getElementById('shareCustomMessage');
+                    area.value = 'Please review the mapped areas before our assessment.\\nSalamat!';
+                    area.dispatchEvent(new Event('input', { bubbles: true }));
+                    if (${geometry.scrolls}) document.getElementById('shareCustomMessageCount').scrollIntoView({ block: 'nearest' });
+                })()`);
+                assert.equal(await evaluate(`(() => {
+                    const body = document.querySelector('.share-modal-body').getBoundingClientRect();
+                    const area = document.querySelector('#shareCustomMessage').getBoundingClientRect();
+                    const count = document.querySelector('#shareCustomMessageCount').getBoundingClientRect();
+                    return area.top >= body.top && count.bottom <= body.bottom + 1;
+                })()`), true, `Message and counter reachable at ${width}x${height}`);
+                await screenshot(`share-${width}x${height}`);
+                await click('#shareModal .modal-footer .btn-secondary');
+                await waitFor("() => !document.querySelector('#shareModal.active')");
+            }
+            await viewport(390, 844);
+            await click('.btn-share');
+            await waitFor("() => document.querySelector('#shareModal.visible')");
+            assert.equal(await value(), 'Please review the mapped areas before our assessment.\nSalamat!');
+            const insertText = text => call('Input.insertText', { text });
+            await evaluate(`${select(shareMessage)}.focus(); ${select(shareMessage)}.select()`);
+            await insertText('🌏');
+            assert.equal(await count(), '2/500 characters');
+            await key('Enter');
+            assert.equal(await value(), '🌏\n');
+            assert.equal(await count(), '3/500 characters');
+            assert.equal(await evaluate("document.querySelectorAll('#recipientChips .recipient-chip').length"), 0);
+            assert.equal(await evaluate("document.getElementById('shareFeedback').textContent"), '');
+            await key('Backspace');
+            assert.equal(await count(), '2/500 characters');
+            await evaluate(`${select(shareMessage)}.select()`);
+            // CDP inserts the whole string through the browser's native editing path.
+            await insertText('x'.repeat(501));
+            assert.equal(await value(), 'x'.repeat(500));
+            assert.equal(await count(), '500/500 characters');
+            await evaluate(`${select(shareMessage)}.select()`);
+            await key('Backspace');
+            assert.equal(await count(), '0/500 characters');
+
+            await evaluate(`Object.defineProperties(visualViewport, { height: { value: 320, configurable: true },
+                offsetTop: { value: 48, configurable: true } }); visualViewport.dispatchEvent(new Event('resize'))`);
+            await waitFor(`() => document.querySelector('#shareModal .modal').getBoundingClientRect().bottom <= 368`);
+            await evaluate("document.getElementById('shareCustomMessageCount').scrollIntoView({ block: 'nearest' })");
+            assert.equal(await evaluate(`(() => {
+                const body = document.querySelector('.share-modal-body').getBoundingClientRect();
+                const area = document.getElementById('shareCustomMessage').getBoundingClientRect();
+                const count = document.getElementById('shareCustomMessageCount').getBoundingClientRect();
+                return document.activeElement.id === 'shareCustomMessage' && area.top >= body.top &&
+                    count.bottom <= body.bottom + 1 && document.getElementById('sendShareBtn').getBoundingClientRect().bottom <= 368;
+            })()`), true, 'Remarks and Send stay reachable in a simulated keyboard viewport');
+            await evaluate("delete visualViewport.height; delete visualViewport.offsetTop; visualViewport.dispatchEvent(new Event('resize'))");
+            await key('Escape');
+            await waitFor("() => !document.querySelector('#shareModal.active')");
         });
     } finally {
         await vite.close();

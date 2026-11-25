@@ -65,19 +65,46 @@ test('partial delivery continues and all failed delivery carries safe recipient 
     (error) => error instanceof ShareDeliveryFailureError && error.results.length === 2);
 });
 
-test('multi-recipient controller returns 207, 201, and safe 500 outcomes', async () => {
+test('multi-recipient remarks reach each isolated delivery while API responses and storage stay the same', async () => {
   const response = () => ({ statusCode: 0, body: null, status(code) { this.statusCode = code; return this; }, json(value) { this.body = value; return this; } });
-  const partial = response();
-  await handleCreateShare({ body }, partial, async () => ({ sentCount: 1, failedCount: 1, results: [{ email: 'juan@example.com', status: 'sent' }, { email: 'maria@example.com', status: 'failed' }] }));
-  assert.equal(partial.statusCode, 207);
-  assert.equal(partial.body.partial, true);
-  const allFailed = response();
-  const oldError = console.error; console.error = () => {};
+  const normalized = 'Review the draft.\nSalamat 🌏';
+  const oldError = console.error;
+  const logs = [];
+  console.error = (...args) => logs.push(args);
   try {
-    await handleCreateShare({ body }, allFailed, async () => { throw new ShareDeliveryFailureError([{ email: 'juan@example.com', status: 'failed' }]); });
+    for (const [status, failures, customMessage, extra] of [
+      [201, [], `  ${normalized.replace('\n', '\r\n')}  `, {}],
+      [201, [], ' \r\n ', {}],
+      [207, ['maria@example.com'], normalized, { partial: true }],
+      [500, body.recipientEmails, normalized, {
+        error: { code: 'EMAIL_DELIVERY_FAILED', message: 'Unable to send the shared map.' },
+      }],
+    ]) {
+      const messages = [];
+      const options = deps({
+        async createMapComposerRecords(entries) {
+          assert.deepEqual(entries, body.recipientEmails.map(email => ({ email, imageData: png })));
+          return [{ id: 10 }, { id: 11 }];
+        },
+        async sendShareEmail(message) {
+          messages.push(message);
+          if (failures.includes(message.recipientEmail)) throw new Error('smtp');
+        },
+      });
+      const res = response();
+      await handleCreateShare({ body: { ...body, customMessage } }, res, request => processShare(request, options));
+      assert.deepEqual(messages, body.recipientEmails.map((recipientEmail, index) => ({
+        recipientEmail, shareUrl: `https://maps.test/share/token-${10 + index}`,
+        ...(customMessage.trim() ? { customMessage: normalized } : {}),
+      })));
+      assert.equal(res.statusCode, status);
+      assert.deepEqual(res.body, {
+        success: status === 201, ...extra, sentCount: 2 - failures.length, failedCount: failures.length,
+        results: body.recipientEmails.map(email => ({ email, status: failures.includes(email) ? 'failed' : 'sent' })),
+      });
+    }
   } finally { console.error = oldError; }
-  assert.equal(allFailed.statusCode, 500);
-  assert.equal(JSON.stringify(allFailed.body).includes('share/'), false);
+  assert.deepEqual(logs, [['Share email delivery failed.']]);
 });
 
 test('repository rolls back failed batch inserts and always releases its connection', async () => {

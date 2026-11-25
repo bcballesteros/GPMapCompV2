@@ -78,6 +78,52 @@ function responseRecorder() {
   };
 }
 
+test('legacy requests normalize and forward optional remarks without changing the response', async () => {
+  for (const [customMessage, expected] of [
+    ['', ''],
+    [' \t\r\n ', ''],
+    ['Please review the map.', 'Please review the map.'],
+    ['x'.repeat(500), 'x'.repeat(500)],
+    ['🌏'.repeat(250), '🌏'.repeat(250)],
+    [`a\r\n${'b'.repeat(498)}`, `a\n${'b'.repeat(498)}`],
+    ['  Mabuhay 🌏\r\n\rLine  two\n<b>Text</b>  ', 'Mabuhay 🌏\n\nLine  two\n<b>Text</b>'],
+  ]) {
+    const res = responseRecorder();
+    const input = { ...body, customMessage };
+    const options = expected ? dependencies({
+      async sendShareEmail(message) {
+        assert.deepEqual(message, { recipientEmail: 'recipient@example.test', shareUrl, customMessage: expected });
+      },
+    }) : dependencies();
+    await handleCreateShare({ body: input }, res, request => processShare(request, options));
+    assert.equal(res.statusCode, 201);
+    assert.deepEqual(res.body, { success: true, message: 'Map shared successfully.' });
+  }
+});
+
+test('invalid remarks return HTTP 400 before storing maps, generating links, or attempting email', async () => {
+  const options = Object.fromEntries([
+    'validateShareLinkConfiguration', 'validateEmailConfiguration',
+    'createMapComposerRecord', 'createMapComposerRecords', 'createShareToken', 'buildShareUrl', 'sendShareEmail',
+  ].map(name => [name, () => assert.fail(`Unexpected call to ${name}`)]));
+  const { recipientEmail: email, ...output } = body;
+  for (const recipients of [{ recipientEmail: email }, { recipientEmails: [email, 'other@example.test'] }]) {
+    for (const [values, code, message] of [
+      [[undefined, 42, false, null, [], {}], 'INVALID_CUSTOM_MESSAGE', 'Enter a valid custom message.'],
+      [['x'.repeat(501), 'xx'.repeat(5000), ' '.repeat(501), ` ${'x'.repeat(500)}`, `${'🌏'.repeat(250)}a`],
+        'CUSTOM_MESSAGE_TOO_LONG', 'Custom message must not exceed 500 characters.'],
+    ]) {
+      for (const customMessage of values) {
+        const res = responseRecorder();
+        await handleCreateShare({ body: { ...output, ...recipients, customMessage } }, res,
+          request => processShare(request, options));
+        assert.equal(res.statusCode, 400);
+        assert.deepEqual(res.body, { success: false, error: { code, message } });
+      }
+    }
+  }
+});
+
 test('controller returns the complete share success response', async () => {
   const res = responseRecorder();
   await handleCreateShare({ body }, res, async () => {});

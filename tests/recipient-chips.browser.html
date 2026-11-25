@@ -74,6 +74,12 @@ window.resolveFixture(async () => {
     const api = initializeShareRecipients();
     const input = document.getElementById('recipientEmail');
     const format = document.getElementById('shareFormat');
+    const message = document.getElementById('shareCustomMessage');
+    const count = () => document.getElementById('shareCustomMessageCount').textContent;
+    const setMessage = value => {
+        message.value = value;
+        message.dispatchEvent(new Event('input', { bubbles: true }));
+    };
     const feedback = () => document.getElementById('shareFeedback').textContent;
     const map = new ol.Map({ controls: [], interactions: [], layers: [new ol.layer.Vector({
         source: new ol.source.Vector({ features: [new ol.Feature(new ol.geom.Point([0, 0]))] })
@@ -93,21 +99,38 @@ window.resolveFixture(async () => {
     try {
         input.value = 'a@example.com b@example.com c@example.com';
         window.__GP_PREVIEW_DEBUG__ = [];
+        check(count() === '0/500 characters' && message.maxLength === 500, 'Initial message counter and native limit');
+        setMessage(' '.repeat(501));
+        check(await sendMap() === false && requests.length === 0 && feedback().includes('500 characters'), 'Overlong message rejected locally');
+        check(window.__GP_PREVIEW_DEBUG__.length === 0, 'Validation before output generation');
+        setMessage('  Mabuhay 🌏\r\n\rReview  the map.  ');
+        const draft = message.value;
+        const draftCounter = count();
         const pending = sendMap(); check(await sendMap() === false, 'Duplicate pending');
-        check(input.disabled && format.disabled, 'Pending lock');
+        check(input.disabled && format.disabled && message.disabled && message.value === draft, 'Pending lock');
+        check(document.getElementById('sendShareBtn').textContent.includes('Sending'), 'Pending button');
         check(await pending === false && requests.length === 1, 'Partial result');
+        check(requests[0].customMessage === 'Mabuhay 🌏\n\nReview  the map.', 'Normalized multiline message in PNG payload');
+        check(!message.disabled && message.value === draft && count() === draftCounter, 'Draft and counter retained after partial delivery');
         check(feedback() === 'Map shared with 2 of 3 recipients. Failed: b@example.com.', 'Partial feedback');
         check(JSON.stringify(api.getRecipients()) === JSON.stringify(['b@example.com']), 'Only failures retained');
         check(window.__GP_PREVIEW_DEBUG__.filter(e => e.event === 'static-output:capture').length === 1, 'Generate once');
-        pass('Partial delivery, generate once, pending lock, duplicate submission');
+        pass('Message validation, partial delivery, generate once, pending lock, duplicate submission');
         status = 201; format.value = 'jpeg';
         check(await sendMap() && requests[1].recipientEmails.length === 1 && requests[1].recipientEmails[0] === 'b@example.com', 'Retry only failure');
+        check(requests[1].customMessage === requests[0].customMessage, 'Manual retry carries the same message');
+        check(!message.disabled && message.value === '' && count() === '0/500 characters', 'Full success clears message');
         check(feedback() === 'Map shared successfully with 1 recipient.' && requests[1].format === 'jpeg', 'Single JPEG success'); pass('Manual retry and JPEG');
         status = 500; input.value = 'failed@example.com'; format.value = 'pdf';
+        setMessage('Retry me');
         check(await sendMap() === false && feedback().includes('Unable to share'), 'Complete failure');
+        check(requests[2].customMessage === 'Retry me' && !message.disabled && message.value === 'Retry me' &&
+            count() === '8/500 characters', 'Complete failure retains remarks');
         check(api.getRecipients()[0] === 'failed@example.com' && requests[2].format === 'pdf', 'PDF failure retained'); pass('Complete failure and PDF');
         status = 201; input.value = 'second@example.com';
+        setMessage(' \n ');
         check(await sendMap() && feedback() === 'Map shared successfully with 2 recipients.', 'Multiple full success'); pass('Full multiple success');
+        check(requests[3].format === 'pdf' && !('customMessage' in requests[3]), 'Whitespace omitted from successful PDF payload');
         check(await sendMap() === false && requests.length === 4 && feedback().includes('at least one'), 'Empty prevents request'); pass('Empty prevents request');
 
         for (const width of [640, 320, 260]) {

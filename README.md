@@ -250,6 +250,21 @@ A typical workflow in GPMapCompV2 consists of the following steps:
 5. Perform map measurements when needed.
 6. Export or share the completed map composition.
 
+### Share Map remarks
+
+Use **Custom Message / Remarks (Optional)** below the recipient and format controls
+to include multiline text in the email. The field accepts up to 500 characters.
+Every recipient receives the same message and an individual map link. Full success
+clears the message. Failed and partial deliveries keep it for manual retry with
+the remaining recipients.
+
+`POST /api/share` accepts an optional `customMessage` string with either the legacy
+`recipientEmail` field or the `recipientEmails` array. Both request formats also
+accept requests that omit the message. The API normalizes line endings to LF and
+checks JavaScript string length before trimming outer whitespace. A blank message
+is omitted from the email. The email treats the message as plain text and escapes
+it for HTML. The message is used only in the recipient email and has no database storage.
+
 ---
 
 ## Roadmap

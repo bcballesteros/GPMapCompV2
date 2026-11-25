@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import net from 'node:net';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 
 process.env.SMTP_HOST = 'smtp.example.test';
 process.env.SMTP_PORT = '587';
@@ -16,6 +18,25 @@ const {
   EmailDeliveryError,
   sendShareEmail,
 } = await import('../services/emailService.js');
+
+function readMimeBody(raw, type) {
+  const start = raw.indexOf(`Content-Type: ${type};`);
+  assert.notEqual(start, -1);
+  const headerEnd = raw.indexOf('\r\n\r\n', start);
+  const headers = raw.slice(start, headerEnd);
+  const bodyStart = headerEnd + 4;
+  const bodyEnd = raw.indexOf('\r\n----', bodyStart);
+  assert.ok(headerEnd > start && bodyEnd > bodyStart);
+  const body = raw.slice(bodyStart, bodyEnd);
+  const encoding = headers.match(/Content-Transfer-Encoding: ([\w-]+)/i)?.[1];
+  if (encoding === 'base64') return Buffer.from(body, 'base64').toString('utf8');
+  if (encoding === 'quoted-printable') {
+    const bytes = body.replace(/=\r\n/g, '')
+      .replace(/=([0-9A-F]{2})/gi, (_, hex) => String.fromCharCode(Number.parseInt(hex, 16)));
+    return Buffer.from(bytes, 'latin1').toString('utf8');
+  }
+  return body;
+}
 
 async function withSmtpCapture(run) {
   let captured = '';
@@ -47,17 +68,11 @@ async function withSmtpCapture(run) {
   Object.assign(env.smtp, { host: '127.0.0.1', port: address.port, secure: false, user: 'test', password: 'test' });
   try {
     await run(() => {
-      const normalized = captured.replace(/=\r\n/g, '');
-      const decodeQuotedPrintable = (value) => value.replace(/=([0-9A-F]{2})/gi, (_, hex) => String.fromCharCode(Number.parseInt(hex, 16)));
-      const decoded = decodeQuotedPrintable(normalized);
-      const textStart = decoded.indexOf('Content-Type: text/plain;');
-      const htmlStart = decoded.indexOf('Content-Type: text/html;');
-      const imageStart = decoded.indexOf('Content-Type: image/png;');
+      const raw = captured.replace(/^\.\./gm, '.');
       return {
-        raw: decoded,
-        text: decoded.slice(textStart, htmlStart),
-        html: decoded.slice(htmlStart, imageStart),
-        related: decoded.slice(htmlStart),
+        raw,
+        text: readMimeBody(raw, 'text/plain').replace(/\r\n/g, '\n'),
+        html: readMimeBody(raw, 'text/html'),
       };
     });
   }
@@ -98,6 +113,8 @@ test('share email has branded sender, CID logo, one secure HTML link, and concis
     assert.match(message.text, /Shared maps are snapshots of the current map composition and cannot be edited by recipients\./);
     assert.match(message.text, /Geoportal Philippines[\s\S]*National Mapping and Resource Information Authority \(NAMRIA\)/);
     assert.match(message.html, /Geoportal Philippines[\s\S]*National Mapping and Resource Information Authority \(NAMRIA\)/);
+    assert.doesNotMatch(message.html, /Message from sender/);
+    assert.doesNotMatch(message.text, /Message from sender/);
   });
 });
 
@@ -107,7 +124,49 @@ test('HTML escapes the validated URL before inserting it into markup', async () 
     await sendShareEmail({ recipientEmail: 'recipient@example.test', shareUrl });
     const message = getCaptured();
     assert.match(message.html, /x=1&amp;y=2/);
-    assert.match(message.related, /href="https:\/\/maps\.example\.test\/share\/token\?x=1&amp;y=2"/);
+    assert.match(message.html, /href="https:\/\/maps\.example\.test\/share\/token\?x=1&amp;y=2"/);
+  });
+});
+
+test('local SMTP captures both email bodies with safely rendered sender remarks', async () => {
+  const shareUrl = 'https://maps.example.test/share/opaque-token';
+  const email = { recipientEmail: 'recipient@example.test', shareUrl };
+  const longWord = 'x'.repeat(500);
+  const remarks = 'Mabuhay, team! 🌏\n\nReview  the mapped areas.\n<script>alert("test")</script> & <b>Bay</b> \'quoted\'';
+  const escaped = 'Mabuhay, team! 🌏<br><br>Review  the mapped areas.<br>&lt;script&gt;alert(&quot;test&quot;)&lt;/script&gt; &amp; &lt;b&gt;Bay&lt;/b&gt; &#39;quoted&#39;';
+  await withSmtpCapture(async (getCaptured) => {
+    await sendShareEmail(email);
+    const baseline = getCaptured();
+    await sendShareEmail({ ...email, customMessage: '' });
+    const blank = getCaptured();
+    assert.equal(blank.text, baseline.text);
+    assert.equal(blank.html, baseline.html);
+    for (const [customMessage, expectedHtml] of [
+      ['Please review the map.', 'Please review the map.'],
+      [remarks, escaped],
+      [longWord, longWord],
+    ]) {
+      await sendShareEmail({ ...email, customMessage });
+      const message = getCaptured();
+      assert.match(message.raw, /From: Geoportal Philippines Map Composer <sender@example\.test>/);
+      assert.match(message.raw, /Subject: Geoportal Philippines Map Composer - Shared Map/);
+      assert.match(message.raw, /Content-ID: <geoportal-philippines-logo>/i);
+      assert.doesNotMatch(message.html, /<script\b|<b>Bay<\/b>/i);
+      const block = message.html.match(/\r?\n +<div[^>]*>\s*<h2[^>]*>Message from sender<\/h2>\s*(<p[^>]*>.*<\/p>)\s*<\/div>/);
+      assert.ok(block);
+      assert.ok(block[1].includes(`>${expectedHtml}</p>`));
+      assert.match(block[1], /word-wrap:break-word;word-break:break-word;overflow-wrap:anywhere;/);
+      assert.ok(message.html.indexOf('Map Composer.</p>') < block.index);
+      assert.ok(block.index < message.html.indexOf('View Shared Map'));
+      assert.equal(message.html.replace(block[0], ''), baseline.html);
+      assert.equal(message.text, baseline.text.replace('View Shared Map', `Message from sender\n\n${customMessage}\n\nView Shared Map`));
+
+      const directory = process.env.SHARE_EMAIL_ARTIFACT_DIR;
+      if (directory && customMessage === remarks) {
+        await mkdir(directory, { recursive: true });
+        await writeFile(join(directory, 'share-email.html'), `\uFEFF${message.html}`);
+      }
+    }
   });
 });
 

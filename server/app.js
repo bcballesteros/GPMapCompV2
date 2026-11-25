@@ -25,7 +25,9 @@ export function createApp() {
       });
     }
 
-    console.error(`Request failed: ${error.message}`);
+    // JSON parser errors may quote the request body, including private Share remarks.
+    const message = error?.type === 'entity.parse.failed' ? 'Could not parse the request body.' : error.message;
+    console.error(`Request failed: ${message}`);
     return res.status(500).json({
       success: false,
       error: { code: 'INTERNAL_SERVER_ERROR', message: 'An unexpected server error occurred.' },

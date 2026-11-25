@@ -5144,6 +5144,7 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
 
 .share-recipient-group {
     min-width: 0;
+    margin-bottom: 0;
 }
 
 .recipient-chips.form-input {
@@ -5259,6 +5260,20 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
     color: var(--gray-500);
     font-size: 12px;
     line-height: 1.4;
+}
+
+.share-message-group {
+    min-width: 0;
+    margin-bottom: 0;
+}
+
+.share-message-group textarea {
+    display: block;
+    resize: none;
+}
+
+.share-message-count {
+    text-align: right;
 }
 
 .share-disclaimer {

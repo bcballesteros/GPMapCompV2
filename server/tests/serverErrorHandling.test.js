@@ -46,12 +46,32 @@ test('Share parser accepts a body sized for a 32 MiB Base64 output', async () =>
   });
 });
 
-test('unexpected Express errors still return a generic 500 response', async () => {
+test('the Share endpoint returns HTTP 400 for invalid custom messages', async () => {
+  await withServer(async (base) => {
+    for (const [recipient, customMessage, error] of [
+      [{ recipientEmail: 'recipient@example.test' }, null,
+        { code: 'INVALID_CUSTOM_MESSAGE', message: 'Enter a valid custom message.' }],
+      [{ recipientEmails: ['recipient@example.test'] }, ' '.repeat(501),
+        { code: 'CUSTOM_MESSAGE_TOO_LONG', message: 'Custom message must not exceed 500 characters.' }],
+    ]) {
+      const response = await fetch(`${base}/api/share`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ ...recipient, format: 'png', imageData: 'iVBORw0KGgo=', customMessage }),
+      });
+      assert.equal(response.status, 400);
+      assert.deepEqual(await response.json(), { success: false, error });
+    }
+  });
+});
+
+test('malformed Share JSON returns the existing generic 500 response and logs no request text', async (t) => {
+  const errorLog = t.mock.method(console, 'error', () => {});
   await withServer(async (base) => {
     const response = await fetch(`${base}/api/share`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: '{',
+      body: '{"customMessage":PrivateRemark}',
     });
     assert.equal(response.status, 500);
     assert.deepEqual(await response.json(), {
@@ -59,6 +79,9 @@ test('unexpected Express errors still return a generic 500 response', async () =
       error: { code: 'INTERNAL_SERVER_ERROR', message: 'An unexpected server error occurred.' },
     });
   });
+  assert.deepEqual(errorLog.mock.calls.map(call => call.arguments), [
+    ['Request failed: Could not parse the request body.'],
+  ]);
 });
 
 test('decoded Share size validation accepts 32 MiB and rejects data above it', () => {

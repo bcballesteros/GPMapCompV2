@@ -4,6 +4,7 @@ import { detectShareOutputFormat, SHARE_OUTPUT_TYPES } from './shareOutputFormat
 import { buildShareUrl, createShareToken, parseShareToken, validateShareLinkConfiguration } from './shareTokenService.js';
 import { sendShareEmail, validateEmailConfiguration } from './emailService.js';
 import { normalizeAndValidateEmail } from '../../src/services/email-validation.js';
+import { normalizeShareCustomMessage, SHARE_CUSTOM_MESSAGE_LIMIT, SHARE_CUSTOM_MESSAGE_TOO_LONG } from '../../src/services/share-custom-message.js';
 
 const SUPPORTED_FORMATS = new Set(['png', 'jpeg', 'pdf']);
 const BASE64_PATTERN = /^[A-Za-z0-9+/]*={0,2}$/;
@@ -51,6 +52,17 @@ function validateFormat(value) {
   }
 
   return value;
+}
+
+function validateCustomMessage(value) {
+  if (typeof value !== 'string') {
+    throw new ShareRequestError(400, 'INVALID_CUSTOM_MESSAGE', 'Enter a valid custom message.');
+  }
+  const normalizedMessage = normalizeShareCustomMessage(value);
+  if (normalizedMessage.length > SHARE_CUSTOM_MESSAGE_LIMIT) {
+    throw new ShareRequestError(400, 'CUSTOM_MESSAGE_TOO_LONG', SHARE_CUSTOM_MESSAGE_TOO_LONG);
+  }
+  return normalizedMessage.trim();
 }
 
 function decodeBase64(value) {
@@ -109,6 +121,7 @@ export async function processShare(body, dependencies = {}) {
   }
   const email = recipients[0];
   const format = validateFormat(body.format);
+  const customMessage = Object.hasOwn(body, 'customMessage') ? validateCustomMessage(body.customMessage) : '';
   const imageData = decodeBase64(body.imageData);
   const actualFormat = detectShareOutputFormat(imageData);
 
@@ -126,13 +139,14 @@ export async function processShare(body, dependencies = {}) {
   const makeToken = dependencies.createShareToken ?? createShareToken;
   const makeUrl = dependencies.buildShareUrl ?? buildShareUrl;
   const deliverEmail = dependencies.sendShareEmail ?? sendShareEmail;
+  const messageFields = customMessage ? { customMessage } : {};
 
   checkShareConfiguration();
   checkEmailConfiguration();
   if (!multiple) {
     const record = await storeRecord({ email, imageData });
     const shareUrl = makeUrl(makeToken(record.id));
-    await deliverEmail({ recipientEmail: email, shareUrl });
+    await deliverEmail({ recipientEmail: email, shareUrl, ...messageFields });
     return;
   }
 
@@ -142,7 +156,7 @@ export async function processShare(body, dependencies = {}) {
   for (let index = 0; index < recipients.length; index += 1) {
     try {
       const shareUrl = makeUrl(makeToken(records[index].id));
-      await deliverEmail({ recipientEmail: recipients[index], shareUrl });
+      await deliverEmail({ recipientEmail: recipients[index], shareUrl, ...messageFields });
       results.push({ email: recipients[index], status: 'sent' });
     } catch {
       results.push({ email: recipients[index], status: 'failed' });

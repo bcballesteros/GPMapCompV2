@@ -7,6 +7,7 @@ import ol from '../lib/ol.js';
 import northArrowUrl from '../assets/north-arrow.svg';
 import { createRecipientChips } from '../ui/recipient-chips.js';
 import { getShareDeliveryResult } from '../services/share-delivery-result.js';
+import { normalizeShareCustomMessage, SHARE_CUSTOM_MESSAGE_LIMIT, SHARE_CUSTOM_MESSAGE_TOO_LONG } from '../services/share-custom-message.js';
 import { captureOutputLegend, drawOutputLegend, legendFont } from '../services/output-legend.js';
 import { assertOutputSize, layoutOutputLegend, OutputSizeError } from '../services/output-legend-layout.js';
 import { getMapPreviewViewer } from '../ui/map-preview-viewer.js';
@@ -936,6 +937,11 @@ function blobToBase64(blob) {
     });
 }
 
+function updateShareMessageCount(input) {
+    const count = document.getElementById('shareCustomMessageCount');
+    if (count) count.textContent = `${normalizeShareCustomMessage(input.value).length}/${SHARE_CUSTOM_MESSAGE_LIMIT} characters`;
+}
+
 let shareRecipients = null;
 export function initializeShareRecipients() {
     if (shareRecipients) return shareRecipients;
@@ -946,6 +952,15 @@ export function initializeShareRecipients() {
         container, input,
         onFeedback: message => setShareFeedback(message, message ? 'warning' : 'neutral')
     });
+    const messageInput = document.getElementById('shareCustomMessage');
+    if (messageInput) {
+        messageInput.maxLength = SHARE_CUSTOM_MESSAGE_LIMIT;
+        updateShareMessageCount(messageInput);
+        messageInput.addEventListener('input', () => updateShareMessageCount(messageInput));
+        messageInput.addEventListener('keydown', event => {
+            if (event.key !== 'Tab' && event.key !== 'Escape') event.stopPropagation();
+        });
+    }
     return shareRecipients;
 }
 
@@ -955,6 +970,7 @@ export async function sendMap(event) {
     if (shareState.pending) return false;
     const recipients = initializeShareRecipients();
     const formatInput = document.getElementById('shareFormat');
+    const messageInput = document.getElementById('shareCustomMessage');
     const sendButton = document.getElementById('sendShareBtn');
 
     if (!recipients || !formatInput || !sendButton) {
@@ -963,6 +979,12 @@ export async function sendMap(event) {
 
     const recipientEmails = recipients.getRecipients();
     if (!recipientEmails) return false;
+    const normalizedMessage = normalizeShareCustomMessage(messageInput?.value ?? '');
+    if (normalizedMessage.length > SHARE_CUSTOM_MESSAGE_LIMIT) {
+        setShareFeedback(SHARE_CUSTOM_MESSAGE_TOO_LONG, 'warning');
+        return false;
+    }
+    const customMessage = normalizedMessage.trim();
     shareState.recipientEmails = recipientEmails;
     shareState.selectedFormat = formatInput.value;
     shareState.success = false;
@@ -980,7 +1002,8 @@ export async function sendMap(event) {
             body: JSON.stringify({
                 recipientEmails,
                 format,
-                imageData
+                imageData,
+                ...(customMessage && { customMessage })
             })
         });
 
@@ -993,6 +1016,10 @@ export async function sendMap(event) {
 
         const delivery = getShareDeliveryResult(response, result, recipientEmails);
         recipients.removeDelivered(delivery.delivered);
+        if (delivery.success && messageInput) {
+            messageInput.value = '';
+            updateShareMessageCount(messageInput);
+        }
         setShareResult({ success: delivery.success, message: delivery.message });
         return delivery.success;
     } catch (error) {
@@ -1008,6 +1035,8 @@ export function setSharePending(isPending) {
     shareRecipients?.setDisabled(shareState.pending);
     const formatInput = document.getElementById('shareFormat');
     if (formatInput) formatInput.disabled = shareState.pending;
+    const messageInput = document.getElementById('shareCustomMessage');
+    if (messageInput) messageInput.disabled = shareState.pending;
     const sendButton = document.getElementById('sendShareBtn');
     if (!sendButton) {
         return;

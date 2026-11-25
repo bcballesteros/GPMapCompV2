@@ -3,6 +3,7 @@
 <div id="exportModal"><div id="mapPreviewContainer" class="export-preview-shell export-preview-shell-centered" style="width:600px;height:400px"><div id="mapPreviewMap" class="export-preview-map"></div><div id="mapPreviewPlaceholder"></div></div></div>
 <div id="shareModal"><div id="sharePreviewContainer" class="export-preview-shell share-preview-shell"><div id="sharePreviewMap" class="export-preview-map"></div><div id="sharePreviewPlaceholder"></div></div></div>
 <div id="recipientChips"><input id="recipientEmail"></div><select id="shareFormat"><option>png</option><option>jpeg</option><option>pdf</option></select><button id="sendShareBtn"></button><div id="shareFeedback"></div><div id="toastContainer"></div>
+<textarea id="shareCustomMessage" maxlength="500"></textarea>
 <script>window.fixtureReady = new Promise(resolve => { window.resolveFixture = resolve; });</script>
 <script type="module">
 import ol from '/src/lib/ol.js';
@@ -180,10 +181,12 @@ window.resolveFixture(async () => {
         }
         report('Export PNG, JPEG and PDF encode the complete common composition');
         const originalFetch=window.fetch;let requests=0;
+        const remarks='Please review these mapped areas.\nSalamat!';
         try {
             window.fetch=async(url,options)=>{
                 check(url==='/api/share','Only Share API intercepted');const body=JSON.parse(options.body);
                 check(body.recipientEmails.length===2,'Multiple recipients retained');
+                check(body.customMessage===remarks,'Remarks travel separately from the map output');
                 const bytes=Uint8Array.from(atob(body.imageData),c=>c.charCodeAt(0));
                 const blob=new Blob([bytes]),decoded=await decodeOutput(blob,body.format);
                 check(await digest(blob)===exportedHashes.get(body.format),'Share artifact bytes match equivalent Export');
@@ -192,6 +195,7 @@ window.resolveFixture(async () => {
             };
             for(const format of ['png','jpeg','pdf']) {
                 document.getElementById('recipientEmail').value='first@example.test;second@example.test';
+                document.getElementById('shareCustomMessage').value=remarks;
                 document.getElementById('shareFormat').value=format;check(await sendMap(),`Share ${format}`);
             }
             check(requests===3,'All Share formats sent');
