@@ -85,6 +85,21 @@ Use visual emphasis only where it communicates hierarchy or state.
 
 GPMapCompV2 uses Inter as its primary interface font.
 
+Use the shared typography variables in `src/styles/main.css` for application UI, choosing a size by component purpose:
+
+| Token | Size | Typical use |
+| --- | ---: | --- |
+| `--font-size-xs` | 11px | Compact metadata only |
+| `--font-size-sm` | 12px | Supporting text and labels |
+| `--font-size-base` | 13px | Standard interface text and actions |
+| `--font-size-md` | 14px | Form controls and tool section titles |
+| `--font-size-lg` | 16px | Application and sidebar titles |
+| `--font-size-xl` | 18px | Modal titles |
+
+Apply tokens selectively to scoped components; do not set a global root or body font size to enforce the scale. Preserve intentionally larger values such as measurement results and legitimate compact metadata. Keep mobile text inputs and selectors at 16px where their responsive overrides prevent browser zoom. Keep placeholders the same size and weight as their controls, with enough contrast to remain distinguishable from entered text. Target WCAG AA contrast (4.5:1 for ordinary text) against the rendered surface.
+
+Use `--system-navy` (`#0b1421`) for the navbar base and Smart Help header. The navbar may retain its existing subtle overlay; Smart Help should match its underlying base navy. Keep icon-tile and tool ownership colors distinct and preserve the established palette.
+
 Preserve the established typography hierarchy.
 
 General guidance:

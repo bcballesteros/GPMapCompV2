@@ -61,13 +61,22 @@
     --system-advanced-rgb: 67, 56, 202;
     --system-settings: #be123c;
     --system-settings-rgb: 190, 18, 60;
-    --smart-help-header: #1f3a5f;
-    --smart-help-icon-tile: #31527a;
+    --smart-help-header: var(--system-navy);
+    --smart-help-icon-tile: #26364a;
     --smart-help-icon: #ffffff;
     --smart-help-surface: #f7fafc;
     --smart-help-border: #cbd5e1;
     --smart-help-primary: #1e293b;
     --smart-help-secondary: #475569;
+    --system-navy: #0b1421;
+
+    /* Application interface typography; apply by component purpose, not globally. */
+    --font-size-xs: 11px;
+    --font-size-sm: 12px;
+    --font-size-base: 13px;
+    --font-size-md: 14px;
+    --font-size-lg: 16px;
+    --font-size-xl: 18px;
     
     /* Spacing system (8px base) */
     --spacing-1: 4px;
@@ -136,7 +145,7 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
     isolation: isolate;
     background:
         linear-gradient(180deg, rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0)),
-        #0b1421;
+        var(--system-navy);
     border-bottom: 1px solid rgba(148, 163, 184, 0.14);
     box-shadow:
         0 1px 0 rgba(255, 255, 255, 0.055) inset,
@@ -198,7 +207,7 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
     text-decoration: none;
     color: white;
     font-weight: 800;
-    font-size: 15px;
+    font-size: var(--font-size-lg);
     white-space: nowrap;
     letter-spacing: -0.2px;
     transition: background 0.2s ease, box-shadow 0.2s ease;
@@ -240,7 +249,7 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
 
 .app-title {
     min-width: 0;
-    font-size: 15px;
+    font-size: var(--font-size-lg);
     font-weight: 700;
     color: rgba(255, 255, 255, 0.98);
     letter-spacing: 0;
@@ -277,11 +286,11 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    font-size: 10px;
-    color: rgba(255, 255, 255, 0.72);
-    font-weight: 700;
+    font-size: var(--font-size-sm);
+    color: rgba(255, 255, 255, 0.88);
+    font-weight: 600;
     text-transform: none;
-    letter-spacing: 0.55px;
+    letter-spacing: 0.15px;
     white-space: nowrap;
 }
 
@@ -315,14 +324,14 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
     border: none;
     background: transparent;
     color: rgba(255, 255, 255, 0.98);
-    font-size: 13px;
+    font-size: var(--font-size-md);
     font-weight: 500;
     line-height: 1.2;
     padding: 0 8px 0 0;
 }
 
 .location-search-input::placeholder {
-    color: rgba(255, 255, 255, 0.42);
+    color: rgba(255, 255, 255, 0.72);
 }
 
 .location-search-input:focus {
@@ -407,11 +416,11 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    font-size: 10px;
-    color: rgba(255, 255, 255, 0.66);
-    font-weight: 700;
+    font-size: var(--font-size-sm);
+    color: rgba(255, 255, 255, 0.88);
+    font-weight: 600;
     text-transform: none;
-    letter-spacing: 0.55px;
+    letter-spacing: 0.15px;
     white-space: nowrap;
 }
 
@@ -426,7 +435,7 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
     border-radius: var(--nav-control-radius);
     background: var(--nav-control-bg);
     color: rgba(255, 255, 255, 0.88);
-    font-size: 12px;
+    font-size: var(--font-size-md);
     font-weight: 500;
     line-height: 1.2;
     cursor: pointer;
@@ -536,6 +545,10 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
     color: rgba(255, 255, 255, 0.88);
     border-color: rgba(255, 255, 255, 0.1);
     box-shadow: none;
+}
+
+.navbar .nav-actions .btn {
+    font-size: var(--font-size-base);
 }
 
 .btn-share:hover {
@@ -723,7 +736,7 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
 }
 
 .sidebar-title {
-    font-size: 15px;
+    font-size: var(--font-size-lg);
     font-weight: 700;
     color: var(--gray-900);
     margin-bottom: var(--spacing-4);
@@ -1034,7 +1047,7 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
 .layer-rename-actions .btn {
     min-height: 34px;
     padding: 8px 12px;
-    font-size: 11px;
+    font-size: var(--font-size-sm);
 }
 
 .layer-actions-item {
@@ -2402,10 +2415,10 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
 }
 
 .right-sidebar-title {
-    font-size: 15px;
+    font-size: var(--font-size-lg);
     font-weight: 700;
     color: var(--gray-900);
-    margin-bottom: var(--spacing-2);
+    margin-bottom: 6px;
     letter-spacing: 0.5px;
     display: flex;
     align-items: center;
@@ -3205,7 +3218,7 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
 }
 
 .annotation-edit-label {
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     font-weight: 700;
     color: var(--gray-700);
 }
@@ -3623,7 +3636,7 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
     margin: 0;
     padding: 0 0 0 37px;
     color: var(--gray-600);
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     font-weight: 600;
     line-height: 1.45;
     letter-spacing: 0;
@@ -3658,7 +3671,7 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
     background: #ffffff;
     color: var(--gray-800);
     box-shadow: none;
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     font-weight: 750;
     line-height: 1.2;
     transform: none;
@@ -4157,7 +4170,7 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
 .smart-help-panel {
     flex: 0 0 auto;
     min-width: 0;
-    margin: 10px 12px 12px;
+    margin: 8px 12px 10px;
     border: 1px solid var(--smart-help-border);
     border-radius: 11px;
     background: var(--smart-help-surface);
@@ -4193,7 +4206,7 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
 .smart-help-message {
     padding: 7px 10px 8px;
     color: var(--smart-help-secondary);
-    font-size: 12px;
+    font-size: var(--font-size-base);
     line-height: 1.5;
     overflow-wrap: anywhere;
 }
@@ -4233,16 +4246,16 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
 }
 
 .map-status-label {
-    font-size: 10px;
+    font-size: var(--font-size-xs);
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.7px;
-    color: var(--gray-400);
+    color: var(--gray-600);
     white-space: nowrap;
 }
 
 .map-status-value {
-    font-size: 11px;
+    font-size: var(--font-size-xs);
     font-weight: 700;
     color: var(--gray-800);
     white-space: nowrap;
@@ -5173,7 +5186,7 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
     background: transparent;
     padding: 3px 0;
     font: inherit;
-    font-size: 12px;
+    font-size: 13px;
     outline: none;
 }
 
@@ -5233,6 +5246,7 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
 
 .share-format-group .form-input {
     min-height: 40px;
+    font-size: 13px;
 }
 
 .share-select-wrapper {
@@ -5260,6 +5274,28 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
     color: var(--gray-500);
     font-size: 12px;
     line-height: 1.4;
+}
+
+.share-modal .form-input,
+.share-modal .recipient-chips > input,
+.share-modal .share-message-group textarea {
+    font-size: 13px;
+}
+
+.share-modal .form-input::placeholder,
+.share-modal .recipient-chips > input::placeholder {
+    color: var(--gray-500);
+    font-size: inherit;
+    font-weight: 400;
+    opacity: 1;
+}
+
+.share-modal .recipient-chip {
+    font-size: 12px;
+}
+
+.share-modal .share-message-count {
+    font-size: 12px;
 }
 
 .share-message-group {
@@ -5575,6 +5611,25 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
     .location-search {
         width: min(100%, 340px);
     }
+}
+
+/* Keep the three established navbar groups within their tracks at compact desktop widths. */
+@media (min-width: 1025px) and (max-width: 1160px) {
+    .navbar {
+        grid-template-columns: minmax(180px, 0.8fr) minmax(220px, 1fr) minmax(400px, 1.35fr);
+        column-gap: 10px;
+        padding-inline: 12px;
+    }
+
+    .basemap-selector select {
+        width: 170px;
+        max-width: 170px;
+        flex-basis: 170px;
+    }
+
+    .navbar-right { gap: 8px; }
+    .basemap-selector { gap: 5px; }
+    .nav-actions { gap: 5px; }
 }
 
 @media (max-width: 520px) {
