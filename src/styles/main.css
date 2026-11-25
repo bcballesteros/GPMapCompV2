@@ -192,6 +192,7 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
     align-items: center;
     justify-content: flex-end;
     gap: 12px;
+    width: 100%;
     min-width: 0;
     justify-self: end;
 }
@@ -397,6 +398,7 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
     display: flex;
     align-items: center;
     gap: 7px;
+    flex: 0 1 auto;
     min-width: 0;
     padding: 4px 6px 4px 9px;
     border: 1px solid var(--nav-surface-border);
@@ -5597,7 +5599,7 @@ h5 { font-size: 14px; font-weight: 600; line-height: 1.4; }
     }
 
     .navbar {
-        grid-template-columns: minmax(220px, 1fr) minmax(260px, 360px) minmax(280px, 1fr);
+        grid-template-columns: minmax(220px, 0.9fr) minmax(260px, 360px) minmax(280px, 1.1fr);
     }
 
     .app-title-full {
