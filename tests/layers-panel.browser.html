@@ -1,21 +1,23 @@
 <!doctype html>
-<html><head><meta charset="utf-8"><link rel="stylesheet" href="/src/styles/main.css"></head>
-<body><aside class="sidebar-left"><div class="sidebar-main"><div class="sidebar-content"><div id="layerList" class="layer-list"><div class="empty-state">No layers in this workspace</div></div></div></div></aside>
+<html><head><meta charset="utf-8"><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"><link rel="stylesheet" href="/src/styles/main.css"></head>
+<body><aside class="sidebar-left"><div class="sidebar-main"><div class="sidebar-content"><div id="layerList" class="layer-list"><div class="empty-state">No layers in this workspace</div></div></div></div></aside><div id="toastContainer" class="toast-container" role="status"></div>
 <script type="module">
 import ol from '/src/lib/ol.js';
 import { setMap, getLayerRecord, setLayerRecord, getState } from '/src/state/store.js';
 import { addVectorLayer, addWmsLayer, ensureAnnotationLayer, changeBasemapLayer } from '/src/map/layer-manager.js';
-import { addLayerItem, removeLayerItem } from '/src/ui/layers-panel.js';
+import { addLayerItem, removeLayer, removeLayerItem } from '/src/ui/layers-panel.js';
 import { applyOverlayOrder, eligibleOverlays } from '/src/map/overlay-order.js';
 import { topToBottomLayers } from '/src/utils/layer-list-layout.js';
 import { captureOutputLegend } from '/src/services/output-legend.js';
 const assert = (value, message) => { if (!value) throw Error(message); };
 const tick = () => new Promise(resolve => setTimeout(resolve, 30));
+const afterFrames = () => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
 const cards = () => [...document.querySelectorAll('.map-layer-list > .layer-item')];
 const names = () => cards().map(card => card.querySelector('.layer-name').textContent);
 const order = expected => assert(JSON.stringify(names()) === JSON.stringify(expected), 'order: ' + names());
 const map = new ol.Map({ controls: [], interactions: [], view: new ol.View({ center: [0,0], zoom: 4 }) });
 setMap(map);
+window.removeLayer = removeLayer;
 const addVector = name => {
     const feature = new ol.Feature(new ol.geom.Point([0,0]));
     const record = addVectorLayer(name, '#2563eb', { type: 'FeatureCollection', features: [{ geometry: { type: 'Point' } }] }, [feature]);
@@ -350,6 +352,102 @@ window.fixtureReady = Promise.resolve(async () => {
         assert(!document.querySelector('.layer-name-tooltip.visible') && !removedLabel.hasAttribute('aria-describedby'), 'removed focused layer clears tooltip');
         for (const name of names()) removeLayerItem(name);
         assert(document.querySelector('.empty-state') && !document.querySelector('.map-layer-list, .map-layers-heading'), 'restored empty state');
+        return true;
+    };
+    window.prepareMenuRemoval = () => {
+        const target = addVector('Menu removal target');
+        const wms = service('WMS removal target', false, 104);
+        const geoportal = service('Geoportal removal target', true, 105);
+        const card = cards().find(item => item.querySelector('.layer-name').textContent === 'Menu removal target');
+        card.querySelector('.layer-item-header').click();
+        const trigger = card.querySelector('.layer-actions-trigger');
+        const expandedRemove = card.querySelector('.layer-action-btn.danger');
+        assert(expandedRemove && expandedRemove.querySelector('.fa-trash'), 'existing expanded Remove button remains');
+        trigger.click();
+        const menu = document.querySelector('[data-layer-floating-root] .layer-actions-dropdown');
+        const actions = [...menu.querySelectorAll('.layer-actions-item')];
+        assert(JSON.stringify(actions.map(item => item.textContent.trim())) === JSON.stringify(['Zoom to Layer', 'Rename', 'Remove Layer']), 'menu action order');
+        const removeAction = actions[2];
+        assert(!removeAction.querySelector('i') && getComputedStyle(removeAction).color === getComputedStyle(card.querySelector('.layer-action-btn.danger')).color, 'plain red destructive label without icon');
+        actions[1].click();
+        const renamedName = 'Renamed <b>vector</b>';
+        document.querySelector('.layer-rename-input').value = renamedName;
+        document.querySelector('.layer-rename-save').click();
+        assert(getLayerRecord(renamedName) === target && card.querySelector('.layer-name').textContent === renamedName, 'rename updates the current display name');
+        trigger.click();
+        const renamedRemoveAction = document.querySelector('[data-layer-floating-root] [data-action="remove"]');
+        assert(renamedRemoveAction.textContent.trim() === 'Remove Layer' && !renamedRemoveAction.querySelector('i'), 'renamed layer menu action remains icon free');
+        renamedRemoveAction.focus();
+        assert(document.activeElement === renamedRemoveAction, 'Remove Layer menu item accepts keyboard focus');
+        window.menuRemovalFixture = { target, wms, geoportal, card, trigger, renamedName };
+        return true;
+    };
+    window.testMenuRemoval = async () => {
+        const { target, wms, geoportal, card, trigger, renamedName } = window.menuRemovalFixture;
+        assert(!trigger.closest('.layer-actions-menu').matches('[data-open="true"]'), 'menu closes on selection');
+        assert(document.querySelector('#confirmationModal.active'), 'confirmation opens');
+        document.querySelector('#confirmationModal [data-confirmation-cancel]').click();
+        await new Promise(resolve => setTimeout(resolve, 250));
+        assert(getLayerRecord(renamedName)?.layer === target.layer && card.isConnected, 'cancel preserves renamed target');
+        assert(getState().currentLayerName === renamedName && wms.layer.getVisible() && geoportal.layer.getVisible(), 'cancel preserves selected and unrelated state');
+        assert(document.querySelectorAll('#toastContainer .toast').length === 0, 'cancel does not show a success toast');
+        trigger.click();
+        document.querySelector('[data-layer-floating-root] [data-action="remove"]').click();
+        await afterFrames();
+        assert(document.querySelector('#confirmationModal.visible'), 'menu confirmation becomes visible');
+        document.querySelector('#confirmationModal #confirmationDialogConfirm').click();
+        await tick();
+        assert(!getLayerRecord(renamedName) && !map.getLayers().getArray().includes(target.layer), 'confirm removes target map layer and record');
+        assert(!card.isConnected && document.querySelector('.layer-item.active') === null, 'confirm removes panel entry and clears selection');
+        const toasts = () => [...document.querySelectorAll('#toastContainer .toast')];
+        assert(toasts().length === 1, 'menu confirmation produces exactly one success toast');
+        assert(toasts()[0].querySelector('.toast-title').textContent === 'Layer Removed' && toasts()[0].querySelector('.toast-message').textContent === '"Renamed <b>vector</b>" has been removed successfully.', 'menu toast uses updated name as safe text');
+        assert(toasts()[0].classList.contains('success') && toasts()[0].querySelector('.fa-check-circle'), 'toast uses existing success appearance');
+        assert(!captureOutputLegend(map, getState().uploadedLayers).some(group => group.identity === renamedName), 'removed layer is absent from generated output legend');
+        return true;
+    };
+    window.testServiceRemovalToasts = async () => {
+        const { wms, geoportal } = window.menuRemovalFixture;
+        const toasts = () => [...document.querySelectorAll('#toastContainer .toast')];
+        const wmsCard = cards().find(item => item.querySelector('.layer-name').textContent === 'WMS removal target');
+        wmsCard.querySelector('.layer-expand-btn').click();
+        assert(wmsCard.querySelector('.layer-action-btn.danger .fa-trash'), 'expanded Remove retains its trash icon');
+        wmsCard.querySelector('.layer-action-btn.danger').click();
+        assert(document.querySelector('#confirmationModal.active'), 'expanded Remove uses same confirmation');
+        await afterFrames();
+        document.querySelector('#confirmationModal [data-confirmation-cancel]').click();
+        await new Promise(resolve => setTimeout(resolve, 250));
+        assert(getLayerRecord('WMS removal target')?.layer === wms.layer && wmsCard.isConnected, 'expanded Remove cancellation preserves layer');
+        assert(toasts().length === 1, 'expanded Remove cancellation does not add a toast');
+        wmsCard.querySelector('.layer-action-btn.danger').click();
+        await afterFrames();
+        document.querySelector('#confirmationModal #confirmationDialogConfirm').click();
+        await tick();
+        assert(!getLayerRecord('WMS removal target') && !map.getLayers().getArray().includes(wms.layer) && !wmsCard.isConnected, 'expanded Remove confirms through the shared handler');
+        assert(toasts().length === 2 && toasts()[1].querySelector('.toast-message').textContent === '"WMS removal target" has been removed successfully.', 'expanded WMS removal creates one correctly named toast');
+        const geoportalCard = cards().find(item => item.querySelector('.layer-name').textContent === 'Geoportal removal target');
+        geoportalCard.querySelector('.layer-actions-trigger').click();
+        document.querySelector('[data-layer-floating-root] [data-action="remove"]').click();
+        await afterFrames();
+        document.querySelector('#confirmationModal #confirmationDialogConfirm').click();
+        await tick();
+        assert(!getLayerRecord('Geoportal removal target') && !map.getLayers().getArray().includes(geoportal.layer), 'menu removal works for Geoportal service layers');
+        assert(toasts().length === 3 && toasts()[2].querySelector('.toast-message').textContent === '"Geoportal removal target" has been removed successfully.', 'Geoportal removal creates one correctly named toast');
+        const failed = addVector('Failed removal target');
+        const failedCard = cards().find(item => item.querySelector('.layer-name').textContent === 'Failed removal target');
+        const originalRemoveLayer = map.removeLayer.bind(map);
+        map.removeLayer = layer => {
+            if (layer === failed.layer) throw new Error('Simulated removal failure');
+            return originalRemoveLayer(layer);
+        };
+        const attemptedRemoval = removeLayer({ stopPropagation() {} }, failedCard);
+        await afterFrames();
+        document.querySelector('#confirmationModal #confirmationDialogConfirm').click();
+        let rejected = false;
+        try { await attemptedRemoval; } catch { rejected = true; }
+        map.removeLayer = originalRemoveLayer;
+        assert(rejected && getLayerRecord('Failed removal target')?.layer === failed.layer && failedCard.isConnected, 'failed removal preserves layer state');
+        assert(toasts().length === 3, 'failed removal does not add a success toast');
         return true;
     };
     window.showDropFeedback = async () => {

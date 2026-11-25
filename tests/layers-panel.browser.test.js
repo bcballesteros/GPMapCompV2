@@ -109,6 +109,27 @@ test('unified Layers panel preserves map order, controls, names and lifecycle', 
                     }
                     const finish = await call('Runtime.evaluate', { expression: 'window.finish()', returnByValue: true });
                     assert.equal(finish.result.value, true);
+                    const prepared = await call('Runtime.evaluate', { expression: 'window.prepareMenuRemoval()', returnByValue: true });
+                    assert.equal(prepared.result.value, true);
+                    if (process.env.LAYERS_SCREENSHOT_PATH) {
+                        const desktopMenu = await call('Page.captureScreenshot', { format: 'png' });
+                        await writeFile(process.env.LAYERS_SCREENSHOT_PATH + '.menu-desktop.png', Buffer.from(desktopMenu.data, 'base64'));
+                        await call('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+                        const mobileMenu = await call('Page.captureScreenshot', { format: 'png' });
+                        await writeFile(process.env.LAYERS_SCREENSHOT_PATH + '.menu-mobile.png', Buffer.from(mobileMenu.data, 'base64'));
+                        await call('Emulation.setDeviceMetricsOverride', { width: 1366, height: 900, deviceScaleFactor: 1, mobile: false });
+                    }
+                    await call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', text: '\r', windowsVirtualKeyCode: 13 });
+                    await call('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
+                    const removal = await call('Runtime.evaluate', { expression: 'window.testMenuRemoval()', awaitPromise: true, returnByValue: true });
+                    assert.equal(removal.result.value, true);
+                    if (process.env.LAYERS_SCREENSHOT_PATH) {
+                        await new Promise(resolve => setTimeout(resolve, 300));
+                        const successToast = await call('Page.captureScreenshot', { format: 'png' });
+                        await writeFile(process.env.LAYERS_SCREENSHOT_PATH + '.removed-toast-desktop.png', Buffer.from(successToast.data, 'base64'));
+                    }
+                    const serviceRemoval = await call('Runtime.evaluate', { expression: 'window.testServiceRemovalToasts()', awaitPromise: true, returnByValue: true });
+                    assert.equal(serviceRemoval.result.value, true);
                     return evaluation.result.value;
                 }
                 await new Promise(resolve => setTimeout(resolve, 50));

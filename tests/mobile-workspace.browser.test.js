@@ -204,10 +204,45 @@ test('responsive workspace preserves the map and exposes GIS workflows on phones
             assert.equal(await evaluate("document.querySelector('.is-drawer-open').id"), 'layersSidebar');
             await tap('.layer-item .layer-actions-trigger');
             assert.equal(await evaluate("Boolean(document.querySelector('#layersSidebar [data-layer-floating-root] .layer-actions-dropdown'))"), true);
+            assert.equal(await evaluate(`(() => {
+                const action = document.querySelector('#layersSidebar [data-layer-floating-root] [data-action="remove"]');
+                const rect = action?.getBoundingClientRect();
+                return action?.textContent.trim() === 'Remove Layer' && action.querySelector('i') === null && rect.width > 0 && rect.bottom <= innerHeight;
+            })()`), true);
+            await screenshot('layer-actions-menu-mobile-390x844');
             await key('Escape');
             assert.equal(await evaluate("Boolean(document.querySelector('[data-layer-floating-root] .layer-actions-dropdown'))"), false);
+            const menuRemovalName = await evaluate(`(() => {
+                const card = document.querySelector('.layer-item');
+                window.mobileMenuRemovalName = card.querySelector('.layer-name').textContent;
+                card.querySelector('.layer-actions-trigger').click();
+                document.querySelector('[data-layer-floating-root] [data-action="remove"]').click();
+                return window.mobileMenuRemovalName;
+            })()`);
+            await waitFor("() => document.querySelector('#confirmationModal.visible')");
+            await click('#confirmationModal [data-confirmation-cancel]');
+            await waitFor("() => !document.querySelector('#confirmationModal.active')");
+            assert.equal(await evaluate("document.querySelectorAll('#toastContainer .toast.success').length"), 0);
+            await click('.layer-item .layer-actions-trigger');
+            await click('[data-layer-floating-root] [data-action="remove"]');
+            await waitFor("() => document.querySelector('#confirmationModal.visible')");
+            await click('#confirmationModal #confirmationDialogConfirm');
+            await waitFor("() => !document.querySelector('#confirmationModal.active')");
+            await waitFor("() => document.querySelector('#toastContainer .toast.success .toast-title')?.textContent === 'Layer Removed'");
+            assert.equal(await evaluate(`(() => {
+                const toast = [...document.querySelectorAll('#toastContainer .toast.success')].find(item => item.querySelector('.toast-title')?.textContent === 'Layer Removed');
+                return toast?.querySelector('.toast-message').textContent === '"' + window.mobileMenuRemovalName + '" has been removed successfully.';
+            })()`), true);
+            assert.equal(await evaluate("document.querySelectorAll('#toastContainer .toast.success .toast-title').length"), 1);
+            await screenshot('layer-removed-toast-mobile-390x844');
+            await waitFor("() => document.querySelectorAll('#toastContainer .toast.success .toast-title').length === 0");
+            await evaluate("document.querySelector('.layer-item .layer-item-header').click()");
             await tap(layers);
             await screenshot('layers-390x844');
+            await evaluate(`(() => {
+                const card = document.querySelector('.layer-item');
+                if (card.classList.contains('collapsed')) card.querySelector('.layer-expand-btn').click();
+            })()`);
             await scrollTap('.layer-item .layer-action-btn.danger');
             await waitFor("() => document.querySelector('#confirmationModal.visible')");
             const layerCount = await evaluate("document.querySelectorAll('.layer-item').length");

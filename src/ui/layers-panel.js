@@ -185,7 +185,8 @@ function getEmptyStateMarkup() {
 
 const LAYER_ACTIONS = [
     { id: 'zoom', label: 'Zoom to Layer' },
-    { id: 'rename', label: 'Rename' }
+    { id: 'rename', label: 'Rename' },
+    { id: 'remove', label: 'Remove Layer', destructive: true }
 ];
 
 // Record identity survives display-name changes; moving cards preserves controls.
@@ -287,7 +288,8 @@ function getLayerActionsMenuMarkup(safeName, options = {}) {
                 ? ` title="${escapeHtml(options.zoomDisabledReason)}"`
                 : '';
 
-            return `<button type="button" class="layer-actions-item" data-action="${action.id}" role="menuitem"${isDisabled ? ' disabled aria-disabled="true"' : ''}${title}>${action.label}</button>`;
+            const className = action.destructive ? ' layer-actions-item-danger' : '';
+            return `<button type="button" class="layer-actions-item${className}" data-action="${action.id}" role="menuitem"${isDisabled ? ' disabled aria-disabled="true"' : ''}${title}>${action.label}</button>`;
         })
         .join('');
 
@@ -849,6 +851,7 @@ export function addLayerItem(name, color, featureCount, options = {}) {
     let polygonStyleControls = '';
     let lineWidthControl = '';
     let pointSizeControl = '';
+    let pointStrokeControls = '';
     let opacityLabel = 'Opacity';
 
     if (isWms) {
@@ -927,37 +930,25 @@ export function addLayerItem(name, color, featureCount, options = {}) {
                     <div class="svg-marker-gallery"></div>
                 </div>
 
-                <div class="marker-stroke-section">
-                    <div class="marker-stroke-toggle">
-                        <label class="checkbox-label">
-                            <input type="checkbox" class="marker-stroke-enabled" ${markerStrokeEnabled ? 'checked' : ''}>
-                            <span>Add Stroke</span>
+            </div>
+        `;
+        pointStrokeControls = `
+            <div class="marker-stroke-section">
+                <div class="control-row polygon-stroke-toggle-row marker-stroke-toggle-row"><label><span>Show Stroke</span><input type="checkbox" class="marker-stroke-enabled" aria-label="Show Stroke" ${markerStrokeEnabled ? 'checked' : ''}></label></div>
+                <div class="marker-stroke-controls">
+                    <div class="control-row">
+                        <label>
+                            <span>Stroke Color</span>
+                            ${colorSwatchMarkup('markerStrokeColor', 'Stroke Color', markerStrokeColor, 'color-picker polygon-stroke-picker')}
                         </label>
                     </div>
-                    <div class="marker-stroke-controls" style="display: ${markerStrokeEnabled ? 'block' : 'none'};">
-                        <div class="marker-stroke-color-row">
-                            <label>
-                                <span class="marker-stroke-color-label">Stroke Color</span>
-                                ${colorSwatchMarkup('markerStrokeColor', 'Stroke Color', markerStrokeColor, 'marker-stroke-color-picker')}
-                            </label>
+                    <div class="control-row control-row-stack polygon-width-row marker-stroke-width-row">
+                        <div class="transparency-header">
+                            <span class="control-label">Stroke Width</span>
+                            <span class="polygon-width-value marker-stroke-width-value">${markerStrokeWidth}px</span>
                         </div>
-                        <div class="marker-stroke-width-row">
-                            <div class="transparency-header">
-                                <span class="control-label">Stroke Width</span>
-                                <span class="marker-stroke-width-value">${markerStrokeWidth}px</span>
-                            </div>
-                            <div class="transparency-control">
-                                <input
-                                    type="range"
-                                    class="marker-stroke-width-slider"
-                                    min="0"
-                                    max="4"
-                                    step="1"
-                                    value="${markerStrokeWidth}"
-                                    title="Stroke Width"
-                                    aria-label="Stroke Width"
-                                >
-                            </div>
+                        <div class="transparency-control">
+                            <input type="range" class="polygon-width-slider marker-stroke-width-slider" min="0" max="4" step="1" value="${markerStrokeWidth}" title="Stroke Width" aria-label="Stroke Width">
                         </div>
                     </div>
                 </div>
@@ -1063,6 +1054,7 @@ export function addLayerItem(name, color, featureCount, options = {}) {
                     ${colorControl}
                     ${polygonStyleControls}
                     ${lineWidthControl}
+                    ${pointStrokeControls}
                     ${pointSizeControl}
                     ${(isPointLayer || isLineLayer) ? '</fieldset>' : ''}
                     <div class="control-row control-row-stack">
@@ -1317,6 +1309,8 @@ export function addLayerItem(name, color, featureCount, options = {}) {
                     zoomToLayerFromItem(newItem);
                 } else if (action === 'rename') {
                     renameLayerFromItem(newItem);
+                } else if (action === 'remove') {
+                    void removeLayer(event, newItem);
                 }
 
                 closeLayerActionMenus();
@@ -1580,17 +1574,14 @@ function syncMarkerTypeWidgets(record, layerItem) {
 
     // Keep stroke controls visible while disabling edits for custom SVG markers.
     const strokeSection = layerItem.querySelector('.marker-stroke-section');
-    const strokeControls = layerItem.querySelector('.marker-stroke-controls');
     const markerStrokeToggle = layerItem.querySelector('.marker-stroke-enabled');
     if (strokeSection) {
         strokeSection.style.display = '';
         strokeSection.querySelectorAll('input,button,select').forEach((el) => {
-            el.disabled = isSvgMode;
-            el.setAttribute('aria-disabled', String(isSvgMode));
+            const disabled = isSvgMode || (el !== markerStrokeToggle && !record.markerStrokeEnabled);
+            el.disabled = disabled;
+            el.setAttribute('aria-disabled', String(disabled));
         });
-        if (strokeControls) {
-            strokeControls.style.display = record.markerStrokeEnabled ? 'block' : 'none';
-        }
         if (markerStrokeToggle) {
             markerStrokeToggle.checked = Boolean(record.markerStrokeEnabled);
         }
@@ -1606,44 +1597,35 @@ function updateMarkerStrokeEnabled(checkbox, layerName, layerItem) {
 
     record.markerStrokeEnabled = checkbox.checked;
 
-    // Show/hide stroke controls
+    // Keep the polygon control arrangement visible and disable its dependent editors.
     const strokeControls = layerItem.querySelector('.marker-stroke-controls');
     if (strokeControls) {
-        if (record.markerStrokeEnabled) {
-            // Create and insert the controls if they don't exist
-            if (!strokeControls.style.display || strokeControls.style.display === 'none') {
-                strokeControls.style.display = 'block';
-            }
-        } else {
-            strokeControls.style.display = 'none';
-        }
+        strokeControls.querySelectorAll('input,button,select').forEach((el) => {
+            el.disabled = !record.markerStrokeEnabled;
+            el.setAttribute('aria-disabled', String(!record.markerStrokeEnabled));
+        });
     } else if (record.markerStrokeEnabled) {
         // If controls don't exist and we need to show them, rebuild the UI
         const strokeSection = layerItem.querySelector('.marker-stroke-section');
         if (strokeSection) {
             strokeSection.innerHTML = `
-                <div class="marker-stroke-toggle">
-                    <label class="checkbox-label">
-                        <input type="checkbox" class="marker-stroke-enabled" checked>
-                        <span>Add stroke</span>
-                    </label>
-                </div>
+                <div class="control-row polygon-stroke-toggle-row marker-stroke-toggle-row"><label><span>Show Stroke</span><input type="checkbox" class="marker-stroke-enabled" aria-label="Show Stroke" checked></label></div>
                 <div class="marker-stroke-controls">
-                    <div class="marker-stroke-color-row">
+                    <div class="control-row">
                         <label>
-                            <span class="marker-stroke-color-label">Stroke Color</span>
-                            ${colorSwatchMarkup('markerStrokeColor', 'Stroke Color', record.markerStrokeColor || record.color, 'marker-stroke-color-picker')}
+                            <span>Stroke Color</span>
+                            ${colorSwatchMarkup('markerStrokeColor', 'Stroke Color', record.markerStrokeColor || record.color, 'color-picker polygon-stroke-picker')}
                         </label>
                     </div>
-                    <div class="marker-stroke-width-row">
+                    <div class="control-row control-row-stack polygon-width-row marker-stroke-width-row">
                         <div class="transparency-header">
                             <span class="control-label">Stroke Width</span>
-                            <span class="marker-stroke-width-value">${record.markerStrokeWidth}px</span>
+                            <span class="polygon-width-value marker-stroke-width-value">${record.markerStrokeWidth}px</span>
                         </div>
                         <div class="transparency-control">
                             <input
                                 type="range"
-                                class="marker-stroke-width-slider"
+                                class="polygon-width-slider marker-stroke-width-slider"
                                 min="0"
                                 max="4"
                                 step="1"
@@ -1672,6 +1654,11 @@ function updateMarkerStrokeEnabled(checkbox, layerName, layerItem) {
                 newWidthSlider.addEventListener('input', () => updateMarkerStrokeWidth(newWidthSlider));
                 newWidthSlider.addEventListener('change', () => updateMarkerStrokeWidth(newWidthSlider));
             }
+
+            strokeSection.querySelectorAll('.marker-stroke-controls input, .marker-stroke-controls button, .marker-stroke-controls select').forEach((el) => {
+                el.disabled = false;
+                el.setAttribute('aria-disabled', 'false');
+            });
         }
     }
 
@@ -1801,10 +1788,10 @@ export function commitLayerOpacity(slider) {
     commitLayerOpacityValue(slider);
 }
 
-export async function removeLayer(event) {
+export async function removeLayer(event, layerItem = null) {
     event.stopPropagation();
 
-    const layerItem = event.target.closest('.layer-item');
+    layerItem ||= event.target.closest('.layer-item');
     const layerName = getLayerItemName(layerItem);
     if (!layerName || !await confirmDestructiveAction({
         title: 'Remove Layer?',
@@ -1814,7 +1801,11 @@ export async function removeLayer(event) {
         return;
     }
 
+    const recordBeforeRemoval = getLayerRecord(layerName);
     removeLayerItem(layerName);
+    if (recordBeforeRemoval && !getLayerRecord(layerName)) {
+        showToast('Layer Removed', `"${escapeHtml(layerName)}" has been removed successfully.`, 'success');
+    }
 }
 
 export function removeLayerItem(layerName) {

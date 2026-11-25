@@ -1,10 +1,11 @@
 <!doctype html>
-<html><head><link rel="stylesheet" href="/src/styles/main.css"></head>
-<body><div id="layerList"></div>
+<html><head><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="/src/styles/main.css"><link rel="stylesheet" href="/src/styles/components.css"></head>
+<body><aside class="sidebar-left"><div class="sidebar-main"><div class="sidebar-content"><div id="layerList" class="layer-list"></div></div></div></aside>
 <script type="module">
 import { addLayerItem } from '/src/ui/layers-panel.js';
 import { setLayerRecord } from '/src/state/store.js';
 import { getManagedLayerLegendDescriptors } from '/src/map/layer-manager.js';
+import MultiPoint from '/node_modules/ol/geom/MultiPoint.js';
 import ol from '/src/lib/ol.js';
 
 const assert = (condition, message) => { if (!condition) throw new Error(message); };
@@ -34,6 +35,12 @@ window.fixtureReady = Promise.resolve(async () => {
     record.layer = new ol.layer.Vector({ source: record.source });
     setLayerRecord('Marker Test', record);
     addLayerItem('Marker Test', record.color, 1);
+    const unrelatedRecord = { isPointLayer: true, geometryType: 'Point', color: '#AA0000', opacity: 1,
+        pointSize: 5, markerPresetType: 'circle', markerStrokeEnabled: false, markerStrokeColor: '#BB0000', markerStrokeWidth: 1,
+        features: [], source: new ol.source.Vector() };
+    unrelatedRecord.layer = new ol.layer.Vector({ source: unrelatedRecord.source });
+    setLayerRecord('Unrelated Points', unrelatedRecord);
+    addLayerItem('Unrelated Points', unrelatedRecord.color, 0);
     const item = document.querySelector('.layer-item');
     const pointColor = item.querySelector('[data-vector-color="color"]');
     const stroke = item.querySelector('.marker-stroke-enabled');
@@ -41,7 +48,9 @@ window.fixtureReady = Promise.resolve(async () => {
     const opacity = item.querySelector('.transparency-slider');
     const checkState = (disabled, label) => {
         assert(pointColor.disabled === disabled, `${label}: Point Color state`);
-        assert(stroke.disabled === disabled, `${label}: Add Stroke state`);
+        assert(stroke.disabled === disabled, `${label}: Show Stroke state`);
+        assert(item.querySelector('[data-vector-color="markerStrokeColor"]').disabled === (disabled || !record.markerStrokeEnabled), `${label}: Stroke Color enabled state`);
+        assert(item.querySelector('.marker-stroke-width-slider').disabled === (disabled || !record.markerStrokeEnabled), `${label}: Stroke Width enabled state`);
         assert(pointSize && !pointSize.disabled, `${label}: Point Size remains enabled`);
         assert(opacity && !opacity.disabled, `${label}: Point Opacity remains enabled`);
     };
@@ -59,6 +68,64 @@ window.fixtureReady = Promise.resolve(async () => {
     assert(getManagedLayerLegendDescriptors('Marker Test')[0]?.symbol?.src !== firstSvg, 'Circle preset rendering restored');
     assert(record.color === '#22AA44' && record.markerStrokeEnabled && record.markerStrokeColor === '#123456' && record.markerStrokeWidth === 3,
         'preset styling values are preserved');
+
+    assert(item.querySelector('.marker-stroke-enabled').getAttribute('aria-label') === 'Show Stroke', 'point stroke toggle uses the polygon accessible name');
+    assert(item.querySelector('.marker-stroke-toggle-row').classList.contains('polygon-stroke-toggle-row'), 'point toggle reuses polygon control layout');
+    assert(item.querySelector('.marker-stroke-width-slider').classList.contains('polygon-width-slider'), 'point width slider reuses polygon width layout');
+    const manualRows = [...item.querySelectorAll('.vector-manual-controls .control-row')];
+    const manualRowIndex = selector => manualRows.findIndex(row => row.matches(selector));
+    assert(manualRowIndex('.control-row:has([data-vector-color="color"])') < manualRowIndex('.marker-stroke-toggle-row')
+        && manualRowIndex('.marker-stroke-toggle-row') < manualRowIndex('.marker-stroke-width-row')
+        && manualRowIndex('.marker-stroke-width-row') < manualRowIndex('.point-size-row'), 'point stroke follows point color and precedes point-specific controls');
+    const point = new ol.Feature(new ol.geom.Point([0, 0]));
+    const multiPoint = new ol.Feature(new MultiPoint([[0, 0], [1, 1]]));
+    record.source.addFeatures([point, multiPoint]);
+    const renderedStroke = (feature, color = record.markerStrokeColor) => decodeURIComponent(record.layer.getStyleFunction()(feature)[0].getImage().getSrc()).includes(`stroke="${color}"`);
+    assert(renderedStroke(point) && renderedStroke(multiPoint), 'Point and MultiPoint render configured outline');
+    const legendStroke = () => decodeURIComponent(getManagedLayerLegendDescriptors('Marker Test')[0]?.symbol?.src || '').includes('stroke="#123456"');
+    assert(legendStroke(), 'point legend includes the effective stroke');
+    const strokeToggle = item.querySelector('.marker-stroke-enabled');
+    strokeToggle.click();
+    strokeToggle.dispatchEvent(new Event('change', { bubbles: true }));
+    assert(!record.markerStrokeEnabled && item.querySelector('[data-vector-color="markerStrokeColor"]').disabled && item.querySelector('.marker-stroke-width-slider').disabled,
+        'disabling Show Stroke keeps dependent editors visible and inactive');
+    assert(!renderedStroke(point) && !renderedStroke(multiPoint), 'disabling Show Stroke removes both outlines');
+    assert(!legendStroke(), 'point legend removes the disabled stroke');
+    strokeToggle.click();
+    strokeToggle.dispatchEvent(new Event('change', { bubbles: true }));
+    assert(record.markerStrokeEnabled && record.markerStrokeColor === '#123456' && record.markerStrokeWidth === 3,
+        're-enabling Show Stroke restores color and width settings');
+    assert(renderedStroke(point) && renderedStroke(multiPoint), 're-enabled outline renders on both geometries');
+    item.querySelector('[data-vector-color="markerStrokeColor"]').click();
+    const strokeHex = document.querySelector('.vector-color-hex');
+    strokeHex.value = '#ABCDEF';
+    strokeHex.dispatchEvent(new Event('input', { bubbles: true }));
+    document.querySelector('.vector-color-close').click();
+    const width = item.querySelector('.marker-stroke-width-slider');
+    width.value = '2';
+    width.dispatchEvent(new Event('input', { bubbles: true }));
+    assert(record.markerStrokeColor === '#ABCDEF' && record.markerStrokeWidth === 2, 'stroke color and width controls update manual settings');
+    assert(renderedStroke(point, '#ABCDEF') && renderedStroke(multiPoint, '#ABCDEF'), 'custom stroke color is rendered for Point and MultiPoint');
+    assert(decodeURIComponent(getManagedLayerLegendDescriptors('Marker Test')[0]?.symbol?.src || '').includes('stroke="#ABCDEF"'), 'custom point stroke color updates its legend');
+    assert(!unrelatedRecord.markerStrokeEnabled && unrelatedRecord.markerStrokeColor === '#BB0000' && unrelatedRecord.markerStrokeWidth === 1,
+        'editing one point layer leaves another layer stroke state unchanged');
+    strokeToggle.click();
+    assert(!record.markerStrokeEnabled, 'customized stroke can be disabled');
+    strokeToggle.click();
+    assert(record.markerStrokeEnabled && record.markerStrokeColor === '#ABCDEF' && record.markerStrokeWidth === 2,
+        'custom stroke color and width survive off/on interaction');
+    assert(renderedStroke(point, '#ABCDEF') && renderedStroke(multiPoint, '#ABCDEF'), 're-enabled custom stroke renders for both geometries');
+    item.querySelector('.layer-expand-btn').click();
+    item.querySelector('.layer-expand-btn').click();
+    item.querySelector('.layer-expand-btn').click();
+    assert(strokeToggle.checked && width.value === '2' && item.querySelector('[data-vector-color="markerStrokeColor"]').value === '#ABCDEF',
+        'stroke settings survive layer collapse and expansion');
+    item.querySelector('[data-vector-color="markerStrokeColor"]').click();
+    document.querySelector('.vector-color-hex').value = '#123456';
+    document.querySelector('.vector-color-hex').dispatchEvent(new Event('input', { bubbles: true }));
+    document.querySelector('.vector-color-close').click();
+    width.value = '3';
+    width.dispatchEvent(new Event('input', { bubbles: true }));
 
     item.querySelector('.svg-marker-thumbnail[data-svg-index="0"]').click();
     checkState(true, 'switch back to first SVG');
@@ -80,6 +147,33 @@ window.fixtureReady = Promise.resolve(async () => {
         item.querySelector('.svg-marker-thumbnail[data-svg-index="1"]').click();
         checkState(true, `SVG after ${preset}`);
     }
+    item.querySelector('.marker-type-option[data-value="triangle"]').click();
+    checkState(false, 'manual preset for visual comparison');
+
+    const polygonRecord = { isPolygonLayer: true, features: [], color: '#123456', polygonFillColor: '#123456',
+        polygonStrokeColor: '#123456', polygonStrokeWidth: 3, opacity: 1 };
+    setLayerRecord('Polygon Comparison', polygonRecord);
+    addLayerItem('Polygon Comparison', polygonRecord.color, 0);
+    const polygonItem = [...document.querySelectorAll('.layer-item')].find(layer => layer.dataset.layerName === 'Polygon Comparison');
+    item.classList.remove('collapsed');
+    polygonItem.classList.remove('collapsed');
+    const controlBox = selector => {
+        const element = selector === '.marker-stroke-toggle-row' ? item.querySelector(selector)
+            : selector === '.marker-color' ? item.querySelector('[data-vector-color="markerStrokeColor"]')
+                : selector === '.marker-stroke-width-slider' ? item.querySelector(selector)
+                    : selector === '.polygon-stroke-toggle-row' ? polygonItem.querySelector(selector)
+                        : selector === '.polygon-color' ? polygonItem.querySelector('[data-vector-color="polygonStrokeColor"]')
+                            : polygonItem.querySelector(selector);
+        const rect = element.getBoundingClientRect();
+        const style = getComputedStyle(element);
+        return { width: rect.width, height: rect.height, font: style.font, fontSize: style.fontSize, accentColor: style.accentColor };
+    };
+    assert(JSON.stringify(controlBox('.marker-stroke-toggle-row')) === JSON.stringify(controlBox('.polygon-stroke-toggle-row')),
+        'point and polygon Show Stroke rows have matching rendered geometry and typography');
+    assert(JSON.stringify(controlBox('.marker-color')) === JSON.stringify(controlBox('.polygon-color')),
+        'point and polygon Stroke Color swatches have matching rendered geometry and typography');
+    assert(JSON.stringify(controlBox('.marker-stroke-width-slider')) === JSON.stringify(controlBox('.polygon-width-slider')),
+        'point and polygon Stroke Width sliders have matching rendered geometry and typography');
 
     const removeSvg = async index => {
         item.querySelector(`.svg-marker-thumbnail[data-svg-index="${index}"] .svg-marker-delete`).click();
